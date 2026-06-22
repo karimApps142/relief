@@ -98,18 +98,21 @@ Windows. 07 needs 06. 08 needs 07. 09 (Gradio) needs 03 (+05 for the models pane
 
 ## Progress tracker
 
-- [ ] **00** Scaffold & repo setup
-- [ ] **01** Geometry core (`relief_core.py`)
-- [ ] **02** Backends (`backends.py`)
-- [ ] **03** Pipeline (`pipeline.py`)
-- [ ] **04** FastAPI service (`service.py`)
-- [ ] **05** Model manager + `/models/*` + `auto`
-- [ ] **06** GPU models (`models.py`)  ·  🪟 Windows
-- [ ] **07** Windows run + tuning  ·  🪟 Windows
-- [ ] **08** Docker multi-machine  ·  🪟 Windows
-- [ ] **09** Gradio UI — `app_gradio.py` (optional)
+- [x] **00** Scaffold & repo setup — ✅ verified on Mac, pushed
+- [x] **01** Geometry core (`relief_core.py`) — ✅ 16-bit PNG + watertight STL
+- [x] **02** Backends (`backends.py`) — ✅ no-torch import, lite normals, central `auto`
+- [x] **03** Pipeline (`pipeline.py`) — ✅ end-to-end lite relief
+- [x] **04** FastAPI service (`service.py`) — ✅ live `/health` + `/relief`
+- [x] **05** Model manager + `/models/*` + `auto` — ✅ status + `auto`→lite on Mac
+- [x] **06** GPU models (`models.py`) — 📝 code written + syntax/name-checked; ⏳ GPU import verify on 🪟 Windows
+- [ ] **07** Windows run + tuning  ·  🪟 Windows — not started (needs the 3060)
+- [x] **08** Docker multi-machine — 📝 Dockerfile written; ⏳ build/run verify on 🪟 Windows
+- [x] **09** Gradio UI — `app_gradio.py` — ✅ make_relief + server boot verified (lite)
 - [ ] **10** The moat (later/ongoing)
-- [ ] **A** ComfyUI prototype (optional)
+- [ ] **A** ComfyUI prototype (optional)  ·  🪟 Windows
+
+> Legend: ✅ built **and verified** on this Mac · 📝 code written, ⏳ verification pending on the
+> Windows 3060 · ☐ not started.
 
 ---
 
