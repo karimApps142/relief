@@ -6,7 +6,8 @@ __pycache__/
 /data/
 /outputs/
 /out/
-# generated test artifacts (Part 01 smoke test)
+# generated test artifacts (Part 01 + Part 03 smoke tests)
 test_relief.png
 test_relief.stl
+sample_input.png
 # HF model cache lives in ~/.cache/huggingface — outside the repo by design
