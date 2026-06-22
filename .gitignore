@@ -1,0 +1,9 @@
+.venv/
+venv/
+__pycache__/
+*.pyc
+.DS_Store
+/data/
+/outputs/
+/out/
+# HF model cache lives in ~/.cache/huggingface — outside the repo by design

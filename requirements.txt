@@ -1,0 +1,11 @@
+numpy
+scipy
+opencv-python-headless
+Pillow
+scikit-image
+trimesh
+fastapi
+uvicorn[standard]
+python-multipart
+pydantic
+huggingface_hub          # for the download manager; pulls no torch by itself
