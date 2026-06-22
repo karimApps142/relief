@@ -15,6 +15,9 @@ from PIL import Image
 
 def get_backend(name=None):
     name = name or os.environ.get("RELIEF_BACKEND", "lite")
+    if name == "auto":                          # full if weights present, else lite
+        import model_manager                    # light dep (huggingface_hub), no torch
+        name = "full" if model_manager.models_present() else "lite"
     return FullBackend() if name == "full" else LiteBackend()
 
 

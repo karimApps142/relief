@@ -24,7 +24,15 @@ later on Windows)
   models load.
 
 Select via env var `RELIEF_BACKEND=lite|full` (default `lite`), or pass `backend=` explicitly.
-The `auto` value (resolves to full-if-installed-else-lite) is added in Part 05.
+`get_backend` also resolves **`auto`** centrally (→ `full` if `model_manager.models_present()`
+else `lite`), so every direct caller — the Gradio app (Part 09), scripts — gets the right backend,
+not just the `/relief` HTTP handler. (Part 05's handler still resolves `auto` itself so its JSON
+response can echo the concrete backend that ran.)
+
+> Note: the original plan only resolved `auto` in the API handler; centralizing it here fixes a
+> gap where `generate_relief(..., backend="auto")` called directly would always fall through to
+> lite. The `import model_manager` stays inside the `auto` branch so the lite path pulls nothing
+> extra.
 
 ---
 
@@ -50,6 +58,9 @@ from PIL import Image
 
 def get_backend(name=None):
     name = name or os.environ.get("RELIEF_BACKEND", "lite")
+    if name == "auto":                          # full if weights present, else lite
+        import model_manager                    # light dep (huggingface_hub), no torch
+        name = "full" if model_manager.models_present() else "lite"
     return FullBackend() if name == "full" else LiteBackend()
 
 

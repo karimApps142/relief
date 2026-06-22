@@ -9,3 +9,4 @@ uvicorn[standard]
 python-multipart
 pydantic
 huggingface_hub          # for the download manager; pulls no torch by itself
+gradio                   # Part 09 browser UI; pure-Python, pulls no torch
