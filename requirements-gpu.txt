@@ -1,6 +1,9 @@
 --extra-index-url https://download.pytorch.org/whl/cu121
-torch
-torchvision
+# Pin the +cu121 builds explicitly. With a bare `torch`, --extra-index-url lets pip
+# pick the higher-versioned CPU wheel from PyPI instead of the CUDA wheel; the +cu121
+# local version only exists on the pytorch index, so this forces the GPU build.
+torch==2.5.1+cu121
+torchvision==0.20.1+cu121
 diffusers>=0.30
 transformers>=4.44
 accelerate
