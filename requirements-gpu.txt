@@ -8,3 +8,5 @@ diffusers>=0.30
 transformers>=4.44
 accelerate
 einops
+kornia                   # BiRefNet (background removal) loads remote code that imports kornia
+timm                     # BiRefNet backbone (timm) — without it from_pretrained raises ImportError
