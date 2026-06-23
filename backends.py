@@ -11,6 +11,7 @@ import os
 import numpy as np
 import cv2
 from PIL import Image
+import relief_core as rc
 
 
 def get_backend(name=None):
@@ -40,7 +41,7 @@ class LiteBackend:
         n /= (np.linalg.norm(n, axis=-1, keepdims=True) + 1e-8)
         return (n + 1.0) / 2.0                      # HxWx3 in [0,1]
 
-    def estimate_depth(self, image: Image.Image, model="lite"):
+    def estimate_depth(self, image: Image.Image, model="lite", tiling=False):
         # crude luminance pseudo-depth so the Mac/lite path still yields a heightmap
         rgb = np.asarray(image.convert("RGB"))
         g = cv2.cvtColor(rgb, cv2.COLOR_RGB2GRAY).astype(np.float32) / 255.0
@@ -66,13 +67,16 @@ class FullBackend:
             return self._m.estimate_normals_marigold(image)
         return self._m.estimate_normals_stable(image)
 
-    def estimate_depth(self, image, model="sapiens"):
-        if model == "sapiens":
-            try:
-                return self._m.estimate_depth_sapiens(image)
-            except Exception:
-                return self._m.estimate_depth(image)   # fallback: Depth-Anything-V2
-        return self._m.estimate_depth(image)           # "depth-anything"
+    def estimate_depth(self, image, model="sapiens", tiling=False):
+        if model == "depth-anything":
+            if tiling:                                 # high-res tile fusion (generic model only)
+                return rc.tiled_depth(image, self._m.estimate_depth)
+            return self._m.estimate_depth(image)
+        # sapiens: single whole-frame pass (tiling is wrong for a whole-person model)
+        try:
+            return self._m.estimate_depth_sapiens(image)
+        except Exception:
+            return self._m.estimate_depth(image)       # fallback: Depth-Anything-V2
 
     def estimate_parts(self, image):
         try:

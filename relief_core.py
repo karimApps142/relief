@@ -6,6 +6,7 @@ Normal integration, bas-relief compression, detail enhancement,
 import numpy as np
 import cv2
 from scipy.fft import dctn, idctn
+from PIL import Image
 import trimesh
 
 
@@ -320,19 +321,37 @@ def to_heightmap_16bit(height, invert=False, normalize=True):
     return (h * 65535.0).astype(np.uint16)
 
 
+def guided_refine_depth(depth, luma, r=8, eps=1e-3, strength=0.6):
+    """Snap a smooth depth map onto the PHOTO's edges via the He-2010 JOINT guided
+    filter (guide = photo luma, input = depth). Unlike a self-bilateral it relocates
+    & sharpens depth edges to the image's true edges (jaw/hairline/collar) and is
+    halo-free. Blended (strength<1) and the guide is de-grained first, so the photo's
+    albedo/texture is NOT engraved into the geometry."""
+    d = depth.astype(np.float32)
+    I = _edge_preserve(luma.astype(np.float32), 0.06)        # de-grain the guide
+    if I.shape[:2] != d.shape[:2]:
+        I = cv2.resize(I, (d.shape[1], d.shape[0]))
+    I = (I - I.min()) / (I.max() - I.min() + 1e-8)
+    q = _guided_filter(I, d, r=int(r), eps=float(eps))       # joint: guide=photo, input=depth
+    return ((1.0 - strength) * d + strength * q).astype(np.float32)
+
+
 # ----- DEPTH-FIRST: raw monocular depth -> clean smooth relief heightmap -----
 # The correct data for bas-relief / CNC / lithophane is a SMOOTH CONTINUOUS depth
 # field (near = high), NOT an emboss/edge map. This robust-normalizes the depth,
 # optionally inverts (if the subject comes out sunken), edge-preserving-smooths
 # away model noise, gently gamma-compresses the range, and seats the subject on a
 # flat base via the mask. No detail bands, no CLAHE, no engraving.
-def depth_to_heightmap(depth, mask=None, invert=False, smooth=0.5,
-                       compress=1.0, flatten_bg=True, base=0.50, fig_span=0.45):
+def depth_to_heightmap(depth, mask=None, luma=None, invert=False, refine=0.6,
+                       smooth=0.5, compress=1.0, flatten_bg=True, base=0.50,
+                       fig_span=0.45):
     d = depth.astype(np.float32)
     lo, hi = np.percentile(d, [1, 99])           # robust normalize (ignore outliers)
     d = np.clip((d - lo) / (hi - lo + 1e-8), 0.0, 1.0).astype(np.float32)
     if invert:
         d = (1.0 - d).astype(np.float32)
+    if luma is not None and refine > 0:          # snap depth edges to the photo's edges
+        d = guided_refine_depth(d, luma, strength=float(refine))
     if smooth > 0:                               # de-noise the model output, keep form
         d = cv2.bilateralFilter(d, 0, 0.04 + 0.16 * float(smooth),
                                 3.0 + 9.0 * float(smooth))
@@ -420,3 +439,87 @@ def heightmap_to_solid(height16, z_scale_mm=8.0, pixel_mm=0.1, base_mm=2.0):
     m = trimesh.Trimesh(vertices=V, faces=F, process=True)
     trimesh.repair.fix_normals(m)
     return m
+
+
+# ----- High-res depth via overlapping-tile fusion (TilingZoeDepth method) -----
+# Opt-in, for a GENERIC depth model (Depth-Anything) ONLY — a whole-person model
+# (Sapiens) degrades on context-free crops. Runs D on a global pass + two
+# overlapping tile grids, moment-matches each tile to the global depth, blends
+# with cos^2 windows (explicit /sum-of-weights), then merges fine detail where the
+# photo has edges. Many forward passes -> slow; gate behind a UI toggle. Pure CPU.
+def _tzd_windows(M, N, peak=0.998):
+    i = np.arange(M)[:, None]; j = np.arange(N)[None, :]
+    xw = np.broadcast_to(peak * np.cos((np.abs(M / 2 - i) / M) * np.pi) ** 2, (M, N))
+    yw = np.broadcast_to(peak * np.cos((np.abs(N / 2 - j) / N) * np.pi) ** 2, (M, N))
+    full = xw * yw
+    top = np.broadcast_to(i < M / 2, (M, N)); left = np.broadcast_to(j < N / 2, (M, N))
+    W = {'filter': full,
+         'left_filter': np.where(left, xw, full), 'right_filter': np.where(~left, xw, full),
+         'top_filter': np.where(top, yw, full), 'bottom_filter': np.where(~top, yw, full)}
+
+    def corner(vert, horz):
+        out = full.copy()
+        out = np.where(horz & ~vert, xw, out)
+        out = np.where(vert & ~horz, yw, out)
+        return np.where(vert & horz, peak, out)
+    W['top_left_filter'] = corner(top, left); W['top_right_filter'] = corner(top, ~left)
+    W['bottom_left_filter'] = corner(~top, left); W['bottom_right_filter'] = corner(~top, ~left)
+    return W
+
+
+def _tzd_select(W, x, y, x_all, y_all):
+    xmin, xmax, ymin, ymax = min(x_all), max(x_all), min(y_all), max(y_all)
+    if y == ymin and x == xmin: return W['top_left_filter']
+    if y == ymin and x == xmax: return W['bottom_left_filter']
+    if y == ymax and x == xmin: return W['top_right_filter']
+    if y == ymax and x == xmax: return W['bottom_right_filter']
+    if y == ymin: return W['left_filter']
+    if y == ymax: return W['right_filter']
+    if x == xmin: return W['top_filter']
+    if x == xmax: return W['bottom_filter']
+    return W['filter']
+
+
+def _tzd_norm(a):
+    return (a - a.min()) / (a.max() - a.min() + 1e-12)
+
+
+def _tzd_grid(im_uint8, D, global01, num_x, num_y):
+    H, Wd = im_uint8.shape[:2]
+    M, N = H // num_x, Wd // num_y
+    win = _tzd_windows(M, N)
+    x_all = (list(range(0, H, H // num_x))[:num_x]
+             + list(range((H // num_x) // 2, H, H // num_x))[:num_x - 1])
+    y_all = (list(range(0, Wd, Wd // num_y))[:num_y]
+             + list(range((Wd // num_y) // 2, Wd, Wd // num_y))[:num_y - 1])
+    acc = np.zeros((H, Wd), np.float64); wsum = np.zeros((H, Wd), np.float64)
+    for x in x_all:
+        for y in y_all:
+            t = _tzd_norm(np.asarray(D(Image.fromarray(im_uint8[x:x + M, y:y + N])),
+                                     dtype=np.float64))
+            g = global01[x:x + M, y:y + N]
+            t_al = g.mean() + g.std() * ((t - t.mean()) / (t.std() + 1e-12))  # moment-match
+            w = _tzd_select(win, x, y, x_all, y_all)
+            acc[x:x + M, y:y + N] += w * t_al
+            wsum[x:x + M, y:y + N] += w
+    acc /= np.maximum(wsum, 1e-6)
+    acc[acc < 0] = 0
+    return acc
+
+
+def tiled_depth(image, D, grids=((2, 2), (4, 4))):
+    """High-res depth by fusing a global pass with two overlapping-tile grids
+    (TilingZoeDepth). D(PIL)->HxW float. Returns HxW float in [0,1] (near=large)."""
+    img = image.convert("RGB")
+    im = np.asarray(img)
+    global01 = _tzd_norm(np.asarray(D(img), dtype=np.float64))
+    (nx0, ny0), (nx1, ny1) = grids
+    coarse = _tzd_grid(im, D, global01, nx0, ny0)
+    fine = _tzd_grid(im, D, global01, nx1, ny1)
+    grey = im.mean(axis=2).astype(np.float32)
+    diff = cv2.GaussianBlur(grey, (0, 0), 20) - grey
+    diff = diff / (np.max(diff) + 1e-12)
+    diff = cv2.GaussianBlur(diff, (0, 0), 40) * 5.0
+    mask = np.clip(diff, 0, 0.999)
+    combined = (mask * fine + (1 - mask) * ((coarse + global01) / 2)) / 2
+    return (combined / (np.max(combined) + 1e-12)).astype(np.float32)
