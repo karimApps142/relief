@@ -335,9 +335,12 @@ def heightmap_to_surface(height16, z_scale_mm=8.0, pixel_mm=0.1):
     return trimesh.Trimesh(vertices=V, faces=F, process=False)
 
 
-def heightmap_to_preview(height16, z_scale_mm=8.0, pixel_mm=0.1, max_px=400):
-    """Lightweight DOWNSAMPLED surface mesh for the in-browser 3D viewer — the
-    full-res STL can be 100+ MB / millions of faces, too heavy for a browser."""
+def heightmap_to_preview(height16, z_scale_mm=8.0, pixel_mm=0.1, max_px=320):
+    """Lightweight DOWNSAMPLED, viewer-oriented SOLID mesh for the in-browser 3D
+    preview. A closed solid renders correctly lit from any angle (an open surface
+    goes dark/invisible from the back). The full-res STL (100+ MB) is too heavy
+    for a browser, so we downsample. The image Y axis points DOWN while the 3D
+    viewer is Y-up, so flip Y to make it upright, then re-fix outward normals."""
     h = height16
     rows, cols = h.shape
     scale = min(1.0, float(max_px) / max(rows, cols))
@@ -346,7 +349,13 @@ def heightmap_to_preview(height16, z_scale_mm=8.0, pixel_mm=0.1, max_px=400):
                        (max(2, int(cols * scale)), max(2, int(rows * scale))),
                        interpolation=cv2.INTER_AREA).astype(np.uint16)
         pixel_mm = pixel_mm / scale            # keep the physical dimensions
-    return heightmap_to_surface(h, z_scale_mm, pixel_mm)
+    m = heightmap_to_solid(h, z_scale_mm, pixel_mm)
+    m.apply_transform([[1, 0, 0, 0],
+                       [0, -1, 0, 0],            # flip image-Y -> viewer up
+                       [0, 0, 1, 0],
+                       [0, 0, 0, 1]])
+    trimesh.repair.fix_normals(m)               # outward normals after the reflection
+    return m
 
 
 def heightmap_to_solid(height16, z_scale_mm=8.0, pixel_mm=0.1, base_mm=2.0):
