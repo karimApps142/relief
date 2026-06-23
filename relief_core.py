@@ -320,6 +320,35 @@ def to_heightmap_16bit(height, invert=False, normalize=True):
     return (h * 65535.0).astype(np.uint16)
 
 
+# ----- DEPTH-FIRST: raw monocular depth -> clean smooth relief heightmap -----
+# The correct data for bas-relief / CNC / lithophane is a SMOOTH CONTINUOUS depth
+# field (near = high), NOT an emboss/edge map. This robust-normalizes the depth,
+# optionally inverts (if the subject comes out sunken), edge-preserving-smooths
+# away model noise, gently gamma-compresses the range, and seats the subject on a
+# flat base via the mask. No detail bands, no CLAHE, no engraving.
+def depth_to_heightmap(depth, mask=None, invert=False, smooth=0.5,
+                       compress=1.0, flatten_bg=True, base=0.50, fig_span=0.45):
+    d = depth.astype(np.float32)
+    lo, hi = np.percentile(d, [1, 99])           # robust normalize (ignore outliers)
+    d = np.clip((d - lo) / (hi - lo + 1e-8), 0.0, 1.0).astype(np.float32)
+    if invert:
+        d = (1.0 - d).astype(np.float32)
+    if smooth > 0:                               # de-noise the model output, keep form
+        d = cv2.bilateralFilter(d, 0, 0.04 + 0.16 * float(smooth),
+                                3.0 + 9.0 * float(smooth))
+    if compress != 1.0:                          # gamma <1 flattens the near -> shallower
+        d = np.power(np.clip(d, 0.0, 1.0), float(compress)).astype(np.float32)
+    if flatten_bg and mask is not None and mask.shape[:2] == d.shape[:2]:
+        m = mask > 0.5
+        if m.any():                              # rescale within the subject region
+            slo, shi = np.percentile(d[m], [1, 99])
+            d = np.clip((d - slo) / (shi - slo + 1e-8), 0.0, 1.0)
+        out = np.where(m, base + d * fig_span, base)   # subject on a flat base
+    else:
+        out = base + np.clip(d, 0.0, 1.0) * fig_span
+    return out.astype(np.float32)
+
+
 # ----- Stage 6: heightmap -> STL -----
 def heightmap_to_surface(height16, z_scale_mm=8.0, pixel_mm=0.1):
     """Open top-surface mesh — fine for CNC (CAM closes the model)."""

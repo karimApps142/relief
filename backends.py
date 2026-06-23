@@ -40,8 +40,11 @@ class LiteBackend:
         n /= (np.linalg.norm(n, axis=-1, keepdims=True) + 1e-8)
         return (n + 1.0) / 2.0                      # HxWx3 in [0,1]
 
-    def estimate_depth(self, image: Image.Image):
-        return None                                 # no depth fusion in lite mode
+    def estimate_depth(self, image: Image.Image, model="lite"):
+        # crude luminance pseudo-depth so the Mac/lite path still yields a heightmap
+        rgb = np.asarray(image.convert("RGB"))
+        g = cv2.cvtColor(rgb, cv2.COLOR_RGB2GRAY).astype(np.float32) / 255.0
+        return cv2.GaussianBlur(g, (0, 0), 8)
 
     def estimate_parts(self, image: Image.Image):
         return None                                 # no face parsing in lite mode
@@ -63,8 +66,13 @@ class FullBackend:
             return self._m.estimate_normals_marigold(image)
         return self._m.estimate_normals_stable(image)
 
-    def estimate_depth(self, image):
-        return self._m.estimate_depth(image)
+    def estimate_depth(self, image, model="sapiens"):
+        if model == "sapiens":
+            try:
+                return self._m.estimate_depth_sapiens(image)
+            except Exception:
+                return self._m.estimate_depth(image)   # fallback: Depth-Anything-V2
+        return self._m.estimate_depth(image)           # "depth-anything"
 
     def estimate_parts(self, image):
         try:

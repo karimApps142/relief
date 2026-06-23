@@ -1,6 +1,9 @@
 """
-pipeline.py — single image in, relief heightmap + STL out. Backend-aware:
-lite (Mac, no models) and full (GPU) run the exact same geometry path.
+pipeline.py — single image in, relief heightmap + STL out.
+Depth-first: a smooth monocular DEPTH map IS the heightmap (near = high), seated
+on a flat base. This is the right data for bas-relief / CNC / lithophane (a
+continuous height field, not an engraving). Backend-aware: lite (Mac, luminance
+pseudo-depth) and full (GPU: Sapiens / Depth-Anything) share one geometry path.
 """
 from dataclasses import dataclass
 from pathlib import Path
@@ -13,36 +16,17 @@ import relief_core as rc
 
 @dataclass
 class ReliefParams:
-    relief_depth_mm: float = 8.0     # physical Z height of the carve
-    pixel_mm: float = 0.1            # mm per pixel (controls plate size)
-    normals: str = "marigold"       # "marigold" | "stable" (StableNormal is broken on Windows)
-    use_depth_fusion: bool = True   # use global depth for the (now shallow) base form
-    compress_beta: float = 0.55     # (legacy; unused by the new engraved engine)
-    detail_gain: float = 1.4        # (legacy; unused by the new engraved engine)
-    # --- form vs. detail composition (sculpt.ok-style: shallow form, dominant detail) ---
-    form_strength: float = 0.18     # global dome share; lower = flatter / more engraved
-    normal_detail: float = 0.6      # surface relief from the AI normals
-    image_detail: float = 1.0       # medium photographic texture (planes / fabric)
-    fine_detail: float = 0.7        # fine strands / lip lines
-    micro_detail: float = 0.35      # pores / lashes / micro-texture
-    detail_sigma: float = 6.0       # base high-pass cutoff in px (smaller = finer)
-    # --- local contrast + base plate ---
-    clahe_clip: float = 1.8         # local-contrast strength ("detail everywhere")
-    clahe_tile: int = 96            # CLAHE tile size in px
-    micro_gain: float = 0.4         # final crisp sharpen
-    surface_smooth: float = 0.5     # edge-preserving denoise of the surface (anti-sandpaper)
-    base_height: float = 0.50       # mid-gray base plate level
-    fig_span: float = 0.45          # shallow figure relief above the base
-    # --- per-material detail pass (face-parsing driven; no-op if unavailable) ---
-    per_material: bool = True       # master enable; auto no-op in lite / no-face
-    hair_gain: float = 2.2          # hair fine+micro multiplier (+ anisotropic grooves)
-    skin_smooth: float = 0.35       # skin micro kept after edge-aware base (lower = smoother)
-    eye_gain: float = 1.5           # eyes/brows targeted sharpen gain
-    lip_gain: float = 1.1           # lips fine gain
-    cloth_gain: float = 0.6         # clothing fine gain
-    flip_y: bool = False            # toggle if relief comes out inverted
-    invert: bool = False            # toggle white<->black height convention
-    make_solid: bool = False        # True = watertight (3D print), False = CNC
+    relief_depth_mm: float = 8.0     # physical Z height of the carve (mm)
+    pixel_mm: float = 0.1            # mm per pixel (plate size)
+    depth_model: str = "sapiens"    # "sapiens" (human-specialized) | "depth-anything"
+    invert: bool = False            # flip near<->far if the subject comes out sunken
+    depth_smooth: float = 0.5       # edge-preserving smoothing of the depth (de-noise)
+    depth_compress: float = 1.0     # gamma; <1 flattens the near -> shallower/flatter relief
+    flatten_bg: bool = True         # seat the subject on a flat base via the mask
+    base_height: float = 0.50       # base plate level
+    fig_span: float = 0.45          # subject relief height above the base
+    make_solid: bool = False        # watertight solid (3D print) vs open surface (CNC)
+    normals: str = "marigold"       # (unused by the depth pipeline; kept for API compat)
     backend: str = None             # "lite" | "full" | "auto" | None (env default)
 
 
@@ -53,59 +37,32 @@ def generate_relief(image_path, out_dir, params: ReliefParams = ReliefParams(),
 
     out = Path(out_dir); out.mkdir(parents=True, exist_ok=True)
     image = Image.open(image_path).convert("RGB")
-    luma = np.asarray(image.convert("L")).astype(np.float32) / 255.0  # photo detail source
 
-    # 0. subject mask
-    mask = be.remove_background(image)
+    # 1. monocular depth — the heightmap source (smooth, continuous surface height)
+    depth = be.estimate_depth(image, model=params.depth_model)
 
-    # 1. surface normals -> integrate to a height field
-    normal_map = be.estimate_normals(image, which=params.normals)
-    height = rc.integrate_normals(normal_map, flip_y=params.flip_y)
+    # 2. subject mask, to seat the figure on a flat base
+    mask = be.remove_background(image) if params.flatten_bg else None
 
-    # 2. compose a SHALLOW global form + DOMINANT multi-scale detail (kills the
-    #    inflated-balloon look), with an optional face-parsing-driven per-material
-    #    pass (hair grooves, smoothed skin, sharp eyes/lips). region_masks is None
-    #    in lite mode / when no face is found -> compose_relief_perpart falls back
-    #    to the plain compose_relief path, so this stays a no-op there.
-    depth = be.estimate_depth(image) if params.use_depth_fusion else None
-    region_masks = be.estimate_parts(image) if params.per_material else None
-    height = rc.compose_relief_perpart(height, depth, luma, region_masks,
-                                       form=params.form_strength,
-                                       normal_detail=params.normal_detail,
-                                       image_detail=params.image_detail,
-                                       fine_detail=params.fine_detail,
-                                       micro_detail=params.micro_detail,
-                                       sigma=params.detail_sigma,
-                                       hair_gain=params.hair_gain,
-                                       skin_smooth=params.skin_smooth,
-                                       eye_gain=params.eye_gain,
-                                       lip_gain=params.lip_gain,
-                                       cloth_gain=params.cloth_gain)
+    # 3. depth -> clean smooth relief heightmap (NO emboss / edge detail)
+    height = rc.depth_to_heightmap(depth, mask,
+                                   invert=params.invert,
+                                   smooth=params.depth_smooth,
+                                   compress=params.depth_compress,
+                                   flatten_bg=params.flatten_bg,
+                                   base=params.base_height,
+                                   fig_span=params.fig_span)
 
-    # 3. local-contrast normalize (CLAHE) + crisp micro-unsharp -> "detail everywhere"
-    height = rc.normalize_local(height, clip=params.clahe_clip,
-                                tile=params.clahe_tile, micro_gain=params.micro_gain)
-
-    # 3b. edge-preserving denoise: kill sub-feature grain so the STL isn't rough
-    height = rc.denoise_surface(height, strength=params.surface_smooth)
-
-    # 4. seat the figure on a flat mid-gray base with a crisp silhouette step
-    height = rc.compose_onto_base(height, mask, base=params.base_height,
-                                  fig_span=params.fig_span)
-
-    # 5. export 16-bit WITHOUT renormalizing, so the shallow base/range survives
-    height16 = rc.to_heightmap_16bit(height, invert=params.invert, normalize=False)
-
+    # 4. export 16-bit (no renormalize — keep the base/range from depth_to_heightmap)
+    height16 = rc.to_heightmap_16bit(height, normalize=False)
     png_path = out / "relief_heightmap.png"
     cv2.imwrite(str(png_path), height16)         # 16-bit PNG
 
-    # 6. STL
+    # 5. STL
     if params.make_solid:
-        mesh = rc.heightmap_to_solid(height16, params.relief_depth_mm,
-                                     params.pixel_mm)
+        mesh = rc.heightmap_to_solid(height16, params.relief_depth_mm, params.pixel_mm)
     else:
-        mesh = rc.heightmap_to_surface(height16, params.relief_depth_mm,
-                                       params.pixel_mm)
+        mesh = rc.heightmap_to_surface(height16, params.relief_depth_mm, params.pixel_mm)
     stl_path = out / "relief.stl"
     mesh.export(str(stl_path))
 

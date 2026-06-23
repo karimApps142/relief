@@ -19,7 +19,7 @@ DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 def unload_all():
     """Free cached models + VRAM. Call between heavy stages on small GPUs."""
     for fn in (_birefnet, _stablenormal, _marigold_normals, _depth_pipe,
-               _face_parser):
+               _face_parser, _sapiens_depth):
         fn.cache_clear()
     gc.collect()
     if torch.cuda.is_available():
@@ -156,3 +156,42 @@ def parse_regions(image: Image.Image):
         return None
     return {region: _feather(np.isin(labels, list(ids)), _FEATHER_PX[region])
             for region, ids in _REGION_CLASSES.items()}
+
+
+# ---------- Depth: Sapiens-1B (Meta, human-specialized; best portrait depth) ----------
+# torchscript checkpoint (not transformers). Native input 1024x768 (H x W),
+# ImageNet normalize. Output is relative depth; we negate so LARGER = NEARER to
+# match the Depth-Anything convention (subject/face = high). ~4 GB download.
+# License: CC-BY-NC (non-commercial research/education).
+_SAPIENS_DEPTH_REPO = "facebook/sapiens-depth-1b-torchscript"
+_SAPIENS_DEPTH_FILE = "sapiens_1b_render_people_epoch_88_torchscript.pt2"
+
+
+@functools.lru_cache(maxsize=1)
+def _sapiens_depth():
+    from huggingface_hub import hf_hub_download
+    path = hf_hub_download(_SAPIENS_DEPTH_REPO, _SAPIENS_DEPTH_FILE)
+    return torch.jit.load(path, map_location=DEVICE).eval()
+
+
+def estimate_depth_sapiens(image: Image.Image) -> np.ndarray:
+    """Relative depth from Sapiens-1B (torchscript). Resized to the model's
+    native 1024x768, output mapped back to the original resolution. Returns an
+    HxW float where LARGER = NEARER (subject/face high)."""
+    from torchvision import transforms
+    img = image.convert("RGB")
+    W0, H0 = img.size
+    tf = transforms.Compose([
+        transforms.Resize((1024, 768)),
+        transforms.ToTensor(),
+        transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225]),
+    ])
+    x = tf(img).unsqueeze(0).to(DEVICE)
+    with torch.inference_mode():
+        out = _sapiens_depth()(x)
+    if out.dim() == 3:                              # (1,H,W) -> (1,1,H,W)
+        out = out.unsqueeze(1)
+    out = torch.nn.functional.interpolate(out[:, :1], size=(H0, W0),
+                                          mode="bilinear", align_corners=False)
+    d = out.float().squeeze().cpu().numpy()         # HxW relative depth (near = small)
+    return -d                                       # negate -> larger = nearer
