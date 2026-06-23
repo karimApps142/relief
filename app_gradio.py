@@ -21,11 +21,7 @@ def make_relief(image_path, depth_model, depth_mm, pixel_mm, refine, depth_smoot
         invert=invert, flatten_bg=flatten_bg, tiling=tiling, make_solid=make_solid,
     )
     out = generate_relief(image_path, "out/", params, backend="auto")
-    # lightweight downsampled mesh for the in-browser 3D viewer
-    h16 = np.asarray(Image.open(out["heightmap"]))
-    preview3d = "out/preview.glb"
-    rc.heightmap_to_preview(h16, z_scale_mm=depth_mm, pixel_mm=pixel_mm).export(preview3d)
-    return out["heightmap"], out["heightmap"], out["stl"], preview3d
+    return out["heightmap"], out["heightmap"], out["stl"], out["preview3d"]
 
 
 # ---- optional models panel (only meaningful on the Windows GPU box) ----

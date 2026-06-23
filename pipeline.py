@@ -86,4 +86,10 @@ def generate_relief(image_path, out_dir, params: ReliefParams = ReliefParams(),
     stl_path = out / "relief.stl"
     mesh.export(str(stl_path))
 
-    return {"heightmap": str(png_path), "stl": str(stl_path)}
+    # lightweight downsampled GLB for the in-browser 3D viewer
+    preview_path = out / "preview.glb"
+    rc.heightmap_to_preview(height16, params.relief_depth_mm,
+                            params.pixel_mm).export(str(preview_path))
+
+    return {"heightmap": str(png_path), "stl": str(stl_path),
+            "preview3d": str(preview_path)}

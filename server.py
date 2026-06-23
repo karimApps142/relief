@@ -17,11 +17,15 @@ from pathlib import Path
 
 from fastapi import FastAPI, UploadFile, File, Form, HTTPException
 from fastapi.responses import JSONResponse, FileResponse
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 
 from features import REGISTRY
 import model_manager
 
 app = FastAPI(title="Relief Studio API")
+app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"],
+                   allow_headers=["*"])
 OUT_ROOT = Path(os.environ.get("RELIEF_OUT_ROOT", "data/jobs"))
 OUT_ROOT.mkdir(parents=True, exist_ok=True)
 
@@ -76,3 +80,11 @@ def get_artifact(job: str, name: str):
     if not path.exists():
         raise HTTPException(404, "artifact not found")
     return FileResponse(str(path))
+
+
+# Serve the built React UI (web/dist) at "/" when present — single-process prod
+# deploy (uvicorn server:app serves both the API and the UI). Mounted last so the
+# /api/* routes above take precedence. In dev, run Vite separately (it proxies /api).
+_DIST = Path(__file__).parent / "web" / "dist"
+if _DIST.exists():
+    app.mount("/", StaticFiles(directory=str(_DIST), html=True), name="web")
