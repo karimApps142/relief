@@ -1,4 +1,6 @@
 node_modules/
-dist/
 *.local
 .vite/
+# NOTE: dist/ is intentionally COMMITTED — the GPU box has no Node toolchain, so it
+# serves the prebuilt UI via `uvicorn server:app` after a plain `git pull`. Rebuild
+# (`npm run build`) and commit dist/ whenever the frontend changes.
