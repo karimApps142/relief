@@ -18,7 +18,8 @@ DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 
 def unload_all():
     """Free cached models + VRAM. Call between heavy stages on small GPUs."""
-    for fn in (_birefnet, _stablenormal, _marigold_normals, _depth_pipe):
+    for fn in (_birefnet, _stablenormal, _marigold_normals, _depth_pipe,
+               _face_parser):
         fn.cache_clear()
     gc.collect()
     if torch.cuda.is_available():
@@ -94,3 +95,64 @@ def _depth_pipe():
 def estimate_depth(image: Image.Image) -> np.ndarray:
     d = np.asarray(_depth_pipe()(image)["depth"]).astype(np.float32)
     return (d - d.min()) / (d.max() - d.min() + 1e-8)  # HxW [0,1]
+
+
+# ---------- Stage 3 (optional): face parsing for per-material detail ----------
+# jonathandinu/face-parsing — SegFormer (mit-b5) on CelebAMask-HQ, 19 classes,
+# ~339 MB. Loads via the same transformers classes used above. Logits are
+# H/4 x W/4: bilinear-upsample to input size BEFORE argmax. License: non-
+# commercial research/education (CelebAMask-HQ heritage). Class indices verified
+# against the model's config.json id2label.
+_FACE_PARSE_ID = "jonathandinu/face-parsing"
+
+# raw CelebAMask-HQ class id -> our 6 relief regions
+_REGION_CLASSES = {
+    "hair":  {13},
+    "skin":  {1, 2, 8, 9, 17},          # skin, nose, ears, neck
+    "eyes":  {3, 4, 5, 6, 7},           # glasses, eyes, brows
+    "lips":  {10, 11, 12},              # mouth, upper/lower lip
+    "cloth": {18},
+    "bg":    {0, 14, 15, 16},           # background, hat, earring, necklace
+}
+
+# per-region feather widths in px (hair wide for a clean hairline)
+_FEATHER_PX = {"hair": 11.0, "skin": 8.0, "eyes": 5.0,
+               "lips": 4.0, "cloth": 8.0, "bg": 10.0}
+
+
+@functools.lru_cache(maxsize=1)
+def _face_parser():
+    from transformers import (SegformerImageProcessor,
+                              SegformerForSemanticSegmentation)
+    proc = SegformerImageProcessor.from_pretrained(_FACE_PARSE_ID)
+    model = SegformerForSemanticSegmentation.from_pretrained(_FACE_PARSE_ID)
+    return proc, model.to(DEVICE).eval()
+
+
+def _feather(binary, width):
+    """Binary mask -> smooth [0,1] blend weight (Gaussian feather)."""
+    m = (binary > 0).astype(np.float32)
+    if width <= 0:
+        return m
+    return np.clip(cv2.GaussianBlur(m, (0, 0), max(0.3, width * 0.5)), 0.0, 1.0)
+
+
+def parse_regions(image: Image.Image):
+    """{region: feathered float32 HxW [0,1]} for the 6 regions, or None if no
+    usable face is found (caller treats None as 'per-material disabled')."""
+    image = image.convert("RGB")
+    proc, model = _face_parser()
+    with torch.no_grad():
+        inputs = proc(images=image, return_tensors="pt").to(DEVICE)
+        logits = model(**inputs).logits                       # (1,19,H/4,W/4)
+        up = torch.nn.functional.interpolate(
+            logits, size=image.size[::-1],                    # (H,W); image.size is (W,H)
+            mode="bilinear", align_corners=False)
+        labels = up.argmax(dim=1)[0].to("cpu").numpy().astype(np.uint8)
+    # face-presence guard: skin+eyes+lips coverage must be non-trivial
+    face_ids = list(_REGION_CLASSES["skin"] | _REGION_CLASSES["eyes"]
+                    | _REGION_CLASSES["lips"])
+    if np.isin(labels, face_ids).mean() < 0.02:              # face absent / too small
+        return None
+    return {region: _feather(np.isin(labels, list(ids)), _FEATHER_PX[region])
+            for region, ids in _REGION_CLASSES.items()}

@@ -10,6 +10,7 @@ import model_manager
 
 def make_relief(image_path, depth_mm, pixel_mm, form_strength,
                 image_detail, fine_detail, micro_detail, clahe_clip, micro_gain,
+                per_material, hair_gain, skin_smooth, eye_gain, lip_gain, cloth_gain,
                 normals, make_solid, flip_y, invert):
     if not image_path:
         raise gr.Error("Upload an image first.")
@@ -18,6 +19,8 @@ def make_relief(image_path, depth_mm, pixel_mm, form_strength,
         form_strength=form_strength, image_detail=image_detail,
         fine_detail=fine_detail, micro_detail=micro_detail,
         clahe_clip=clahe_clip, micro_gain=micro_gain,
+        per_material=per_material, hair_gain=hair_gain, skin_smooth=skin_smooth,
+        eye_gain=eye_gain, lip_gain=lip_gain, cloth_gain=cloth_gain,
         normals=normals, make_solid=make_solid,
         flip_y=flip_y, invert=invert,
     )
@@ -83,6 +86,18 @@ with gr.Blocks(title="CNC Bas-Relief") as demo:
                                    label="Local contrast (detail everywhere)")
             micro_gain = gr.Slider(0.0, 1.5, value=0.6, step=0.05,
                                    label="Sharpen")
+            gr.Markdown("**Per-material detail** (portraits; auto-off if no face)")
+            per_material = gr.Checkbox(value=True, label="Enable per-material pass")
+            hair_gain = gr.Slider(0.0, 4.0, value=2.2, step=0.1,
+                                  label="Hair detail (+ directional grooves)")
+            skin_smooth = gr.Slider(0.0, 1.0, value=0.35, step=0.05,
+                                    label="Skin micro (lower = smoother)")
+            eye_gain = gr.Slider(0.0, 3.0, value=1.5, step=0.1,
+                                 label="Eyes / brows sharpen")
+            lip_gain = gr.Slider(0.0, 2.0, value=1.1, step=0.05,
+                                 label="Lips detail")
+            cloth_gain = gr.Slider(0.0, 2.0, value=1.0, step=0.05,
+                                   label="Clothing weave")
             normals = gr.Radio(["marigold", "stable"], value="marigold",
                                label="Normals model (full mode only)")
             with gr.Row():
@@ -104,6 +119,7 @@ with gr.Blocks(title="CNC Bas-Relief") as demo:
     go.click(make_relief,
              [img, depth_mm, pixel_mm, form_strength,
               image_detail, fine_detail, micro_detail, clahe_clip, micro_gain,
+              per_material, hair_gain, skin_smooth, eye_gain, lip_gain, cloth_gain,
               normals, make_solid, flip_y, invert],
              [preview, png_file, stl_file])
 

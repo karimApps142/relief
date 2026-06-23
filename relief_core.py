@@ -79,6 +79,149 @@ def compose_relief(normal_height, depth, luma, form=0.18, normal_detail=0.6,
     return form * g + detail
 
 
+# ----- Stage 3c: PER-MATERIAL detail modulation (face-parsing driven) -----
+# Given feathered region weight masks, modulate the fine/micro detail per region
+# (skin smoothed via guided filter, hair carved into directional grooves along
+# the structure-tensor orientation, eyes/lips sharpened, cloth weave) and blend
+# with the feathered alphas — no seams. Falls back to plain compose_relief()
+# when region_masks is None (lite / no face / parse failure).
+def _structure_tensor(h, rho=1.0, sigma_t=2.0):
+    """Local orientation (theta = gradient angle, ACROSS the strand) + coherence."""
+    h = h.astype(np.float32)
+    if rho > 0:
+        h = cv2.GaussianBlur(h, (0, 0), rho)
+    Gx = cv2.Sobel(h, cv2.CV_32F, 1, 0, ksize=3)
+    Gy = cv2.Sobel(h, cv2.CV_32F, 0, 1, ksize=3)
+    Gxx = cv2.GaussianBlur(Gx * Gx, (0, 0), sigma_t)
+    Gyy = cv2.GaussianBlur(Gy * Gy, (0, 0), sigma_t)
+    Gxy = cv2.GaussianBlur(Gx * Gy, (0, 0), sigma_t)
+    theta = 0.5 * np.arctan2(2 * Gxy, Gxx - Gyy)
+    tmp = np.sqrt((Gxx - Gyy) ** 2 + 4 * Gxy * Gxy)
+    l1 = 0.5 * (Gxx + Gyy + tmp)
+    l2 = 0.5 * (Gxx + Gyy - tmp)
+    coh = (l1 - l2) / (l1 + l2 + 1e-8)
+    return theta.astype(np.float32), coh.astype(np.float32)
+
+
+def hair_anisotropic(h, gain=0.6, K=12, lambd=6.0, gamma=0.5, ks=21):
+    """Carve grooves ALONG hair strands via an oriented Gabor bank steered by the
+    structure-tensor orientation, gated by coherence (flat areas stay untouched)."""
+    h32 = h.astype(np.float32)
+    theta, coh = _structure_tensor(h32, rho=1.0, sigma_t=2.0)
+    sigma = 0.56 * lambd
+    angs = np.linspace(0, np.pi, K, endpoint=False)
+    resp = np.zeros((K,) + h32.shape, np.float32)
+    for k, a in enumerate(angs):                          # a = stripe-normal = gradient angle
+        kern = cv2.getGaborKernel((ks, ks), sigma, a, lambd, gamma,
+                                  psi=0, ktype=cv2.CV_32F)
+        kern -= kern.mean()                               # zero-DC -> pure high-pass
+        resp[k] = cv2.filter2D(h32, cv2.CV_32F, kern)
+    idx = np.argmin(np.abs(((theta[None] - angs[:, None, None] + np.pi / 2)
+                            % np.pi) - np.pi / 2), axis=0)
+    carve = np.take_along_axis(resp, idx[None], 0)[0]
+    carve = carve / (np.abs(carve).max() + 1e-8)
+    return (h32 + gain * coh * carve).astype(np.float32)
+
+
+def _guided_filter(I, p, r=4, eps=4e-4):
+    """He 2010 guided filter — edge-aware base, no ximgproc dependency."""
+    I = I.astype(np.float32); p = p.astype(np.float32)
+    k = (2 * r + 1, 2 * r + 1)
+    mI = cv2.boxFilter(I, -1, k); mp = cv2.boxFilter(p, -1, k)
+    cov = cv2.boxFilter(I * p, -1, k) - mI * mp
+    var = cv2.boxFilter(I * I, -1, k) - mI * mI
+    a = cov / (var + eps); b = mp - a * mI
+    return cv2.boxFilter(a, -1, k) * I + cv2.boxFilter(b, -1, k)
+
+
+def _local_unsharp(h, r=1.2, amount=0.8):
+    h = h.astype(np.float32)
+    return h + amount * (h - cv2.GaussianBlur(h, (0, 0), r))
+
+
+def compose_relief_perpart(normal_height, depth, luma, region_masks,
+                           form=0.18, normal_detail=0.6, image_detail=1.0,
+                           fine_detail=0.7, micro_detail=0.5, sigma=6.0,
+                           hair_gain=2.2, skin_smooth=0.35, eye_gain=1.5,
+                           lip_gain=1.1, cloth_gain=1.0):
+    """Per-material variant of compose_relief. region_masks is None -> returns
+    exactly compose_relief(...) (graceful fallback for lite / no-face)."""
+    if region_masks is None:
+        return compose_relief(normal_height, depth, luma, form, normal_detail,
+                              image_detail, fine_detail, micro_detail, sigma)
+
+    H, W = luma.shape
+    norm = lambda a: (a - a.min()) / (a.max() - a.min() + 1e-8)
+
+    def fit(a):
+        a = a.astype(np.float32)
+        return a if a.shape[:2] == (H, W) else cv2.resize(a, (W, H))
+
+    def band(a, s):
+        a = norm(fit(a))
+        hp = a - cv2.GaussianBlur(a, (0, 0), s)
+        rstd = 1.4826 * np.median(np.abs(hp - np.median(hp))) + 1e-6
+        return hp / rstd
+
+    # global form (identical to compose_relief)
+    src = depth if depth is not None else normal_height
+    g = norm(cv2.GaussianBlur(fit(src), (0, 0), sigma * 2.5))
+    g = norm(g - cv2.GaussianBlur(g, (0, 0), sigma * 8.0))
+
+    # split detail: mid (structure, kept ~1.0) vs fine+micro (region-modulated)
+    detail_mid = (normal_detail * band(normal_height, sigma)
+                  + image_detail * band(luma, sigma))
+    detail_fine = (fine_detail * band(luma, sigma * 0.5)
+                   + micro_detail * band(luma, sigma * 0.25))
+
+    def M(name):
+        m = region_masks.get(name)
+        return fit(m) if m is not None else np.zeros((H, W), np.float32)
+    m_hair, m_skin = M("hair"), M("skin")
+    m_eyes, m_lips = M("eyes"), M("lips")
+    m_cloth, m_bg = M("cloth"), M("bg")
+
+    # per-region GAIN field for fine+micro (feathered partition of unity)
+    GAIN = {"hair": hair_gain, "skin": skin_smooth, "eyes": eye_gain,
+            "lips": lip_gain, "cloth": cloth_gain, "bg": 0.0}
+    s = np.full((H, W), 1e-6, np.float32)
+    gain_field = np.zeros((H, W), np.float32)
+    for name, m in (("hair", m_hair), ("skin", m_skin), ("eyes", m_eyes),
+                    ("lips", m_lips), ("cloth", m_cloth), ("bg", m_bg)):
+        gain_field += m * GAIN[name]
+        s += m
+    gain_field = gain_field / s
+    covered = np.clip(s - 1e-6, 0, 1)                     # uncovered pixels -> gain 1.0
+    gain_field = covered * gain_field + (1.0 - covered) * 1.0
+    gain_field = gain_field * (1.0 - m_bg)               # hard-kill background detail
+
+    relief = form * g + detail_mid + gain_field * detail_fine
+
+    # targeted per-region treatments, alpha-blended by the feathered mask
+    if m_skin.max() > 0:                                 # skin: edge-aware smoothing
+        base = _guided_filter(relief, relief, r=4, eps=4e-4)
+        skin_treated = base + skin_smooth * (relief - base)
+        relief = m_skin * skin_treated + (1.0 - m_skin) * relief
+    if m_hair.max() > 0:                                 # hair: directional grooves
+        relief = (m_hair * hair_anisotropic(relief, gain=0.6, lambd=6.0)
+                  + (1.0 - m_hair) * relief)
+    if m_eyes.max() > 0:                                 # eyes/brows: targeted sharpen
+        relief = (m_eyes * _local_unsharp(relief, r=1.2, amount=0.8)
+                  + (1.0 - m_eyes) * relief)
+    if m_lips.max() > 0:                                 # lips: vermilion ridge + striations
+        gx = cv2.Sobel(m_lips, cv2.CV_32F, 1, 0, 3)
+        gy = cv2.Sobel(m_lips, cv2.CV_32F, 0, 1, 3)
+        vermilion = 0.05 * np.sqrt(gx * gx + gy * gy)
+        striate = relief - cv2.GaussianBlur(relief, (0, 0), sigmaX=1.0, sigmaY=3.0)
+        relief = (m_lips * (relief + vermilion + 0.6 * striate)
+                  + (1.0 - m_lips) * relief)
+    if m_cloth.max() > 0:                                # cloth: faint isotropic weave
+        n = np.random.default_rng(0).standard_normal((H, W)).astype(np.float32)
+        relief = relief + m_cloth * 0.03 * (n - cv2.GaussianBlur(n, (0, 0), 1.2))
+
+    return relief.astype(np.float32)
+
+
 # ----- Stage 4: bas-relief compression (THE secret sauce) -----
 # Fattal-2002 / Weyrich-2007 style: attenuate large gradients (big depth
 # jumps) while preserving/boosting small ones (fine detail), then re-integrate.

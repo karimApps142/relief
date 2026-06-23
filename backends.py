@@ -43,6 +43,9 @@ class LiteBackend:
     def estimate_depth(self, image: Image.Image):
         return None                                 # no depth fusion in lite mode
 
+    def estimate_parts(self, image: Image.Image):
+        return None                                 # no face parsing in lite mode
+
 
 # ---------------- FULL (GPU, real models) ----------------
 class FullBackend:
@@ -62,3 +65,9 @@ class FullBackend:
 
     def estimate_depth(self, image):
         return self._m.estimate_depth(image)
+
+    def estimate_parts(self, image):
+        try:
+            return self._m.parse_regions(image)
+        except Exception:
+            return None                             # any parse failure -> feature off

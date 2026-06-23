@@ -32,6 +32,13 @@ class ReliefParams:
     micro_gain: float = 0.6         # final crisp sharpen
     base_height: float = 0.50       # mid-gray base plate level
     fig_span: float = 0.45          # shallow figure relief above the base
+    # --- per-material detail pass (face-parsing driven; no-op if unavailable) ---
+    per_material: bool = True       # master enable; auto no-op in lite / no-face
+    hair_gain: float = 2.2          # hair fine+micro multiplier (+ anisotropic grooves)
+    skin_smooth: float = 0.35       # skin micro kept after edge-aware base (lower = smoother)
+    eye_gain: float = 1.5           # eyes/brows targeted sharpen gain
+    lip_gain: float = 1.1           # lips fine gain
+    cloth_gain: float = 1.0         # clothing fine gain (isotropic weave)
     flip_y: bool = False            # toggle if relief comes out inverted
     invert: bool = False            # toggle white<->black height convention
     make_solid: bool = False        # True = watertight (3D print), False = CNC
@@ -55,15 +62,24 @@ def generate_relief(image_path, out_dir, params: ReliefParams = ReliefParams(),
     height = rc.integrate_normals(normal_map, flip_y=params.flip_y)
 
     # 2. compose a SHALLOW global form + DOMINANT multi-scale detail (kills the
-    #    inflated-balloon look). depth is None in lite mode -> form from normals.
+    #    inflated-balloon look), with an optional face-parsing-driven per-material
+    #    pass (hair grooves, smoothed skin, sharp eyes/lips). region_masks is None
+    #    in lite mode / when no face is found -> compose_relief_perpart falls back
+    #    to the plain compose_relief path, so this stays a no-op there.
     depth = be.estimate_depth(image) if params.use_depth_fusion else None
-    height = rc.compose_relief(height, depth, luma,
-                               form=params.form_strength,
-                               normal_detail=params.normal_detail,
-                               image_detail=params.image_detail,
-                               fine_detail=params.fine_detail,
-                               micro_detail=params.micro_detail,
-                               sigma=params.detail_sigma)
+    region_masks = be.estimate_parts(image) if params.per_material else None
+    height = rc.compose_relief_perpart(height, depth, luma, region_masks,
+                                       form=params.form_strength,
+                                       normal_detail=params.normal_detail,
+                                       image_detail=params.image_detail,
+                                       fine_detail=params.fine_detail,
+                                       micro_detail=params.micro_detail,
+                                       sigma=params.detail_sigma,
+                                       hair_gain=params.hair_gain,
+                                       skin_smooth=params.skin_smooth,
+                                       eye_gain=params.eye_gain,
+                                       lip_gain=params.lip_gain,
+                                       cloth_gain=params.cloth_gain)
 
     # 3. local-contrast normalize (CLAHE) + crisp micro-unsharp -> "detail everywhere"
     height = rc.normalize_local(height, clip=params.clahe_clip,
