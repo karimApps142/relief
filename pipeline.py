@@ -24,12 +24,13 @@ class ReliefParams:
     normal_detail: float = 0.6      # surface relief from the AI normals
     image_detail: float = 1.0       # medium photographic texture (planes / fabric)
     fine_detail: float = 0.7        # fine strands / lip lines
-    micro_detail: float = 0.5       # pores / lashes / micro-texture
+    micro_detail: float = 0.35      # pores / lashes / micro-texture
     detail_sigma: float = 6.0       # base high-pass cutoff in px (smaller = finer)
     # --- local contrast + base plate ---
-    clahe_clip: float = 2.5         # local-contrast strength ("detail everywhere")
+    clahe_clip: float = 1.8         # local-contrast strength ("detail everywhere")
     clahe_tile: int = 96            # CLAHE tile size in px
-    micro_gain: float = 0.6         # final crisp sharpen
+    micro_gain: float = 0.4         # final crisp sharpen
+    surface_smooth: float = 0.5     # edge-preserving denoise of the surface (anti-sandpaper)
     base_height: float = 0.50       # mid-gray base plate level
     fig_span: float = 0.45          # shallow figure relief above the base
     # --- per-material detail pass (face-parsing driven; no-op if unavailable) ---
@@ -38,7 +39,7 @@ class ReliefParams:
     skin_smooth: float = 0.35       # skin micro kept after edge-aware base (lower = smoother)
     eye_gain: float = 1.5           # eyes/brows targeted sharpen gain
     lip_gain: float = 1.1           # lips fine gain
-    cloth_gain: float = 1.0         # clothing fine gain (isotropic weave)
+    cloth_gain: float = 0.6         # clothing fine gain
     flip_y: bool = False            # toggle if relief comes out inverted
     invert: bool = False            # toggle white<->black height convention
     make_solid: bool = False        # True = watertight (3D print), False = CNC
@@ -84,6 +85,9 @@ def generate_relief(image_path, out_dir, params: ReliefParams = ReliefParams(),
     # 3. local-contrast normalize (CLAHE) + crisp micro-unsharp -> "detail everywhere"
     height = rc.normalize_local(height, clip=params.clahe_clip,
                                 tile=params.clahe_tile, micro_gain=params.micro_gain)
+
+    # 3b. edge-preserving denoise: kill sub-feature grain so the STL isn't rough
+    height = rc.denoise_surface(height, strength=params.surface_smooth)
 
     # 4. seat the figure on a flat mid-gray base with a crisp silhouette step
     height = rc.compose_onto_base(height, mask, base=params.base_height,

@@ -40,6 +40,31 @@ def integrate_normals(normal_map, flip_y=False):
     return solve_poisson_neumann(div)
 
 
+# ----- edge-preserving helpers (noise control) -----
+def _edge_preserve(a, sigma_color=0.06, sigma_space=5):
+    """Bilateral smooth of a float32 image: removes low-contrast grain while
+    keeping high-contrast edges (hair strands, feature lines). Extracting detail
+    from this instead of the raw photo stops sensor grain becoming relief."""
+    a = a.astype(np.float32)
+    if sigma_color <= 0:
+        return a
+    return cv2.bilateralFilter(a, 0, float(sigma_color), float(sigma_space))
+
+
+def denoise_surface(height, strength=0.5):
+    """Edge-preserving smooth of the FINISHED height field to kill sub-feature
+    geometric grain (the 'sandpaper' that meshes into a rough STL) while keeping
+    carved edges/grooves. strength in [0,1]; 0 = off."""
+    if strength <= 0:
+        return height.astype(np.float32)
+    h = height.astype(np.float32)
+    lo, hi = float(h.min()), float(h.max())
+    hn = (h - lo) / (hi - lo + 1e-8)
+    sm = cv2.bilateralFilter(hn, 0, 0.04 + 0.08 * float(strength),
+                             3.0 + 7.0 * float(strength))
+    return (sm * (hi - lo) + lo).astype(np.float32)
+
+
 # ----- Stage 3b: compose a SHALLOW form + DOMINANT multi-scale detail -----
 # sculpt.ok-class reliefs are ~85% multi-scale edge-aware DETAIL riding on a
 # deliberately crushed (~15%) global form. The previous version did the
@@ -53,6 +78,7 @@ def integrate_normals(normal_map, flip_y=False):
 def compose_relief(normal_height, depth, luma, form=0.18, normal_detail=0.6,
                    image_detail=1.0, fine_detail=0.7, micro_detail=0.5, sigma=6.0):
     H, W = luma.shape
+    luma = _edge_preserve(luma, 0.06)            # de-grain before extracting detail
     norm = lambda a: (a - a.min()) / (a.max() - a.min() + 1e-8)
 
     def fit(a):                                  # align every layer to the photo
@@ -151,6 +177,7 @@ def compose_relief_perpart(normal_height, depth, luma, region_masks,
                               image_detail, fine_detail, micro_detail, sigma)
 
     H, W = luma.shape
+    luma = _edge_preserve(luma, 0.06)            # de-grain before extracting detail
     norm = lambda a: (a - a.min()) / (a.max() - a.min() + 1e-8)
 
     def fit(a):
@@ -215,9 +242,8 @@ def compose_relief_perpart(normal_height, depth, luma, region_masks,
         striate = relief - cv2.GaussianBlur(relief, (0, 0), sigmaX=1.0, sigmaY=3.0)
         relief = (m_lips * (relief + vermilion + 0.6 * striate)
                   + (1.0 - m_lips) * relief)
-    if m_cloth.max() > 0:                                # cloth: faint isotropic weave
-        n = np.random.default_rng(0).standard_normal((H, W)).astype(np.float32)
-        relief = relief + m_cloth * 0.03 * (n - cv2.GaussianBlur(n, (0, 0), 1.2))
+    # (cloth keeps the photo's own weave via the gain field; no synthetic noise
+    #  added — that was geometric sandpaper on the STL.)
 
     return relief.astype(np.float32)
 

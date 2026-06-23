@@ -9,7 +9,7 @@ import model_manager
 
 
 def make_relief(image_path, depth_mm, pixel_mm, form_strength,
-                image_detail, fine_detail, micro_detail, clahe_clip, micro_gain,
+                image_detail, fine_detail, micro_detail, clahe_clip, micro_gain, surface_smooth,
                 per_material, hair_gain, skin_smooth, eye_gain, lip_gain, cloth_gain,
                 normals, make_solid, flip_y, invert):
     if not image_path:
@@ -18,7 +18,7 @@ def make_relief(image_path, depth_mm, pixel_mm, form_strength,
         relief_depth_mm=depth_mm, pixel_mm=pixel_mm,
         form_strength=form_strength, image_detail=image_detail,
         fine_detail=fine_detail, micro_detail=micro_detail,
-        clahe_clip=clahe_clip, micro_gain=micro_gain,
+        clahe_clip=clahe_clip, micro_gain=micro_gain, surface_smooth=surface_smooth,
         per_material=per_material, hair_gain=hair_gain, skin_smooth=skin_smooth,
         eye_gain=eye_gain, lip_gain=lip_gain, cloth_gain=cloth_gain,
         normals=normals, make_solid=make_solid,
@@ -57,7 +57,7 @@ detail on a flat mid-gray base (the sculpt.ok approach). The defaults already ta
 Keep **Normals = marigold**. Adjust from the result:
 - **Still puffy / bust-like?** → lower *3D form* toward 0.10
 - **Want more carving / texture?** → raise *Fine* + *Micro detail*, and *Local contrast* toward 3.5
-- **Too noisy / grainy?** → lower *Micro detail* and *Sharpen*
+- **Rough / noisy 3D surface (sandpaper in the STL)?** → raise *Surface smoothness*; lower *Micro detail* + *Sharpen*
 - **Detail weak/flat in smooth areas?** → raise *Local contrast*
 
 *This engine inverts the old balance: ~15% global form, ~85% multi-scale detail. The photo's own
@@ -80,12 +80,14 @@ with gr.Blocks(title="CNC Bas-Relief") as demo:
                                      label="Photo detail — medium (planes / fabric)")
             fine_detail = gr.Slider(0.0, 1.5, value=0.7, step=0.05,
                                     label="Fine detail — strands / lip lines")
-            micro_detail = gr.Slider(0.0, 1.2, value=0.5, step=0.05,
+            micro_detail = gr.Slider(0.0, 1.2, value=0.35, step=0.05,
                                      label="Micro detail — pores / lashes")
-            clahe_clip = gr.Slider(1.0, 4.0, value=2.5, step=0.1,
+            clahe_clip = gr.Slider(1.0, 4.0, value=1.8, step=0.1,
                                    label="Local contrast (detail everywhere)")
-            micro_gain = gr.Slider(0.0, 1.5, value=0.6, step=0.05,
+            micro_gain = gr.Slider(0.0, 1.5, value=0.4, step=0.05,
                                    label="Sharpen")
+            surface_smooth = gr.Slider(0.0, 1.0, value=0.5, step=0.05,
+                                       label="Surface smoothness (denoise / anti-rough)")
             gr.Markdown("**Per-material detail** (portraits; auto-off if no face)")
             per_material = gr.Checkbox(value=True, label="Enable per-material pass")
             hair_gain = gr.Slider(0.0, 4.0, value=2.2, step=0.1,
@@ -96,8 +98,8 @@ with gr.Blocks(title="CNC Bas-Relief") as demo:
                                  label="Eyes / brows sharpen")
             lip_gain = gr.Slider(0.0, 2.0, value=1.1, step=0.05,
                                  label="Lips detail")
-            cloth_gain = gr.Slider(0.0, 2.0, value=1.0, step=0.05,
-                                   label="Clothing weave")
+            cloth_gain = gr.Slider(0.0, 2.0, value=0.6, step=0.05,
+                                   label="Clothing detail")
             normals = gr.Radio(["marigold", "stable"], value="marigold",
                                label="Normals model (full mode only)")
             with gr.Row():
@@ -118,7 +120,7 @@ with gr.Blocks(title="CNC Bas-Relief") as demo:
 
     go.click(make_relief,
              [img, depth_mm, pixel_mm, form_strength,
-              image_detail, fine_detail, micro_detail, clahe_clip, micro_gain,
+              image_detail, fine_detail, micro_detail, clahe_clip, micro_gain, surface_smooth,
               per_material, hair_gain, skin_smooth, eye_gain, lip_gain, cloth_gain,
               normals, make_solid, flip_y, invert],
              [preview, png_file, stl_file])
