@@ -15,7 +15,7 @@ import relief_core as rc
 class ReliefParams:
     relief_depth_mm: float = 8.0     # physical Z height of the carve
     pixel_mm: float = 0.1            # mm per pixel (controls plate size)
-    normals: str = "stable"         # "stable" | "marigold" (full mode only)
+    normals: str = "marigold"       # "marigold" | "stable" (StableNormal is broken on Windows)
     use_depth_fusion: bool = True   # blend global depth + normal detail
     compress_beta: float = 0.55     # lower = flatter relief
     detail_gain: float = 1.4        # higher = punchier detail

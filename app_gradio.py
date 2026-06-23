@@ -45,7 +45,7 @@ with gr.Blocks(title="CNC Bas-Relief") as demo:
             beta = gr.Slider(0.1, 1.0, value=0.55, step=0.05,
                              label="compress_beta (lower = flatter)")
             detail = gr.Slider(0.5, 3.0, value=1.4, step=0.1, label="detail_gain")
-            normals = gr.Radio(["stable", "marigold"], value="stable",
+            normals = gr.Radio(["marigold", "stable"], value="marigold",
                                label="Normals model (full mode only)")
             with gr.Row():
                 make_solid = gr.Checkbox(label="Watertight solid (3D print)")
