@@ -10,6 +10,11 @@ accelerate
 einops
 kornia                   # BiRefNet (background removal) loads remote code that imports kornia
 timm                     # BiRefNet backbone (timm) — without it from_pretrained raises ImportError
-# Depth Anything 3 (optional depth backend, not on PyPI). Install on the box once:
-#   pip install xformers
-#   pip install git+https://github.com/ByteDance-Seed/Depth-Anything-3
+# Depth Anything 3 (optional depth backend). Its full deps (open3d -> numpy<2,
+# moviepy, pycolmap, xformers>=torch2.10) CONFLICT with our cu121/numpy-2 stack,
+# so install the package WITHOUT deps + only the light leaf deps the monocular
+# depth path needs. The heavy export/multi-view libs are stubbed at runtime in
+# models._da3(), so they are NOT required. Install on the box once:
+#   pip install --no-deps git+https://github.com/ByteDance-Seed/Depth-Anything-3
+#   pip install omegaconf e3nn typer addict jaxtyping roma plyfile
+#   (do NOT 'pip install xformers' — its latest needs torch>=2.10 and nukes cu121)

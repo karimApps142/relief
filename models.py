@@ -215,7 +215,9 @@ def _da3():
     import sys
     from unittest.mock import MagicMock
     for _m in ("moviepy", "moviepy.editor", "open3d", "pycolmap", "evo",
-               "pillow_heif", "gsplat"):
+               "pillow_heif", "gsplat",
+               "depth_anything_3.utils.export",      # whole export chain (gs/ply/video/matplotlib)
+               "depth_anything_3.utils.pose_align"):  # multi-view pose alignment (evo)
         sys.modules.setdefault(_m, MagicMock())
     from depth_anything_3.api import DepthAnything3
     return DepthAnything3.from_pretrained(_DA3_REPO).to(device=DEVICE)
