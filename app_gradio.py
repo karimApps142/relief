@@ -37,8 +37,31 @@ def do_download():
     return "\n".join(logs), models_status_md()
 
 
+TUNING_GUIDE = """\
+**Reference look = detailed + shallow-carved** — lots of surface texture, moderate 3D.
+Push detail **up** and form **down**.
+
+| Control | Default | Try this |
+|---|---|---|
+| **Photo detail** (hair / fabric / skin) | 0.8 | **1.4** |
+| **3D form** (lower = flatter / engraved) | 1.0 | **0.65** |
+| **detail_gain** | 1.4 | **2.0** |
+| **compress_beta** | 0.55 | **0.45** |
+
+Keep **Normals = marigold**, then adjust from the result:
+- **Still smooth / blobby?** → *Photo detail* up to 1.8–2.0, *3D form* down to 0.4
+- **Too noisy / grainy?** → lower *Photo detail* and *detail_gain* a little
+- **Face too flat** (no cheekbones / nose)? → *3D form* back up to ~0.9
+
+*Photo detail turns the photo's own luminance (hair, fabric, eyes, lips) into relief — it's the
+main lever for the carved look; depth/normals alone smooth into a blob.*
+"""
+
+
 with gr.Blocks(title="CNC Bas-Relief") as demo:
     gr.Markdown("# CNC Bas-Relief Generator\nImage → 16-bit heightmap + STL")
+    with gr.Accordion("📐 Tuning guide — chase the engraved / sculpt-style look", open=False):
+        gr.Markdown(TUNING_GUIDE)
     with gr.Row():
         with gr.Column():
             img = gr.Image(type="filepath", label="Input image")
