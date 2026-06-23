@@ -207,6 +207,16 @@ _DA3_REPO = "depth-anything/DA3-LARGE"
 
 @functools.lru_cache(maxsize=1)
 def _da3():
+    # DA3's api.py eagerly imports its multi-view / video / point-cloud EXPORT
+    # stack (moviepy, open3d, pycolmap, …) at module load. We only need monocular
+    # depth (inference().depth) and never call those exporters, so stub them with
+    # mocks instead of installing them — open3d in particular would force numpy<2
+    # and break the cu121 stack. The depth path never touches these.
+    import sys
+    from unittest.mock import MagicMock
+    for _m in ("moviepy", "moviepy.editor", "open3d", "pycolmap", "evo",
+               "pillow_heif", "gsplat"):
+        sys.modules.setdefault(_m, MagicMock())
     from depth_anything_3.api import DepthAnything3
     return DepthAnything3.from_pretrained(_DA3_REPO).to(device=DEVICE)
 
