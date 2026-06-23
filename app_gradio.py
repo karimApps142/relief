@@ -8,15 +8,16 @@ from pipeline import generate_relief, ReliefParams
 import model_manager
 
 
-def make_relief(image_path, depth_mm, pixel_mm, beta, detail_gain,
-                image_detail, form_strength,
+def make_relief(image_path, depth_mm, pixel_mm, form_strength,
+                image_detail, fine_detail, micro_detail, clahe_clip, micro_gain,
                 normals, make_solid, flip_y, invert):
     if not image_path:
         raise gr.Error("Upload an image first.")
     params = ReliefParams(
         relief_depth_mm=depth_mm, pixel_mm=pixel_mm,
-        compress_beta=beta, detail_gain=detail_gain,
-        image_detail=image_detail, form_strength=form_strength,
+        form_strength=form_strength, image_detail=image_detail,
+        fine_detail=fine_detail, micro_detail=micro_detail,
+        clahe_clip=clahe_clip, micro_gain=micro_gain,
         normals=normals, make_solid=make_solid,
         flip_y=flip_y, invert=invert,
     )
@@ -38,23 +39,26 @@ def do_download():
 
 
 TUNING_GUIDE = """\
-**Reference look = detailed + shallow-carved** — lots of surface texture, moderate 3D.
-Push detail **up** and form **down**.
+**Engraved bas-relief engine** — a shallow global form with dominant multi-scale photographic
+detail on a flat mid-gray base (the sculpt.ok approach). The defaults already target that look.
 
-| Control | Default | Try this |
+| Control | Default | Effect |
 |---|---|---|
-| **Photo detail** (hair / fabric / skin) | 0.8 | **1.4** |
-| **3D form** (lower = flatter / engraved) | 1.0 | **0.65** |
-| **detail_gain** | 1.4 | **2.0** |
-| **compress_beta** | 0.55 | **0.45** |
+| **3D form** | 0.18 | global dome share — **lower = flatter / more engraved**, higher = bust-like |
+| **Photo detail (medium)** | 1.0 | planes, fabric folds, broad texture |
+| **Fine detail** | 0.7 | hair strands, lip lines |
+| **Micro detail** | 0.5 | eyelashes, pores, skin micro-texture |
+| **Local contrast** | 2.5 | CLAHE — pushes detail into smooth areas (cheeks) too |
+| **Sharpen** | 0.6 | final crispness |
 
-Keep **Normals = marigold**, then adjust from the result:
-- **Still smooth / blobby?** → *Photo detail* up to 1.8–2.0, *3D form* down to 0.4
-- **Too noisy / grainy?** → lower *Photo detail* and *detail_gain* a little
-- **Face too flat** (no cheekbones / nose)? → *3D form* back up to ~0.9
+Keep **Normals = marigold**. Adjust from the result:
+- **Still puffy / bust-like?** → lower *3D form* toward 0.10
+- **Want more carving / texture?** → raise *Fine* + *Micro detail*, and *Local contrast* toward 3.5
+- **Too noisy / grainy?** → lower *Micro detail* and *Sharpen*
+- **Detail weak/flat in smooth areas?** → raise *Local contrast*
 
-*Photo detail turns the photo's own luminance (hair, fabric, eyes, lips) into relief — it's the
-main lever for the carved look; depth/normals alone smooth into a blob.*
+*This engine inverts the old balance: ~15% global form, ~85% multi-scale detail. The photo's own
+luminance becomes the carved surface; depth only gives gentle overall shaping.*
 """
 
 
@@ -67,13 +71,18 @@ with gr.Blocks(title="CNC Bas-Relief") as demo:
             img = gr.Image(type="filepath", label="Input image")
             depth_mm = gr.Slider(2, 20, value=8, step=0.5, label="Relief depth (mm)")
             pixel_mm = gr.Slider(0.02, 0.5, value=0.1, step=0.01, label="Pixel size (mm)")
-            beta = gr.Slider(0.1, 1.0, value=0.55, step=0.05,
-                             label="compress_beta (lower = flatter)")
-            detail = gr.Slider(0.5, 3.0, value=1.4, step=0.1, label="detail_gain")
-            image_detail = gr.Slider(0.0, 2.0, value=0.8, step=0.05,
-                                     label="Photo detail (hair / fabric / skin)")
-            form_strength = gr.Slider(0.0, 2.0, value=1.0, step=0.05,
-                                      label="3D form (lower = flatter, more engraved)")
+            form_strength = gr.Slider(0.05, 0.40, value=0.18, step=0.01,
+                                      label="3D form (lower = flatter / more engraved)")
+            image_detail = gr.Slider(0.0, 2.0, value=1.0, step=0.05,
+                                     label="Photo detail — medium (planes / fabric)")
+            fine_detail = gr.Slider(0.0, 1.5, value=0.7, step=0.05,
+                                    label="Fine detail — strands / lip lines")
+            micro_detail = gr.Slider(0.0, 1.2, value=0.5, step=0.05,
+                                     label="Micro detail — pores / lashes")
+            clahe_clip = gr.Slider(1.0, 4.0, value=2.5, step=0.1,
+                                   label="Local contrast (detail everywhere)")
+            micro_gain = gr.Slider(0.0, 1.5, value=0.6, step=0.05,
+                                   label="Sharpen")
             normals = gr.Radio(["marigold", "stable"], value="marigold",
                                label="Normals model (full mode only)")
             with gr.Row():
@@ -93,7 +102,8 @@ with gr.Blocks(title="CNC Bas-Relief") as demo:
         dl.click(do_download, outputs=[dl_log, status])
 
     go.click(make_relief,
-             [img, depth_mm, pixel_mm, beta, detail, image_detail, form_strength,
+             [img, depth_mm, pixel_mm, form_strength,
+              image_detail, fine_detail, micro_detail, clahe_clip, micro_gain,
               normals, make_solid, flip_y, invert],
              [preview, png_file, stl_file])
 

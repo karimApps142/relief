@@ -40,15 +40,18 @@ def integrate_normals(normal_map, flip_y=False):
     return solve_poisson_neumann(div)
 
 
-# ----- Stage 3b: compose global form + multi-source surface detail -----
-# The old pipeline added a FULL-RANGE depth map to a tiny high-pass of the
-# integrated normals, so depth swamped everything -> a smooth "melted" blob.
-# Here every layer is normalized and detail gets real weight. Crucially, the
-# source photo's own luminance high-pass supplies the fine texture (hair
-# strands, fabric folds, eyes/lips) that the AI depth/normal models smooth
-# away — that photographic detail is what separates a flat blob from a carving.
-def compose_relief(normal_height, depth, luma, form=1.0, normal_detail=0.6,
-                   image_detail=0.8, fine_detail=0.4, sigma=6.0):
+# ----- Stage 3b: compose a SHALLOW form + DOMINANT multi-scale detail -----
+# sculpt.ok-class reliefs are ~85% multi-scale edge-aware DETAIL riding on a
+# deliberately crushed (~15%) global form. The previous version did the
+# opposite: a full-range depth dome at form=1.0 plus tiny high-pass residuals,
+# so form swamped detail ~15:1 -> an inflated soft bust. Fixes here:
+#   (1) plane-subtract the depth dome and keep only a small slice (form~0.18);
+#   (2) build detail from MAD-normalized octaves so each weight is a REAL
+#       amplitude (a raw high-pass is only a few % p-p), incl. a ~1.5px micro
+#       band for lashes/pores. The detail sum (~2.8) now dominates the thin form.
+# (Fattal 2002 / Weyrich 2007 gradient-domain bas-relief family.)
+def compose_relief(normal_height, depth, luma, form=0.18, normal_detail=0.6,
+                   image_detail=1.0, fine_detail=0.7, micro_detail=0.5, sigma=6.0):
     H, W = luma.shape
     norm = lambda a: (a - a.min()) / (a.max() - a.min() + 1e-8)
 
@@ -56,20 +59,24 @@ def compose_relief(normal_height, depth, luma, form=1.0, normal_detail=0.6,
         a = a.astype(np.float32)
         return a if a.shape[:2] == (H, W) else cv2.resize(a, (W, H))
 
-    def highpass(a, s):                          # normalized high-frequency layer
+    def band(a, s):                              # zero-mean octave, ~unit amplitude
         a = norm(fit(a))
-        return a - cv2.GaussianBlur(a, (0, 0), s)
+        hp = a - cv2.GaussianBlur(a, (0, 0), s)
+        rstd = 1.4826 * np.median(np.abs(hp - np.median(hp))) + 1e-6
+        return hp / rstd                         # MAD-normalize: weight -> real amplitude
 
-    # global 3D form: heavily smoothed depth (falls back to the integrated
-    # normals when depth is absent, e.g. lite mode on the Mac)
+    # GLOBAL FORM: crush the balloon — strip the broad low-freq dome, keep a sliver
     src = depth if depth is not None else normal_height
-    base = norm(cv2.GaussianBlur(fit(src), (0, 0), sigma * 2.5))
+    g = norm(cv2.GaussianBlur(fit(src), (0, 0), sigma * 2.5))
+    g = norm(g - cv2.GaussianBlur(g, (0, 0), sigma * 8.0))
 
-    # surface detail: mid-freq from the normals + multi-scale photographic detail
-    detail = normal_detail * highpass(normal_height, sigma)
-    detail = detail + image_detail * highpass(luma, sigma)        # medium texture
-    detail = detail + fine_detail * highpass(luma, sigma * 0.5)   # fine strands
-    return form * base + detail
+    # MULTI-SCALE DETAIL: finest octaves dominate (~1/f spectrum)
+    detail = normal_detail * band(normal_height, sigma)          # mid (AI normals)
+    detail = detail + image_detail * band(luma, sigma)           # medium texture
+    detail = detail + fine_detail * band(luma, sigma * 0.5)      # fine strands
+    detail = detail + micro_detail * band(luma, sigma * 0.25)    # micro (lashes/pores)
+
+    return form * g + detail
 
 
 # ----- Stage 4: bas-relief compression (THE secret sauce) -----
@@ -102,9 +109,43 @@ def flatten_background(height, mask, threshold=0.5):
     return np.clip(height, 0, None)
 
 
-def to_heightmap_16bit(height, invert=False):
+# ----- Stage 5b (new engine): local-contrast normalize + flat mid-gray base -----
+def _clahe_tiles(h, px):
+    return (max(2, h.shape[1] // px), max(2, h.shape[0] // px))
+
+
+def normalize_local(height, clip=2.5, tile=96, gamma=0.85, micro_gain=0.6):
+    """CLAHE local-contrast + crisp micro-unsharp so detail reads with comparable
+    amplitude EVERYWHERE (smooth cheek vs. dense hair) — the engraved character.
+    Replaces enhance_detail in the new flow; a 0.5/99.5 percentile stretch makes
+    it robust to the spiky outliers MAD-normalized detail bands can produce."""
+    lo, hi = np.percentile(height, [0.5, 99.5])
+    h = np.clip((height - lo) / (hi - lo + 1e-8), 0.0, 1.0).astype(np.float32)
+    h16 = (h * 65535.0).astype(np.uint16)
+    clahe = cv2.createCLAHE(clipLimit=float(clip), tileGridSize=_clahe_tiles(h, tile))
+    h = clahe.apply(h16).astype(np.float32) / 65535.0
+    h = np.power(h, gamma)                                # mild mid-tone lift
+    hp = h - cv2.GaussianBlur(h, (0, 0), 1.5)            # true fine high-pass
+    return np.clip(h + micro_gain * hp, 0.0, 1.0)
+
+
+def compose_onto_base(figure, mask, base=0.50, fig_span=0.45):
+    """Seat the figure on a flat mid-gray plate with a crisp silhouette step, so it
+    looks engraved into a slab (sculpt.ok-style) instead of a full-range dome
+    floating in black. Caller must NOT renormalize after this (keeps it shallow)."""
+    f = (figure - figure.min()) / (figure.max() - figure.min() + 1e-8)
+    out = (base + f * fig_span).astype(np.float32)       # figure rides base..base+span
+    if mask is not None and mask.shape[:2] == out.shape[:2]:
+        out = np.where(mask > 0.5, out, base).astype(np.float32)  # flat base + crisp edge
+    return out
+
+
+def to_heightmap_16bit(height, invert=False, normalize=True):
     h = height.astype(np.float64)
-    h = (h - h.min()) / (h.max() - h.min() + 1e-8)
+    if normalize:                                # legacy callers: stretch to full range
+        h = (h - h.min()) / (h.max() - h.min() + 1e-8)
+    else:                                        # new flow: keep the shallow base/range
+        h = np.clip(h, 0.0, 1.0)
     if invert:
         h = 1.0 - h
     return (h * 65535.0).astype(np.uint16)
