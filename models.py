@@ -31,8 +31,12 @@ def _birefnet():
     from transformers import AutoModelForImageSegmentation
     m = AutoModelForImageSegmentation.from_pretrained(
         "ZhengPeng7/BiRefNet", trust_remote_code=True
-    ).to(DEVICE).eval()
-    return m
+    ).to(DEVICE)
+    # transformers >=5 loads the checkpoint in its native fp16; remove_background
+    # feeds an fp32 tensor, so force fp32 to avoid "Input type (float) and bias
+    # type (c10::Half) should be the same" in the first conv. fp32 BiRefNet is
+    # only ~0.9 GB — fine on the 12 GB 3060, and keeps the mask in fp32 for cv2.
+    return m.float().eval()
 
 
 def remove_background(image: Image.Image) -> np.ndarray:
