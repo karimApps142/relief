@@ -40,6 +40,38 @@ def integrate_normals(normal_map, flip_y=False):
     return solve_poisson_neumann(div)
 
 
+# ----- Stage 3b: compose global form + multi-source surface detail -----
+# The old pipeline added a FULL-RANGE depth map to a tiny high-pass of the
+# integrated normals, so depth swamped everything -> a smooth "melted" blob.
+# Here every layer is normalized and detail gets real weight. Crucially, the
+# source photo's own luminance high-pass supplies the fine texture (hair
+# strands, fabric folds, eyes/lips) that the AI depth/normal models smooth
+# away — that photographic detail is what separates a flat blob from a carving.
+def compose_relief(normal_height, depth, luma, form=1.0, normal_detail=0.6,
+                   image_detail=0.8, fine_detail=0.4, sigma=6.0):
+    H, W = luma.shape
+    norm = lambda a: (a - a.min()) / (a.max() - a.min() + 1e-8)
+
+    def fit(a):                                  # align every layer to the photo
+        a = a.astype(np.float32)
+        return a if a.shape[:2] == (H, W) else cv2.resize(a, (W, H))
+
+    def highpass(a, s):                          # normalized high-frequency layer
+        a = norm(fit(a))
+        return a - cv2.GaussianBlur(a, (0, 0), s)
+
+    # global 3D form: heavily smoothed depth (falls back to the integrated
+    # normals when depth is absent, e.g. lite mode on the Mac)
+    src = depth if depth is not None else normal_height
+    base = norm(cv2.GaussianBlur(fit(src), (0, 0), sigma * 2.5))
+
+    # surface detail: mid-freq from the normals + multi-scale photographic detail
+    detail = normal_detail * highpass(normal_height, sigma)
+    detail = detail + image_detail * highpass(luma, sigma)        # medium texture
+    detail = detail + fine_detail * highpass(luma, sigma * 0.5)   # fine strands
+    return form * base + detail
+
+
 # ----- Stage 4: bas-relief compression (THE secret sauce) -----
 # Fattal-2002 / Weyrich-2007 style: attenuate large gradients (big depth
 # jumps) while preserving/boosting small ones (fine detail), then re-integrate.

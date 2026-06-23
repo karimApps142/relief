@@ -9,12 +9,14 @@ import model_manager
 
 
 def make_relief(image_path, depth_mm, pixel_mm, beta, detail_gain,
+                image_detail, form_strength,
                 normals, make_solid, flip_y, invert):
     if not image_path:
         raise gr.Error("Upload an image first.")
     params = ReliefParams(
         relief_depth_mm=depth_mm, pixel_mm=pixel_mm,
         compress_beta=beta, detail_gain=detail_gain,
+        image_detail=image_detail, form_strength=form_strength,
         normals=normals, make_solid=make_solid,
         flip_y=flip_y, invert=invert,
     )
@@ -45,6 +47,10 @@ with gr.Blocks(title="CNC Bas-Relief") as demo:
             beta = gr.Slider(0.1, 1.0, value=0.55, step=0.05,
                              label="compress_beta (lower = flatter)")
             detail = gr.Slider(0.5, 3.0, value=1.4, step=0.1, label="detail_gain")
+            image_detail = gr.Slider(0.0, 2.0, value=0.8, step=0.05,
+                                     label="Photo detail (hair / fabric / skin)")
+            form_strength = gr.Slider(0.0, 2.0, value=1.0, step=0.05,
+                                      label="3D form (lower = flatter, more engraved)")
             normals = gr.Radio(["marigold", "stable"], value="marigold",
                                label="Normals model (full mode only)")
             with gr.Row():
@@ -64,8 +70,8 @@ with gr.Blocks(title="CNC Bas-Relief") as demo:
         dl.click(do_download, outputs=[dl_log, status])
 
     go.click(make_relief,
-             [img, depth_mm, pixel_mm, beta, detail, normals,
-              make_solid, flip_y, invert],
+             [img, depth_mm, pixel_mm, beta, detail, image_detail, form_strength,
+              normals, make_solid, flip_y, invert],
              [preview, png_file, stl_file])
 
 
