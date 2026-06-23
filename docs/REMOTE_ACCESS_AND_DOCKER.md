@@ -9,6 +9,36 @@ Two operational guides for the GPU box (`DESKTOP-BVI0N3I`, Windows 11 Pro, RTX 3
 
 ---
 
+## ⚡ Quick start — connect & run (the everyday commands)
+
+**1. On the Mac** (Terminal) — SSH into the box over Tailscale:
+```bash
+ssh ad@100.86.189.84
+```
+
+**2. On the box** — pull latest + start the app:
+```
+cd /d F:\relief
+git pull
+.venv\Scripts\python.exe app_gradio.py
+```
+Wait for `Running on http://0.0.0.0:7860`.
+
+**3. View it on the Mac** — open in the browser (no tunnel needed; Tailscale routes directly):
+
+> **http://100.86.189.84:7860**
+
+**Stop:** `Ctrl+C` in that terminal, then `exit` to leave SSH.
+
+Notes:
+- Keep the SSH terminal open — closing it stops the app.
+- If `ssh` asks for a password, enter the Windows **`ad`** account password.
+- `connection refused / timed out` → the box is off/asleep or not on Tailscale; power it on.
+- First **Generate** with the **sapiens** depth model downloads ~4 GB once (cached after).
+- Box identity: `DESKTOP-BVI0N3I`, Tailscale IP `100.86.189.84`, project at `F:\relief`.
+
+---
+
 # Part A — SSH into Windows from the Mac
 
 ## A1. Enable OpenSSH Server on Windows (one-time)
