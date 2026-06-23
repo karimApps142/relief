@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(ping -c 4 192.168.1.6)",
+      "Bash(ping -c 3 100.86.189.84)",
+      "Bash(nc -vz -G 5 100.86.189.84 22)",
+      "Bash(ssh-keygen -t ed25519 -f ~/.ssh/winbox -N \"\" -C \"mac->winbox\")",
+      "Bash(ssh -v -o BatchMode=yes -o ConnectTimeout=10 -o StrictHostKeyChecking=accept-new ad@100.86.189.84 exit)",
+      "Bash(git commit -m 'fix\\(gpu\\): pin torch/torchvision to +cu121 so pip can'\\\\''t grab the CPU wheel *)",
+      "Bash(git push *)",
+      "Bash(git commit -m 'fix\\(gpu\\): add kornia + timm \\(BiRefNet remote-code deps\\) *)"
+    ]
+  }
+}
