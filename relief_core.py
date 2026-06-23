@@ -335,6 +335,20 @@ def heightmap_to_surface(height16, z_scale_mm=8.0, pixel_mm=0.1):
     return trimesh.Trimesh(vertices=V, faces=F, process=False)
 
 
+def heightmap_to_preview(height16, z_scale_mm=8.0, pixel_mm=0.1, max_px=400):
+    """Lightweight DOWNSAMPLED surface mesh for the in-browser 3D viewer — the
+    full-res STL can be 100+ MB / millions of faces, too heavy for a browser."""
+    h = height16
+    rows, cols = h.shape
+    scale = min(1.0, float(max_px) / max(rows, cols))
+    if scale < 1.0:
+        h = cv2.resize(h.astype(np.float32),
+                       (max(2, int(cols * scale)), max(2, int(rows * scale))),
+                       interpolation=cv2.INTER_AREA).astype(np.uint16)
+        pixel_mm = pixel_mm / scale            # keep the physical dimensions
+    return heightmap_to_surface(h, z_scale_mm, pixel_mm)
+
+
 def heightmap_to_solid(height16, z_scale_mm=8.0, pixel_mm=0.1, base_mm=2.0):
     """Watertight solid (top + base + walls) — needed for 3D printing."""
     h = height16.astype(np.float64) / 65535.0

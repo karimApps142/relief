@@ -3,8 +3,11 @@ app_gradio.py — all-Python local UI for the relief pipeline.
 Run: python app_gradio.py   (opens http://localhost:7860)
 Backend = "auto": lite on the Mac, full on Windows once weights are downloaded.
 """
+import numpy as np
+from PIL import Image
 import gradio as gr
 from pipeline import generate_relief, ReliefParams
+import relief_core as rc
 import model_manager
 
 
@@ -25,8 +28,13 @@ def make_relief(image_path, depth_mm, pixel_mm, form_strength,
         flip_y=flip_y, invert=invert,
     )
     out = generate_relief(image_path, "out/", params, backend="auto")
-    # heightmap path feeds both the preview and the PNG download
-    return out["heightmap"], out["heightmap"], out["stl"]
+    # lightweight downsampled mesh for the in-browser 3D viewer (the full STL can
+    # be 100+ MB and too heavy for the browser)
+    h16 = np.asarray(Image.open(out["heightmap"]))
+    preview3d = "out/preview.glb"
+    rc.heightmap_to_preview(h16, z_scale_mm=depth_mm, pixel_mm=pixel_mm).export(preview3d)
+    # heightmap path feeds both the preview image and the PNG download
+    return out["heightmap"], out["heightmap"], out["stl"], preview3d
 
 
 # ---- optional models panel (only meaningful on the Windows GPU box) ----
@@ -109,6 +117,7 @@ with gr.Blocks(title="CNC Bas-Relief") as demo:
             go = gr.Button("Generate relief", variant="primary")
         with gr.Column():
             preview = gr.Image(label="Heightmap preview")
+            model3d = gr.Model3D(label="3D preview (rotate / zoom — the real surface)")
             png_file = gr.File(label="16-bit heightmap (PNG)")
             stl_file = gr.File(label="STL")
 
@@ -123,7 +132,7 @@ with gr.Blocks(title="CNC Bas-Relief") as demo:
               image_detail, fine_detail, micro_detail, clahe_clip, micro_gain, surface_smooth,
               per_material, hair_gain, skin_smooth, eye_gain, lip_gain, cloth_gain,
               normals, make_solid, flip_y, invert],
-             [preview, png_file, stl_file])
+             [preview, png_file, stl_file, model3d])
 
 
 if __name__ == "__main__":
