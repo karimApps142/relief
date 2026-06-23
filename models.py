@@ -19,7 +19,7 @@ DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 def unload_all():
     """Free cached models + VRAM. Call between heavy stages on small GPUs."""
     for fn in (_birefnet, _stablenormal, _marigold_normals, _depth_pipe,
-               _face_parser, _sapiens_depth):
+               _face_parser, _sapiens_depth, _da3):
         fn.cache_clear()
     gc.collect()
     if torch.cuda.is_available():
@@ -195,3 +195,43 @@ def estimate_depth_sapiens(image: Image.Image) -> np.ndarray:
                                           mode="bilinear", align_corners=False)
     d = out.float().squeeze().cpu().numpy()         # HxW relative depth (near = small)
     return -d                                       # negate -> larger = nearer
+
+
+# ---------- Depth: Depth Anything 3 (ByteDance, SOTA monocular/geometry) ----------
+# Uses the standalone `depth_anything_3` package (NOT transformers). Install on the
+# box once:  pip install xformers
+#            pip install git+https://github.com/ByteDance-Seed/Depth-Anything-3
+# CC-BY-NC. DA3-LARGE ~0.35B, fits 12 GB. inference([path]) -> prediction.depth [1,H,W].
+_DA3_REPO = "depth-anything/DA3-LARGE"
+
+
+@functools.lru_cache(maxsize=1)
+def _da3():
+    from depth_anything_3.api import DepthAnything3
+    return DepthAnything3.from_pretrained(_DA3_REPO).to(device=DEVICE)
+
+
+def estimate_depth_da3(image: Image.Image) -> np.ndarray:
+    """Monocular depth from Depth Anything 3 (single image), mapped back to the
+    input resolution. Returns HxW float where LARGER = NEARER (matches the other
+    depth backends)."""
+    import tempfile
+    import os as _os
+    img = image.convert("RGB")
+    W0, H0 = img.size
+    tmp = tempfile.NamedTemporaryFile(suffix=".png", delete=False).name
+    img.save(tmp)
+    try:
+        pred = _da3().inference([tmp])
+    finally:
+        try:
+            _os.unlink(tmp)
+        except OSError:
+            pass
+    d = pred.depth
+    if hasattr(d, "detach"):
+        d = d.detach().float().cpu().numpy()
+    d = np.asarray(d, dtype=np.float32).squeeze()       # [1,H,W] -> HxW
+    if d.shape[:2] != (H0, W0):
+        d = cv2.resize(d, (W0, H0))
+    return -d                                           # negate -> larger = nearer

@@ -68,6 +68,11 @@ class FullBackend:
         return self._m.estimate_normals_stable(image)
 
     def estimate_depth(self, image, model="sapiens", tiling=False):
+        if model == "depth-anything-3":                # ByteDance DA3 (SOTA, needs its package)
+            try:
+                return self._m.estimate_depth_da3(image)
+            except Exception:
+                return self._m.estimate_depth(image)   # fallback: Depth-Anything-V2
         if model == "depth-anything":
             if tiling:                                 # high-res tile fusion (generic model only)
                 return rc.tiled_depth(image, self._m.estimate_depth)

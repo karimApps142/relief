@@ -14,7 +14,7 @@ class ReliefFeature(Feature):
     inputs = ["image"]
     params = [
         ParamSpec("depth_model", "select", "sapiens", "Depth model",
-                  choices=["sapiens", "depth-anything"]),
+                  choices=["sapiens", "depth-anything-3", "depth-anything"]),
         ParamSpec("relief_depth_mm", "number", 8.0, "Relief depth (mm)", 2, 20, 0.5),
         ParamSpec("pixel_mm", "number", 0.1, "Pixel size (mm)", 0.02, 0.5, 0.01),
         ParamSpec("refine", "number", 0.6, "Edge refine (snap to photo)", 0.0, 1.0, 0.05),

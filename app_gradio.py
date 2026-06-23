@@ -63,8 +63,8 @@ with gr.Blocks(title="CNC Bas-Relief") as demo:
     with gr.Row():
         with gr.Column():
             img = gr.Image(type="filepath", label="Input image")
-            depth_model = gr.Radio(["sapiens", "depth-anything"], value="sapiens",
-                                   label="Depth model")
+            depth_model = gr.Radio(["sapiens", "depth-anything-3", "depth-anything"],
+                                   value="sapiens", label="Depth model")
             depth_mm = gr.Slider(2, 20, value=8, step=0.5, label="Relief depth (mm)")
             pixel_mm = gr.Slider(0.02, 0.5, value=0.1, step=0.01, label="Pixel size (mm)")
             refine = gr.Slider(0.0, 1.0, value=0.6, step=0.05,
