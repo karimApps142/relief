@@ -41,7 +41,8 @@ class LiteBackend:
         n /= (np.linalg.norm(n, axis=-1, keepdims=True) + 1e-8)
         return (n + 1.0) / 2.0                      # HxWx3 in [0,1]
 
-    def estimate_depth(self, image: Image.Image, model="lite", tiling=False):
+    def estimate_depth(self, image: Image.Image, model="lite", tiling=False,
+                       da3_variant=None):
         # crude luminance pseudo-depth so the Mac/lite path still yields a heightmap
         rgb = np.asarray(image.convert("RGB"))
         g = cv2.cvtColor(rgb, cv2.COLOR_RGB2GRAY).astype(np.float32) / 255.0
@@ -67,10 +68,11 @@ class FullBackend:
             return self._m.estimate_normals_marigold(image)
         return self._m.estimate_normals_stable(image)
 
-    def estimate_depth(self, image, model="sapiens", tiling=False):
+    def estimate_depth(self, image, model="sapiens", tiling=False,
+                       da3_variant="DA3-LARGE"):
         if model == "depth-anything-3":                # ByteDance DA3 (SOTA, needs its package)
             try:
-                return self._m.estimate_depth_da3(image)
+                return self._m.estimate_depth_da3(image, variant=da3_variant)
             except Exception:
                 return self._m.estimate_depth(image)   # fallback: Depth-Anything-V2
         if model == "depth-anything":

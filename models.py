@@ -202,11 +202,11 @@ def estimate_depth_sapiens(image: Image.Image) -> np.ndarray:
 # box once:  pip install xformers
 #            pip install git+https://github.com/ByteDance-Seed/Depth-Anything-3
 # CC-BY-NC. DA3-LARGE ~0.35B, fits 12 GB. inference([path]) -> prediction.depth [1,H,W].
-_DA3_REPO = "depth-anything/DA3-LARGE"
+_DA3_DEFAULT = "DA3-LARGE"
 
 
 @functools.lru_cache(maxsize=1)
-def _da3():
+def _da3(repo):
     # DA3's api.py eagerly imports its multi-view / video / point-cloud EXPORT
     # stack (moviepy, open3d, pycolmap, …) at module load. We only need monocular
     # depth (inference().depth) and never call those exporters, so stub them with
@@ -220,13 +220,13 @@ def _da3():
                "depth_anything_3.utils.pose_align"):  # multi-view pose alignment (evo)
         sys.modules.setdefault(_m, MagicMock())
     from depth_anything_3.api import DepthAnything3
-    return DepthAnything3.from_pretrained(_DA3_REPO).to(device=DEVICE)
+    return DepthAnything3.from_pretrained(repo).to(device=DEVICE)
 
 
-def estimate_depth_da3(image: Image.Image) -> np.ndarray:
+def estimate_depth_da3(image: Image.Image, variant: str = _DA3_DEFAULT) -> np.ndarray:
     """Monocular depth from Depth Anything 3 (single image), mapped back to the
     input resolution. Returns HxW float where LARGER = NEARER (matches the other
-    depth backends)."""
+    depth backends). `variant` selects the hub repo, e.g. DA3MONO-LARGE / DA3-GIANT."""
     import tempfile
     import os as _os
     img = image.convert("RGB")
@@ -234,7 +234,7 @@ def estimate_depth_da3(image: Image.Image) -> np.ndarray:
     tmp = tempfile.NamedTemporaryFile(suffix=".png", delete=False).name
     img.save(tmp)
     try:
-        pred = _da3().inference([tmp])
+        pred = _da3("depth-anything/" + variant).inference([tmp])
     finally:
         try:
             _os.unlink(tmp)

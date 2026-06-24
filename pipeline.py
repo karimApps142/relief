@@ -23,7 +23,8 @@ _DEPTH_CACHE = {}
 class ReliefParams:
     relief_depth_mm: float = 8.0     # physical Z height of the carve (mm)
     pixel_mm: float = 0.1            # mm per pixel (plate size)
-    depth_model: str = "sapiens"    # "sapiens" (human-specialized) | "depth-anything"
+    depth_model: str = "sapiens"    # "sapiens" | "depth-anything-3" | "depth-anything"
+    da3_variant: str = "DA3-LARGE"  # DA3 hub variant (when depth_model == depth-anything-3)
     invert: bool = False            # flip near<->far if the subject comes out sunken
     depth_smooth: float = 0.5       # edge-preserving smoothing of the depth (de-noise)
     depth_compress: float = 1.0     # gamma; <1 flattens the near -> shallower/flatter relief
@@ -55,7 +56,8 @@ def generate_relief(image_path, out_dir, params: ReliefParams = ReliefParams(),
     if ckey is not None and ckey in _DEPTH_CACHE:
         depth = _DEPTH_CACHE[ckey]
     else:
-        depth = be.estimate_depth(image, model=params.depth_model, tiling=params.tiling)
+        depth = be.estimate_depth(image, model=params.depth_model, tiling=params.tiling,
+                                  da3_variant=params.da3_variant)
         if ckey is not None:
             _DEPTH_CACHE.clear()                 # keep only the most recent (bounded memory)
             _DEPTH_CACHE[ckey] = depth

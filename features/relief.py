@@ -15,6 +15,9 @@ class ReliefFeature(Feature):
     params = [
         ParamSpec("depth_model", "select", "sapiens", "Depth model",
                   choices=["sapiens", "depth-anything-3", "depth-anything"]),
+        ParamSpec("da3_variant", "select", "DA3-LARGE", "DA3 variant (when depth-anything-3)",
+                  choices=["DA3MONO-LARGE", "DA3-LARGE", "DA3-LARGE-1.1",
+                           "DA3-GIANT", "DA3-GIANT-1.1", "DA3-BASE", "DA3-SMALL"]),
         ParamSpec("relief_depth_mm", "number", 8.0, "Relief depth (mm)", 2, 20, 0.5),
         ParamSpec("pixel_mm", "number", 0.1, "Pixel size (mm)", 0.02, 0.5, 0.01),
         ParamSpec("refine", "number", 0.6, "Edge refine (snap to photo)", 0.0, 1.0, 0.05),
