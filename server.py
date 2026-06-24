@@ -19,6 +19,7 @@ from fastapi import FastAPI, UploadFile, File, Form, HTTPException
 from fastapi.responses import JSONResponse, FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+from fastapi.concurrency import run_in_threadpool
 
 from features import REGISTRY
 import model_manager
@@ -67,6 +68,13 @@ def comfy_start():
     return comfy_manager.start()
 
 
+@app.get("/api/comfy/progress")
+def comfy_progress():
+    """Live generation progress (sampler steps) for the in-flight ComfyUI job."""
+    from features._comfy import get_progress
+    return get_progress()
+
+
 def _free_relief_vram():
     """Unload our in-process depth/matting models so ComfyUI (separate process)
     can claim the 12 GB. Best-effort; harmless if nothing is loaded."""
@@ -97,12 +105,18 @@ async def run_feature(fid: str, file: UploadFile = File(None), params: str = For
         dst.write_bytes(await file.read())
         inputs["image"] = str(dst)
 
-    if getattr(feat, "needs_comfy", False):               # ComfyUI-backed feature
-        _free_relief_vram()                               # free the GPU for ComfyUI
-        comfy_manager.ensure_running()                    # auto-start if installed & down
+    coerced = feat.coerce(raw)
+
+    def _execute():
+        # Runs in a worker thread (run_in_threadpool) so the event loop stays free to
+        # serve /api/comfy/progress + /api/comfy/status polls during a long generation.
+        if getattr(feat, "needs_comfy", False):           # ComfyUI-backed feature
+            _free_relief_vram()                           # free the 12 GB for ComfyUI
+            comfy_manager.ensure_running()                # auto-start if installed & down
+        return feat.run(inputs, coerced, out_dir)
 
     try:
-        artifacts = feat.run(inputs, feat.coerce(raw), out_dir)
+        artifacts = await run_in_threadpool(_execute)
     except Exception as e:  # surface the error to the client instead of a 500 page
         return JSONResponse(status_code=500, content={"job": job, "error": str(e)})
 

@@ -2,7 +2,7 @@
 // feature's schema and shows whatever artifacts come back — so relief works now
 // and future features (upscale/text2img) appear with no changes here.
 import React, { useEffect, useMemo, useState } from 'react'
-import { FeatureSchema, RunResult, runFeature } from './api'
+import { ComfyProgress, FeatureSchema, RunResult, getComfyProgress, runFeature } from './api'
 import { Button, Card, Field, NumberSlider, Toggle, Select } from './ui'
 
 function defaults(f: FeatureSchema): Record<string, any> {
@@ -36,8 +36,24 @@ export default function FeaturePanel({ feature }: { feature: FeatureSchema }) {
   const [running, setRunning] = useState(false)
   const [error, setError] = useState('')
   const [result, setResult] = useState<RunResult | null>(null)
+  const [progress, setProgress] = useState<ComfyProgress | null>(null)
 
-  useEffect(() => { setParams(defaults(feature)); setResult(null); setError('') }, [feature.id])
+  useEffect(() => {
+    setParams(defaults(feature)); setResult(null); setError(''); setProgress(null)
+  }, [feature.id])
+
+  // While a ComfyUI-backed generation runs, poll live sampler progress for the bar.
+  // feature.id is a dep so switching tabs mid-run tears the poll down (no stale bar).
+  useEffect(() => {
+    if (!running || !feature.needs_comfy) { setProgress(null); return }
+    let alive = true
+    const tick = async () => {
+      try { const p = await getComfyProgress(); if (alive) setProgress(p) } catch { /* ignore */ }
+    }
+    tick()
+    const t = setInterval(tick, 400)
+    return () => { alive = false; clearInterval(t) }
+  }, [running, feature.needs_comfy, feature.id])
 
   const needsImage = feature.inputs.includes('image')
   const canRun = !running && (!needsImage || !!file)
@@ -119,7 +135,24 @@ export default function FeaturePanel({ feature }: { feature: FeatureSchema }) {
         {error && <div className="mb-4 rounded-md bg-red-500/15 p-3 text-sm text-red-300">{error}</div>}
         {!result && !error && (
           <div className="flex h-full min-h-[300px] items-center justify-center text-sm text-gray-500">
-            {running ? 'Running on the GPU…' : 'Results appear here.'}
+            {running ? (
+              progress && progress.active && progress.max > 0 ? (
+                <div className="w-full max-w-xs">
+                  <div className="mb-1.5 flex justify-between text-xs text-gray-400">
+                    <span>Generating…</span>
+                    <span className="tabular-nums">{progress.value}/{progress.max}</span>
+                  </div>
+                  <div className="h-2 w-full overflow-hidden rounded-full bg-white/10">
+                    <div className="h-full rounded-full bg-indigo-500 transition-all duration-300"
+                      style={{ width: `${Math.min(100, Math.round((100 * progress.value) / progress.max))}%` }} />
+                  </div>
+                </div>
+              ) : (
+                <span>Running on the GPU…</span>
+              )
+            ) : (
+              'Results appear here.'
+            )}
           </div>
         )}
         {artifacts.length > 0 && (

@@ -67,6 +67,20 @@ export const comfyInstall = () => post('/api/comfy/install')
 export const comfyDownload = () => post('/api/comfy/download')
 export const comfyStart = () => post('/api/comfy/start')
 
+export type ComfyProgress = {
+  active: boolean
+  value: number
+  max: number
+  node: string | null
+  label?: string
+}
+
+export async function getComfyProgress(): Promise<ComfyProgress> {
+  const r = await fetch('/api/comfy/progress')
+  if (!r.ok) throw new Error(`GET /api/comfy/progress failed (${r.status})`)
+  return r.json()
+}
+
 export async function runFeature(
   id: string,
   file: File | null,

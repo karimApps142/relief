@@ -196,6 +196,13 @@ renders. No terminal, no second app.
   `needs_comfy` feature runs (`comfy_manager.ensure_running()`), which first calls
   `models.unload_all()` to free the 12 GB for ComfyUI (relief ↔ image-AI are used
   one at a time — they can't co-reside on a 3060).
+- **`GET /api/comfy/progress`** — **live generation progress**. `_comfy.ComfyUIClient`
+  consumes ComfyUI's `/ws` socket (sampler `value`/`max` per step), writing a
+  process-global progress dict; `FeaturePanel` polls this every 400 ms and shows a bar.
+  `run_feature` offloads the (blocking) generation to a threadpool so this endpoint
+  stays responsive. The client submits the prompt **once** and shares a single deadline
+  across the ws watch + an HTTP-poll fallback (used if `websockets` is missing or the
+  socket drops), so generation is robust with or without the live bar.
 
 **Locations** (env-configurable): `COMFYUI_DIR` (default `<repo-parent>/ComfyUI`,
 i.e. outside the git repo) and `COMFYUI_URL` (default `127.0.0.1:8188`).
