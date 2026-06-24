@@ -11,8 +11,13 @@ work (the heavy bits no-op cleanly off the box).
   start()           -> launch ComfyUI headless on COMFYUI_URL if down
   ensure_running()  -> best-effort start before a ComfyUI-backed feature runs
 
+Model files download into a ComfyUI-LOCAL HF cache (on the same drive as ComfyUI) and
+are hardlinked into ComfyUI/models, so the big GGUF is stored once WITHOUT touching the
+global HF_HOME — the relief models keep using their own default cache.
+
 Locations are env-configurable:
   COMFYUI_DIR  (default: <repo-parent>/ComfyUI)   COMFYUI_URL (default 127.0.0.1:8188)
+  COMFY_HF_CACHE (default: <COMFYUI_DIR>/.hf-cache — must share ComfyUI's volume)
 """
 import os
 import sys
@@ -27,6 +32,9 @@ _ROOT = Path(__file__).resolve().parent
 COMFY_DIR = Path(os.environ.get("COMFYUI_DIR", _ROOT.parent / "ComfyUI")).resolve()
 COMFY_URL = os.environ.get("COMFYUI_URL", "127.0.0.1:8188")
 _HOST, _PORT = (COMFY_URL.split(":") + ["8188"])[:2]
+# ComfyUI's own HF cache — on the same volume as COMFY_DIR so downloads hardlink into
+# ComfyUI/models (stored once) instead of copying, and the global HF_HOME stays untouched.
+_HF_CACHE = Path(os.environ.get("COMFY_HF_CACHE", COMFY_DIR / ".hf-cache"))
 
 COMFY_GIT = "https://github.com/comfyanonymous/ComfyUI"
 GGUF_GIT = "https://github.com/city96/ComfyUI-GGUF"
@@ -158,6 +166,7 @@ def download_async(labels=None):
 def _download(labels):
     try:
         from huggingface_hub import hf_hub_download
+        _HF_CACHE.mkdir(parents=True, exist_ok=True)       # ComfyUI-local cache (same volume)
         items = MODELS if not labels else {k: MODELS[k] for k in labels if k in MODELS}
         for label, (repo, path_in_repo, sub) in items.items():
             dest_dir = COMFY_DIR / "models" / sub
@@ -168,8 +177,10 @@ def _download(labels):
                 continue
             sf = str(Path(path_in_repo).parent)
             _log(f"downloading {label} from {repo} …")
+            # cache_dir keeps this OFF the global HF_HOME (relief's cache is untouched).
             cached = hf_hub_download(repo_id=repo, filename=Path(path_in_repo).name,
-                                     subfolder=None if sf in ("", ".") else sf)
+                                     subfolder=None if sf in ("", ".") else sf,
+                                     cache_dir=str(_HF_CACHE))
             try:                                          # hardlink (instant, same volume)
                 os.link(cached, target)
             except OSError:                               # cross-volume → copy

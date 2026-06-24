@@ -207,10 +207,11 @@ renders. No terminal, no second app.
 **Locations** (env-configurable): `COMFYUI_DIR` (default `<repo-parent>/ComfyUI`,
 i.e. outside the git repo) and `COMFYUI_URL` (default `127.0.0.1:8188`).
 
-**Disk tip:** set `HF_HOME` onto the same drive as `COMFYUI_DIR` (e.g. `F:\hf-cache`)
-so downloaded files are **hardlinked** into `ComfyUI/models/` instead of copied —
-otherwise the 7.5 GB GGUF is duplicated (cache + dest). The code tries `os.link`
-first and falls back to a copy across volumes.
+**Disk:** the downloader uses a ComfyUI-local HF cache (`COMFY_HF_CACHE`, default
+`<COMFYUI_DIR>/.hf-cache`) on the same volume as ComfyUI, and **hardlinks** each file
+into `ComfyUI/models/` — so the 7.5 GB GGUF is stored once and you **do NOT set a
+global `HF_HOME`** (that would hide the relief models' own default cache). No env vars
+needed; just run `uvicorn`.
 
 **Caveat (untested lifecycle):** the install/launch path can only be fully verified
 on the box. The pieces compile and the status/download logic is validated on the Mac;
