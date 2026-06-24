@@ -17,7 +17,7 @@ class ReliefFeature(Feature):
         ParamSpec("depth_model", "select", "depth-anything", "Depth model",
                   choices=["depth-anything", "depth-anything-3", "sapiens"]),
         ParamSpec("tile_detail", "select", "medium", "Facial detail (tiling — higher = slower)",
-                  choices=["off", "low", "medium", "high"]),
+                  choices=["off", "low", "medium", "high", "ultra", "max"]),
         ParamSpec("face_crop", "bool", True, "Auto face-crop (focus detail on the face)"),
         ParamSpec("da3_variant", "select", "DA3MONO-LARGE", "DA3 variant (when depth-anything-3)",
                   choices=["DA3MONO-LARGE", "DA3-LARGE", "DA3-GIANT", "DA3-BASE", "DA3-SMALL"]),

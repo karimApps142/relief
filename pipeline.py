@@ -19,7 +19,8 @@ import relief_core as rc
 
 # tile_detail -> (coarse grid, fine grid). Coarse stays <=3x3 for global scale
 # stability; fine sized so one tile ~ the face box ~ the model's native res.
-_GRIDS = {"low": ((2, 2), (4, 4)), "medium": ((3, 3), (6, 6)), "high": ((4, 4), (8, 8))}
+_GRIDS = {"low": ((2, 2), (4, 4)), "medium": ((3, 3), (6, 6)), "high": ((4, 4), (8, 8)),
+          "ultra": ((5, 5), (10, 10)), "max": ((6, 6), (12, 12))}
 
 # raw depth cache: geometry sliders re-tune instantly without re-running the GPU.
 # Keyed on (image, model, tile_detail, da3_variant); holds only the most recent.
