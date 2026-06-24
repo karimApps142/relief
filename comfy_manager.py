@@ -154,11 +154,27 @@ def _install():
         _log("installing ComfyUI requirements (this can take a few minutes)…")
         _run([py, "-m", "pip", "install", "-r", str(COMFY_DIR / "requirements.txt")])
         _run([py, "-m", "pip", "install", "-r", str(gguf / "requirements.txt")])
+        _align_torchaudio(py)
         _log("✓ ComfyUI installed")
         _end()
     except Exception as e:
         _log(f"ERROR: {e}")
         _end(str(e))
+
+
+def _align_torchaudio(py):
+    """ComfyUI's requirements pull an unpinned torchaudio that often mismatches our pinned
+    torch — its C++ ext then fails to load (WinError 127) and ComfyUI won't boot. Reinstall
+    torchaudio matching the installed torch version, from the cu121 index."""
+    try:
+        ver = subprocess.run([py, "-c", "import torch;print(torch.__version__.split('+')[0])"],
+                             capture_output=True, text=True).stdout.strip()
+        if ver:
+            _log(f"aligning torchaudio with torch {ver} (avoids the WinError 127 ABI clash)…")
+            _run([py, "-m", "pip", "install", "--index-url",
+                  "https://download.pytorch.org/whl/cu121", f"torchaudio=={ver}"])
+    except Exception as e:
+        _log(f"torchaudio align skipped ({e}) — run it manually if ComfyUI won't start")
 
 
 # -------------------------------------------------------------------------- downloads

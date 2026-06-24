@@ -4,6 +4,8 @@
 # local version only exists on the pytorch index, so this forces the GPU build.
 torch==2.5.1+cu121
 torchvision==0.20.1+cu121
+torchaudio==2.5.1+cu121   # ComfyUI imports torchaudio; it MUST match torch or its C++
+                          # ext fails to load (WinError 127 on Windows) and ComfyUI won't boot
 diffusers>=0.30
 transformers>=4.44
 accelerate
