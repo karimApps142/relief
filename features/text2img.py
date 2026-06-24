@@ -12,57 +12,11 @@ on :8188 with these files present:
   models/vae/qwen_image_vae.safetensors
 Point this module at it with COMFYUI_URL (default 127.0.0.1:8188).
 """
-import os
-import time
-import uuid
 import random
 from pathlib import Path
 
 from .base import Feature, ParamSpec
-
-
-class ComfyUIError(RuntimeError):
-    pass
-
-
-class ComfyUIClient:
-    """Queue an API-format graph, poll /history, download the first output image."""
-
-    def __init__(self, server=None, timeout=30):
-        self.base = f"http://{server or os.environ.get('COMFYUI_URL', '127.0.0.1:8188')}"
-        self.timeout = timeout
-        self.client_id = uuid.uuid4().hex
-
-    def _session(self):
-        import requests
-        return requests.Session()
-
-    def generate(self, graph, poll=1.0, max_wait=600):
-        import requests
-        s = self._session()
-        try:
-            r = s.post(f"{self.base}/prompt",
-                       json={"prompt": graph, "client_id": self.client_id}, timeout=self.timeout)
-        except requests.exceptions.RequestException:
-            raise ComfyUIError(f"ComfyUI not reachable at {self.base} — is it running "
-                               f"(python main.py --listen --port 8188)?")
-        if r.status_code != 200:
-            raise ComfyUIError(f"/prompt {r.status_code}: {r.text[:400]}")
-        pid = r.json()["prompt_id"]
-        waited = 0.0
-        while waited < max_wait:
-            h = s.get(f"{self.base}/history/{pid}", timeout=self.timeout).json()
-            if pid in h:                                  # appears only once complete
-                for node in h[pid].get("outputs", {}).values():
-                    for im in node.get("images", []):
-                        v = s.get(f"{self.base}/view", params={
-                            "filename": im["filename"], "subfolder": im.get("subfolder", ""),
-                            "type": im.get("type", "output")}, timeout=self.timeout)
-                        v.raise_for_status()
-                        return v.content
-                raise ComfyUIError("ComfyUI finished but produced no image")
-            time.sleep(poll); waited += poll
-        raise ComfyUIError(f"ComfyUI timed out after {max_wait}s")
+from ._comfy import ComfyUIClient
 
 
 def _build_graph(prompt, width, height, steps, seed, gguf):

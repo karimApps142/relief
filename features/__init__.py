@@ -8,6 +8,8 @@ The API (server.py) and UI enumerate REGISTRY automatically — no other changes
 """
 from .relief import ReliefFeature
 from .text2img import Text2ImgFeature
+from .img2img import Img2ImgFeature
+from .upscale import UpscaleFeature
 
 REGISTRY = {}
 
@@ -16,8 +18,7 @@ def register(feature):
     REGISTRY[feature.id] = feature
 
 
-register(ReliefFeature())
-register(Text2ImgFeature())          # Krea-2-Turbo GGUF via ComfyUI (needs ComfyUI on :8188)
-# Phase 3 — more drop-ins here:
-# register(Img2ImgFeature())
-# register(UpscaleFeature())
+register(ReliefFeature())            # local (Sapiens/DA-V2/DA3 depth tiling)
+register(Text2ImgFeature())          # Krea-2-Turbo GGUF via ComfyUI (:8188)
+register(Img2ImgFeature())           # Krea-2-Turbo img2img via ComfyUI
+register(UpscaleFeature())           # ESRGAN upscale via ComfyUI

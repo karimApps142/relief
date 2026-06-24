@@ -156,6 +156,21 @@ Last: add a content-filter stub (license requirement) before any non-internal us
 - **Speed**: 8-step turbo at Q4 on a 3060 ≈ a few seconds–tens of seconds per image
   (much faster than the tiled relief).
 
+## 7. Also implemented: img2img + upscale (same ComfyUI engine)
+
+Two more drop-in feature modules, sharing `features/_comfy.py`:
+- **`features/img2img.py`** — Image → Image (Krea-2-Turbo). Uploads the image,
+  `VAEEncode`s it, re-diffuses under a prompt at partial `denoise` (lower = closer
+  to the original). **No new model files** — reuses the same Krea GGUF + encoder + VAE.
+- **`features/upscale.py`** — ESRGAN upscale (no diffusion). Needs **one extra file**:
+  an upscale model in `ComfyUI/models/upscale_models/` (default `4x-UltraSharp.pth`;
+  also offers `RealESRGAN_x4plus.pth`, `4x_foolhardy_Remacri.pth`). Download whichever
+  you use; it's a small ~60 MB file.
+
+All four features (`relief`, `text2img`, `img2img`, `upscale`) appear automatically
+as tabs in the React UI — no frontend changes needed (schema-driven). img2img/upscale
+need the same ComfyUI on :8188; upscale additionally needs the upscale model file.
+
 ## Sources
 - https://huggingface.co/krea/Krea-2-Turbo
 - https://huggingface.co/vantagewithai/Krea-2-Turbo-GGUF
