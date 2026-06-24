@@ -442,6 +442,12 @@ def heightmap_to_preview(height16, z_scale_mm=8.0, pixel_mm=0.1, max_px=320):
                        [0, 0, 1, 0],
                        [0, 0, 0, 1]])
     trimesh.repair.fix_normals(m)               # outward normals after the reflection
+    # matte, non-metallic material so the viewer's lighting reveals the relief
+    # surface instead of washing out as flat white.
+    m.visual = trimesh.visual.TextureVisuals(
+        material=trimesh.visual.material.PBRMaterial(
+            name="relief", baseColorFactor=[200, 202, 210, 255],
+            metallicFactor=0.0, roughnessFactor=0.85))
     return m
 
 

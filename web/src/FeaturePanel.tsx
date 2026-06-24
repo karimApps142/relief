@@ -15,8 +15,9 @@ function Artifact({ name, url }: { name: string; url: string }) {
   const lower = url.toLowerCase()
   if (lower.endsWith('.glb') || lower.endsWith('.gltf')) {
     // @ts-ignore — model-viewer is a web component (loaded in index.html)
-    return <model-viewer src={url} camera-controls auto-rotate exposure="1.0"
-      shadow-intensity="1" ar={false as any} />
+    return <model-viewer src={url} camera-controls auto-rotate
+      camera-orbit="-20deg 72deg 100%" min-field-of-view="25deg" exposure="1.15"
+      shadow-intensity="1" tone-mapping="neutral" interaction-prompt="none" />
   }
   if (/\.(png|jpg|jpeg|webp)$/.test(lower)) {
     return <img src={url} alt={name} className="w-full rounded-lg border border-white/10" />
