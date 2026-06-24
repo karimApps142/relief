@@ -46,15 +46,24 @@ class Text2ImgFeature(Feature):
     name = "Text → Image"
     description = "Generate an image from a prompt with Krea-2-Turbo (GGUF, via ComfyUI)."
     needs_comfy = True
+    engine = "comfy"
+    icon = "text"
+    est_runtime = "~5–20 s"
+    vram = "~9–10 GB"
+    output_kinds = ["Image PNG"]
     inputs = []                                          # no image upload; prompt is a param
     params = [
-        ParamSpec("prompt", "text", "", "Prompt"),
-        ParamSpec("quant", "select", "Q4_K_M", "Model quant (VRAM)",
-                  choices=["Q3_K_M", "Q4_K_M", "Q5_K_M", "Q6_K"]),
-        ParamSpec("width", "number", 1024, "Width", 512, 2048, 64),
-        ParamSpec("height", "number", 1024, "Height", 512, 2048, 64),
-        ParamSpec("steps", "number", 8, "Steps (turbo = 8)", 4, 20, 1),
-        ParamSpec("seed", "number", 0, "Seed (0 = random)", 0, 2_147_483_647, 1),
+        ParamSpec("prompt", "text", "", "Prompt", placeholder="Describe what to generate…"),
+        ParamSpec("width", "number", 1024, "Width", 512, 2048, 64, control="slider", suffix=" px"),
+        ParamSpec("height", "number", 1024, "Height", 512, 2048, 64, control="slider", suffix=" px"),
+        ParamSpec("quant", "select", "Q4_K_M", "Quantization", control="seg", group="advanced",
+                  help="Quality vs VRAM — higher is heavier.",
+                  choices=[{"value": "Q3_K_M", "label": "Q3"}, {"value": "Q4_K_M", "label": "Q4"},
+                           {"value": "Q5_K_M", "label": "Q5"}, {"value": "Q6_K", "label": "Q6"}]),
+        ParamSpec("steps", "number", 8, "Steps", 4, 20, 1, control="slider", group="advanced",
+                  help="Turbo is tuned for 8 steps."),
+        ParamSpec("seed", "number", 0, "Seed", 0, 2_147_483_647, 1, control="stepper", group="advanced",
+                  help="0 = random each run."),
     ]
 
     def run(self, inputs, params, out_dir):

@@ -34,14 +34,23 @@ class Img2ImgFeature(Feature):
     name = "Image → Image"
     description = "Transform an image with a prompt (Krea-2-Turbo img2img, via ComfyUI)."
     needs_comfy = True
+    engine = "comfy"
+    icon = "image"
+    est_runtime = "~5–20 s"
+    vram = "~9–10 GB"
+    output_kinds = ["Image PNG"]
     inputs = ["image"]
     params = [
-        ParamSpec("prompt", "text", "", "Prompt"),
-        ParamSpec("denoise", "number", 0.6, "Strength (lower = closer to original)", 0.1, 1.0, 0.05),
-        ParamSpec("quant", "select", "Q4_K_M", "Model quant (VRAM)",
-                  choices=["Q3_K_M", "Q4_K_M", "Q5_K_M", "Q6_K"]),
-        ParamSpec("steps", "number", 8, "Steps", 4, 20, 1),
-        ParamSpec("seed", "number", 0, "Seed (0 = random)", 0, 2_147_483_647, 1),
+        ParamSpec("prompt", "text", "", "Prompt", placeholder="Describe how to transform it…"),
+        ParamSpec("denoise", "number", 0.6, "Denoise strength", 0.1, 1.0, 0.05, control="slider",
+                  help="Lower stays close to the original; higher reinvents it."),
+        ParamSpec("quant", "select", "Q4_K_M", "Quantization", control="seg", group="advanced",
+                  help="Quality vs VRAM.",
+                  choices=[{"value": "Q3_K_M", "label": "Q3"}, {"value": "Q4_K_M", "label": "Q4"},
+                           {"value": "Q5_K_M", "label": "Q5"}, {"value": "Q6_K", "label": "Q6"}]),
+        ParamSpec("steps", "number", 8, "Steps", 4, 20, 1, control="slider", group="advanced"),
+        ParamSpec("seed", "number", 0, "Seed", 0, 2_147_483_647, 1, control="stepper", group="advanced",
+                  help="0 = random."),
     ]
 
     def run(self, inputs, params, out_dir):

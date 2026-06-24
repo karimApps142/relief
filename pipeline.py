@@ -52,16 +52,31 @@ class ReliefParams:
     tiling: bool = True
 
 
+_TILES_TOTAL = {"off": 1, "low": 9, "medium": 36, "high": 64, "ultra": 100, "max": 144}
+
+
 def generate_relief(image_path, out_dir, params: ReliefParams = ReliefParams(),
                     backend=None):
     from backends import get_backend
+    import relief_progress
     be = get_backend(backend or getattr(params, "backend", None))
 
+    relief_progress.start(["Depth + tiling", "Heightmap", "STL mesh", "3D preview"],
+                          tiles_total=_TILES_TOTAL.get(params.tile_detail, 36))
+    try:
+        return _generate_relief(image_path, out_dir, params, be)
+    finally:
+        relief_progress.stop()
+
+
+def _generate_relief(image_path, out_dir, params, be):
+    import relief_progress
     out = Path(out_dir); out.mkdir(parents=True, exist_ok=True)
     image = Image.open(image_path).convert("RGB")
 
     # 1. TILED high-res depth (the detail lives here). Cached on (image, model,
     #    detail level) so the geometry sliders below re-tune instantly.
+    relief_progress.phase(0)
     tiling = params.tile_detail != "off"
     grids = _GRIDS.get(params.tile_detail, _GRIDS["medium"])
     try:
@@ -79,6 +94,7 @@ def generate_relief(image_path, out_dir, params: ReliefParams = ReliefParams(),
         _RAW_CACHE.clear(); _RAW_CACHE[ckey] = cache
 
     # 2. subject mask -> seat on a flat base. NO smoothing / refine / fusion / emboss.
+    relief_progress.phase(1)
     mask = be.remove_background(image) if params.flatten_bg else None
     height = rc.tiled_relief_heightmap(depth, mask, invert=params.invert,
                                        base=params.base_height, fig_span=params.fig_span,
@@ -90,6 +106,7 @@ def generate_relief(image_path, out_dir, params: ReliefParams = ReliefParams(),
     cv2.imwrite(str(png_path), height16)         # 16-bit PNG
 
     # 4. STL
+    relief_progress.phase(2)
     if params.make_solid:
         mesh = rc.heightmap_to_solid(height16, params.relief_depth_mm, params.pixel_mm)
     else:
@@ -98,6 +115,7 @@ def generate_relief(image_path, out_dir, params: ReliefParams = ReliefParams(),
     mesh.export(str(stl_path))
 
     # lightweight downsampled GLB for the in-browser 3D viewer
+    relief_progress.phase(3)
     preview_path = out / "preview.glb"
     rc.heightmap_to_preview(height16, params.relief_depth_mm,
                             params.pixel_mm).export(str(preview_path))

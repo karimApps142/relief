@@ -23,10 +23,18 @@ class UpscaleFeature(Feature):
     name = "Upscale"
     description = "Upscale an image with an ESRGAN model (ComfyUI; no diffusion model)."
     needs_comfy = True
+    engine = "comfy"
+    icon = "upscale"
+    est_runtime = "~2–8 s"
+    vram = "~1–2 GB"
+    output_kinds = ["Image PNG · ~4×"]
     inputs = ["image"]
     params = [
         ParamSpec("model_name", "select", "4x-UltraSharp.pth", "Upscale model",
-                  choices=["4x-UltraSharp.pth", "RealESRGAN_x4plus.pth", "4x_foolhardy_Remacri.pth"]),
+                  help="ESRGAN upscaler (all ~4×).",
+                  choices=[{"value": "4x-UltraSharp.pth", "label": "4x-UltraSharp"},
+                           {"value": "RealESRGAN_x4plus.pth", "label": "RealESRGAN x4plus"},
+                           {"value": "4x_foolhardy_Remacri.pth", "label": "4x Foolhardy Remacri"}]),
     ]
 
     def run(self, inputs, params, out_dir):

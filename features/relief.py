@@ -13,20 +13,42 @@ class ReliefFeature(Feature):
     description = ("High-resolution TILED monocular-depth heightmap (16-bit PNG) + STL. "
                    "Tiling recovers facial detail a single depth pass smooths away.")
     inputs = ["image"]
+    engine = "local"
+    icon = "box"
+    est_runtime = "~5 s – 4 min"
+    vram = "~2–4 GB"
+    output_kinds = ["Heightmap PNG", "3D preview GLB", "STL mesh"]
     params = [
-        ParamSpec("depth_model", "select", "depth-anything", "Depth model",
-                  choices=["depth-anything", "depth-anything-3", "sapiens"]),
-        ParamSpec("tile_detail", "select", "medium", "Facial detail (tiling — higher = slower)",
-                  choices=["off", "low", "medium", "high", "ultra", "max"]),
-        ParamSpec("face_crop", "bool", True, "Auto face-crop (focus detail on the face)"),
-        ParamSpec("da3_variant", "select", "DA3MONO-LARGE", "DA3 variant (when depth-anything-3)",
-                  choices=["DA3MONO-LARGE", "DA3-LARGE", "DA3-GIANT", "DA3-BASE", "DA3-SMALL"]),
-        ParamSpec("relief_depth_mm", "number", 8.0, "Relief depth (mm)", 2, 20, 0.5),
-        ParamSpec("pixel_mm", "number", 0.1, "Pixel size (mm)", 0.02, 0.5, 0.01),
-        ParamSpec("black_bg", "bool", True, "Black background (vs mid-gray plate)"),
-        ParamSpec("invert", "bool", False, "Invert (flip near/far)"),
-        ParamSpec("flatten_bg", "bool", True, "Flatten background"),
-        ParamSpec("make_solid", "bool", False, "Watertight solid (3D print)"),
+        ParamSpec("depth_model", "select", "depth-anything", "Depth model", control="seg",
+                  help="Monocular-depth model that estimates 3D shape from one photo.",
+                  choices=[{"value": "depth-anything", "label": "Depth-Anything"},
+                           {"value": "depth-anything-3", "label": "DA3"},
+                           {"value": "sapiens", "label": "Sapiens"}]),
+        ParamSpec("tile_detail", "select", "medium", "Tile detail",
+                  help="Finer tiling recovers facial detail. Off = 1 pass, Max = 144 tiles (slower).",
+                  choices=[{"value": "off", "label": "Off · 1 pass"}, {"value": "low", "label": "Low · 9"},
+                           {"value": "medium", "label": "Medium · 36"}, {"value": "high", "label": "High · 64"},
+                           {"value": "ultra", "label": "Ultra · 100"}, {"value": "max", "label": "Max · 144"}]),
+        ParamSpec("face_crop", "bool", True, "Face crop",
+                  help="Auto-detect the face and concentrate detail there."),
+        ParamSpec("da3_variant", "select", "DA3MONO-LARGE", "DA3 variant",
+                  help="Model size — only for Depth-Anything-3.",
+                  depends_on={"param": "depth_model", "value": "depth-anything-3"},
+                  choices=[{"value": "DA3MONO-LARGE", "label": "DA3MONO-LARGE"},
+                           {"value": "DA3-LARGE", "label": "DA3-LARGE"}, {"value": "DA3-GIANT", "label": "DA3-GIANT"},
+                           {"value": "DA3-BASE", "label": "DA3-BASE"}, {"value": "DA3-SMALL", "label": "DA3-SMALL"}]),
+        ParamSpec("relief_depth_mm", "number", 8.0, "Relief depth", 2, 20, 0.5, control="slider",
+                  suffix=" mm", help="Physical carve depth of the relief."),
+        ParamSpec("pixel_mm", "number", 0.1, "Pixel size", 0.02, 0.5, 0.01, control="slider",
+                  suffix=" mm/px", help="Real-world size of one pixel → sets STL dimensions."),
+        ParamSpec("black_bg", "bool", True, "Black background", group="advanced",
+                  help="Background sits at zero height vs a mid-gray plate."),
+        ParamSpec("invert", "bool", False, "Invert depth", group="advanced",
+                  help="Flip near/far (raised ↔ recessed)."),
+        ParamSpec("flatten_bg", "bool", True, "Flatten background", group="advanced",
+                  help="Push the background to a flat plane."),
+        ParamSpec("make_solid", "bool", False, "Make solid", group="advanced",
+                  help="Watertight solid (3D printing) vs surface (CNC)."),
     ]
 
     def run(self, inputs, params, out_dir):
