@@ -44,7 +44,14 @@ def list_features():
 
 @app.get("/api/models/status")
 def models_status():
-    return {"installed": model_manager.models_present()}
+    return model_manager.status()
+
+
+@app.post("/api/models/download")
+def models_download():
+    """Download the CORE relief weights (BiRefNet + Depth-Anything-V2) in the
+    background; the next relief run then uses the full GPU backend (no restart)."""
+    return {"started": model_manager.download_async(), **model_manager.status()}
 
 
 # ---- ComfyUI engine: install / download / launch, all driven from the UI ----

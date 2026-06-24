@@ -33,7 +33,16 @@ export async function getFeatures(): Promise<FeatureSchema[]> {
   return r.json()
 }
 
-export async function getModelsStatus(): Promise<{ installed: boolean }> {
+export type ModelsStatus = {
+  installed: boolean
+  models?: Record<string, boolean>
+  busy?: boolean
+  log?: string[]
+  error?: string | null
+  done?: boolean
+}
+
+export async function getModelsStatus(): Promise<ModelsStatus> {
   try {
     const r = await fetch('/api/models/status')
     return r.ok ? r.json() : { installed: false }
@@ -41,6 +50,9 @@ export async function getModelsStatus(): Promise<{ installed: boolean }> {
     return { installed: false }
   }
 }
+
+export const modelsDownload = () =>
+  fetch('/api/models/download', { method: 'POST' }).then((r) => r.json())
 
 // ---- ComfyUI engine management (install / download / launch from the UI) ----
 export type ComfyStatus = {

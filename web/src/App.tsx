@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { FeatureSchema, getFeatures, getModelsStatus } from './api'
 import FeaturePanel from './FeaturePanel'
 import ComfyGate from './ComfyGate'
+import ModelsBanner from './ModelsBanner'
 
 export default function App() {
   const [features, setFeatures] = useState<FeatureSchema[]>([])
@@ -52,7 +53,7 @@ export default function App() {
       {current ? (
         current.needs_comfy
           ? <ComfyGate><FeaturePanel feature={current} /></ComfyGate>
-          : <FeaturePanel feature={current} />
+          : <><ModelsBanner /><FeaturePanel feature={current} /></>
       ) : !err && (
         <div className="text-sm text-gray-500">Loading features…</div>
       )}
