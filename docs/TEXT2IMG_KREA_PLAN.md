@@ -1,7 +1,17 @@
 # Phase 3 — Text-to-Image feature (Krea-2-Turbo, GGUF, via ComfyUI)
 
-Status: **PLANNED — not yet implemented.** Pick this up when ready. The relief
-feature is the template; this adds a second feature module to the same registry.
+Status: **CODE DONE — needs the box setup (ComfyUI + 3 model files) to run.**
+
+✅ **Implemented (in repo):** `features/text2img.py` (a `ComfyUIClient` + the
+`Text2ImgFeature`, registered in `features/__init__.py`), a `"text"` ParamSpec type
+(`base.py`) + prompt `<textarea>` in the React UI. The API-format graph is
+**hand-authored from the verified Krea workflow's GGUF path** — no manual export
+needed. The feature already shows up at `/api/features` and in the UI; it just
+errors with "ComfyUI not reachable" until the box setup below is done.
+
+⏳ **Remaining = box setup only:** install ComfyUI + ComfyUI-GGUF, drop in the 3
+model files, run it headless on :8188. Then point our server at it
+(`COMFYUI_URL=127.0.0.1:8188`, the default) and it works.
 
 ---
 
@@ -99,17 +109,39 @@ Mirror the relief feature. **No frontend changes** — the React UI is schema-dr
 
 ---
 
-## 5. Step-by-step (when we pick this up)
+## 5. VERIFIED box setup (the only remaining work)
 
-1. Install ComfyUI + ComfyUI-GGUF on the box; confirm it launches headless.
-2. Download the 3 files (Q4_K_M transformer, Qwen2.5-VL encoder, VAE) into ComfyUI.
-3. Load `Vantage_Krea-2-Turbo.json` in ComfyUI UI once; generate a test image
-   manually to confirm the model runs and to learn the node IDs to inject into.
-4. Write the ComfyUI API client + `features/text2img.py` (inject prompt → POST →
-   poll → fetch PNG).
-5. Add the `"text"` ParamSpec type + `<textarea>` in the React panel; rebuild dist.
-6. Register the feature; test end-to-end from the UI; tune default size/steps.
-7. Add a content-filter stub (license requirement) before any non-internal use.
+Exact files the code expects (verified from the Krea workflow JSON):
+
+| File | ComfyUI folder | Source |
+|---|---|---|
+| `krea2_turbo-Q4_K_M.gguf` (or Q3_K_M/Q5_K_M/Q6_K — selectable in UI) | `models/unet/` | `vantagewithai/Krea-2-Turbo-GGUF` |
+| `qwen3vl_4b_fp8_scaled.safetensors` (Qwen3-VL 4B encoder) | `models/text_encoders/` | qwen_image / Krea ComfyUI release |
+| `qwen_image_vae.safetensors` | `models/vae/` | qwen_image release |
+
+Steps on the box:
+```
+# 1. ComfyUI + the GGUF node (reuse the relief venv or a fresh one)
+git clone https://github.com/comfyanonymous/ComfyUI
+git clone https://github.com/city96/ComfyUI-GGUF ComfyUI/custom_nodes/ComfyUI-GGUF
+.venv\Scripts\python.exe -m pip install -r ComfyUI/requirements.txt
+.venv\Scripts\python.exe -m pip install -r ComfyUI/custom_nodes/ComfyUI-GGUF/requirements.txt
+# 2. download the 3 files above into the listed folders (hf download / browser)
+# 3. run ComfyUI headless
+.venv\Scripts\python.exe ComfyUI/main.py --listen 0.0.0.0 --port 8188
+# 4. run our app in another shell; it auto-finds ComfyUI at 127.0.0.1:8188
+.venv\Scripts\python.exe -m uvicorn server:app --host 0.0.0.0 --port 8000
+```
+Then in the UI pick **Text → Image**, type a prompt, Generate. (No manual workflow
+export — the graph is built in `features/text2img.py:_build_graph`. If the exact
+node names ever change, that's the one function to update.)
+
+Verified graph (GGUF path): `UnetLoaderGGUF(16)` → `KSampler(2)` ← `CLIPTextEncode(6)`
+← `CLIPLoader(18, type="krea2")`, `ConditioningZeroOut(8)` as negative,
+`EmptyLatentImage(10)`, `VAEDecode(3)` ← `VAELoader(4)`, `SaveImage(22)`.
+Defaults: 8 steps, cfg 1.0, sampler `er_sde`, scheduler `simple`.
+
+Last: add a content-filter stub (license requirement) before any non-internal use.
 
 ---
 

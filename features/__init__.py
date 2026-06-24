@@ -7,6 +7,7 @@ To add a feature (text2img, img2img, upscale, …):
 The API (server.py) and UI enumerate REGISTRY automatically — no other changes.
 """
 from .relief import ReliefFeature
+from .text2img import Text2ImgFeature
 
 REGISTRY = {}
 
@@ -16,7 +17,7 @@ def register(feature):
 
 
 register(ReliefFeature())
-# Phase 3 — drop-in here:
-# register(Text2ImgFeature())
+register(Text2ImgFeature())          # Krea-2-Turbo GGUF via ComfyUI (needs ComfyUI on :8188)
+# Phase 3 — more drop-ins here:
 # register(Img2ImgFeature())
 # register(UpscaleFeature())

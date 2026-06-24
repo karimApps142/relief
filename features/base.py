@@ -60,6 +60,8 @@ class Feature:
                     v = min(p.max, v)
             elif p.type == "bool":
                 v = v.lower() in ("1", "true", "yes", "on") if isinstance(v, str) else bool(v)
+            elif p.type == "text":
+                v = "" if v is None else str(v)
             elif p.type == "select" and p.choices and v not in p.choices:
                 v = p.default
             out[p.name] = v

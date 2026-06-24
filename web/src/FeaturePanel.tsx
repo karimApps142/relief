@@ -96,6 +96,12 @@ export default function FeaturePanel({ feature }: { feature: FeatureSchema }) {
                 <Toggle checked={!!params[p.name]} label={p.label || p.name}
                   onChange={(v) => setParams((s) => ({ ...s, [p.name]: v }))} />
               )}
+              {p.type === 'text' && (
+                <textarea value={params[p.name] || ''} rows={3}
+                  placeholder="Describe the image…"
+                  onChange={(e) => setParams((s) => ({ ...s, [p.name]: e.target.value }))}
+                  className="w-full rounded-md border border-white/10 bg-white/5 px-3 py-2 text-sm text-gray-100" />
+              )}
             </Field>
           ))}
         </div>
