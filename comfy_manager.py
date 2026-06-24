@@ -65,7 +65,7 @@ def _log(msg):
 
 
 def _dest(subdir, path_in_repo):
-    return COMFY_DIR / "models" / subdir / Path(path_in_repo).name
+    return COMFY_DIR / "models" / subdir / path_in_repo.rsplit("/", 1)[-1]
 
 
 def is_installed():
@@ -164,33 +164,39 @@ def download_async(labels=None):
 
 
 def _download(labels):
-    try:
-        from huggingface_hub import hf_hub_download
-        _HF_CACHE.mkdir(parents=True, exist_ok=True)       # ComfyUI-local cache (same volume)
-        items = MODELS if not labels else {k: MODELS[k] for k in labels if k in MODELS}
-        for label, (repo, path_in_repo, sub) in items.items():
-            dest_dir = COMFY_DIR / "models" / sub
-            dest_dir.mkdir(parents=True, exist_ok=True)
-            target = dest_dir / Path(path_in_repo).name
-            if target.exists():
-                _log(f"✓ {label} — already present")
-                continue
-            sf = str(Path(path_in_repo).parent)
+    from huggingface_hub import hf_hub_download
+    _HF_CACHE.mkdir(parents=True, exist_ok=True)           # ComfyUI-local cache (same volume)
+    items = MODELS if not labels else {k: MODELS[k] for k in labels if k in MODELS}
+    failures = []
+    for label, (repo, path_in_repo, sub) in items.items():
+        # HF repo paths ALWAYS use '/', never os.sep — split with str ops, not Path
+        # (Path(...).parent on Windows yields a backslash → HF 404 on split_files%5Cvae).
+        name = path_in_repo.rsplit("/", 1)[-1]
+        subfolder = path_in_repo.rsplit("/", 1)[0] if "/" in path_in_repo else None
+        dest_dir = COMFY_DIR / "models" / sub
+        dest_dir.mkdir(parents=True, exist_ok=True)
+        target = dest_dir / name
+        if target.exists():
+            _log(f"✓ {label} — already present")
+            continue
+        try:
             _log(f"downloading {label} from {repo} …")
             # cache_dir keeps this OFF the global HF_HOME (relief's cache is untouched).
-            cached = hf_hub_download(repo_id=repo, filename=Path(path_in_repo).name,
-                                     subfolder=None if sf in ("", ".") else sf,
+            cached = hf_hub_download(repo_id=repo, filename=name, subfolder=subfolder,
                                      cache_dir=str(_HF_CACHE))
             try:                                          # hardlink (instant, same volume)
                 os.link(cached, target)
             except OSError:                               # cross-volume → copy
                 shutil.copy(cached, target)
             _log(f"✓ {label} -> {target}")
+        except Exception as e:                            # one bad file shouldn't block the rest
+            failures.append(label)
+            _log(f"✗ {label}: {e}")
+    if failures:
+        _end("failed: " + ", ".join(failures))
+    else:
         _log("✓ downloads complete")
         _end()
-    except Exception as e:
-        _log(f"ERROR: {e}")
-        _end(str(e))
 
 
 # ----------------------------------------------------------------------------- launch
