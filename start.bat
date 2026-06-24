@@ -10,10 +10,8 @@ echo Updating to latest (git pull)...
 git pull --ff-only
 
 REM --- free port 8000 if a previous server is still holding it (clean restart) ---
-for /f "tokens=5" %%a in ('netstat -ano ^| findstr LISTENING ^| findstr ":8000"') do (
-  echo Stopping previous server on :8000 (PID %%a)...
-  taskkill /F /PID %%a >nul 2>nul
-)
+echo Freeing port 8000 if a previous server is running...
+for /f "tokens=5" %%a in ('netstat -ano ^| findstr LISTENING ^| findstr ":8000"') do taskkill /F /PID %%a >nul 2>nul
 
 if not exist ".venv\Scripts\python.exe" (
   echo.
