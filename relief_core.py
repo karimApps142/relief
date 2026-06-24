@@ -384,6 +384,27 @@ def depth_to_heightmap(depth, mask=None, luma=None, invert=False, refine=0.6,
     return out.astype(np.float32)
 
 
+def tiled_relief_heightmap(depth, mask=None, invert=False, base=0.50, fig_span=0.45):
+    """LEAN heightmap for TILED depth: the tiling already baked the facial detail
+    into the depth, so do only robust percentile-normalize -> (invert) -> re-stretch
+    inside the subject -> seat on a flat base. NO bilateral / guided-refine / gamma /
+    CLAHE / unsharp — any blur > ~1.5px would erase the sub-2px detail tiling recovered."""
+    d = depth.astype(np.float32)
+    lo, hi = np.percentile(d, [1, 99])                   # seam-spike-safe normalize
+    d = np.clip((d - lo) / (hi - lo + 1e-8), 0.0, 1.0).astype(np.float32)
+    if invert:
+        d = (1.0 - d).astype(np.float32)
+    if mask is not None and mask.shape[:2] == d.shape[:2]:
+        m = mask > 0.5
+        if m.any():                                      # use the full Z budget on the subject
+            slo, shi = np.percentile(d[m], [1, 99])
+            d = np.clip((d - slo) / (shi - slo + 1e-8), 0.0, 1.0)
+        out = np.where(m, base + d * fig_span, base)
+    else:
+        out = base + d * fig_span
+    return out.astype(np.float32)
+
+
 # ----- Stage 6: heightmap -> STL -----
 def heightmap_to_surface(height16, z_scale_mm=8.0, pixel_mm=0.1):
     """Open top-surface mesh — fine for CNC (CAM closes the model)."""
@@ -523,15 +544,23 @@ def _tzd_grid(im_uint8, D, global01, num_x, num_y):
     return acc
 
 
-def tiled_depth(image, D, grids=((2, 2), (4, 4))):
+def tiled_depth(image, D, grids=((3, 3), (6, 6)), input_size=768):
     """High-res depth by fusing a global pass with two overlapping-tile grids
-    (TilingZoeDepth). D(PIL)->HxW float. Returns HxW float in [0,1] (near=large)."""
+    (TilingZoeDepth). D(PIL[, input_size])->HxW float. Returns HxW [0,1] (near=large).
+    Each tile is run at the model's full resolution (input_size) so the face fills
+    the receptive field and fine geometry is recovered, then stitched seamlessly."""
+    import inspect
+    try:
+        accepts = "input_size" in inspect.signature(D).parameters
+    except (TypeError, ValueError):
+        accepts = False
+    Dt = (lambda pil: D(pil, input_size=input_size)) if accepts else D
     img = image.convert("RGB")
     im = np.asarray(img)
-    global01 = _tzd_norm(np.asarray(D(img), dtype=np.float64))
+    global01 = _tzd_norm(np.asarray(Dt(img), dtype=np.float64))
     (nx0, ny0), (nx1, ny1) = grids
-    coarse = _tzd_grid(im, D, global01, nx0, ny0)
-    fine = _tzd_grid(im, D, global01, nx1, ny1)
+    coarse = _tzd_grid(im, Dt, global01, nx0, ny0)
+    fine = _tzd_grid(im, Dt, global01, nx1, ny1)
     grey = im.mean(axis=2).astype(np.float32)
     diff = cv2.GaussianBlur(grey, (0, 0), 20) - grey
     diff = diff / (np.max(diff) + 1e-12)

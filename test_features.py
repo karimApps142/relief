@@ -24,7 +24,7 @@ assert sch["inputs"] == ["image"] and len(sch["params"]) >= 8
 p = feat.coerce({"relief_depth_mm": 999, "make_solid": "true", "depth_model": "bogus"})
 assert p["relief_depth_mm"] == 20.0, "number not clamped to max"
 assert p["make_solid"] is True, "string bool not parsed"
-assert p["depth_model"] == "sapiens", "bad select not reset to default"
+assert p["depth_model"] == "depth-anything", "bad select not reset to default"
 print("coerce OK:", {k: p[k] for k in ("relief_depth_mm", "make_solid", "depth_model")})
 
 # run end-to-end (lite)

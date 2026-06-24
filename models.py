@@ -86,15 +86,33 @@ def estimate_normals_marigold(image: Image.Image) -> np.ndarray:
 # ---------- Stage 2 (optional): depth for global form ----------
 @functools.lru_cache(maxsize=1)
 def _depth_pipe():
-    from transformers import pipeline
-    return pipeline("depth-estimation",
-                    model="depth-anything/Depth-Anything-V2-Large-hf",
-                    device=0 if DEVICE == "cuda" else -1)
+    from transformers import AutoImageProcessor, AutoModelForDepthEstimation
+    repo = "depth-anything/Depth-Anything-V2-Large-hf"
+    proc = AutoImageProcessor.from_pretrained(repo)
+    model = AutoModelForDepthEstimation.from_pretrained(repo).to(DEVICE).eval()
+    return proc, model
 
 
-def estimate_depth(image: Image.Image) -> np.ndarray:
-    d = np.asarray(_depth_pipe()(image)["depth"]).astype(np.float32)
-    return (d - d.min()) / (d.max() - d.min() + 1e-8)  # HxW [0,1]
+def estimate_depth(image: Image.Image, input_size: int = 518) -> np.ndarray:
+    """Depth-Anything-V2-Large. `input_size` = the model working resolution; the
+    tiling wrapper raises it per tile (~768) so each crop yields finer relief.
+    Returns HxW [0,1] at the input resolution (near = high)."""
+    proc, model = _depth_pipe()
+    img = image.convert("RGB")
+    W0, H0 = img.size
+    s = max(14, int(round(input_size / 14)) * 14)        # multiple of 14 (DPT patch size)
+    try:
+        inputs = proc(images=img, size={"height": s, "width": s}, return_tensors="pt")
+    except Exception:
+        inputs = proc(images=img, return_tensors="pt")   # fall back to processor default
+    inputs = {k: v.to(DEVICE) for k, v in inputs.items()}
+    with torch.inference_mode():
+        pred = model(**inputs).predicted_depth
+    if pred.dim() == 3:
+        pred = pred.unsqueeze(1)                          # (1,h,w) -> (1,1,h,w)
+    d = torch.nn.functional.interpolate(pred, size=(H0, W0), mode="bicubic",
+                                        align_corners=False)[0, 0].float().cpu().numpy()
+    return (d - d.min()) / (d.max() - d.min() + 1e-8)
 
 
 # ---------- Stage 3 (optional): face parsing for per-material detail ----------
