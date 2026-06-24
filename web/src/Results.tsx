@@ -49,8 +49,9 @@ function ArtifactCard({ name, url }: { name: string; url: string }) {
 }
 
 export default function Results({ s }: { s: Studio }) {
-  const f = s.active!
+  const f = s.active
   const p = s.progress
+  if (!f) return null
 
   // ---- idle ----
   if (s.runState === 'idle') {
@@ -145,7 +146,8 @@ export default function Results({ s }: { s: Studio }) {
   }
 
   // ---- result ----
-  const rec = s.record!
+  const rec = s.record
+  if (!rec) return null
   const arts = Object.entries(rec.artifacts)
   const meta = rec.meta
   const metaRows = [

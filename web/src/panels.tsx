@@ -42,14 +42,17 @@ export function LiteBanner({ s }: { s: Studio }) {
 // ---------------------------------------------------------------- COMFY WIZARD
 export function ComfyWizard({ s }: { s: Studio }) {
   const c = s.comfy
-  const f = s.active!
-  const models = c ? Object.entries(c.models) : []
+  const f = s.active
+  if (!c || !f) return (
+    <div style={{ flex: 1, minHeight: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--hf-text-tertiary)', fontSize: 13 }}>Checking the image engine…</div>
+  )
+  const models = Object.entries(c.models)
   const allM = models.length > 0 && models.every(([, b]) => b)
-  const steps = c ? [
+  const steps = [
     { key: 'install', label: 'Install ComfyUI', desc: 'Clone the engine and Python dependencies.', done: c.installed, available: !c.installed, btn: 'Install', showModels: false },
     { key: 'download', label: 'Download models', desc: 'Fetch the 4 model files (~11.7 GB total).', done: allM, available: c.installed && !allM, btn: 'Download', showModels: true },
     { key: 'start', label: 'Start engine', desc: 'Launch ComfyUI on 127.0.0.1:8188.', done: c.running, available: c.installed && allM && !c.running, btn: 'Start', showModels: false },
-  ] : []
+  ]
   return (
     <div style={{ flex: 1, minHeight: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '34px 26px' }}>
       <div style={{ width: '100%', maxWidth: 620, border: '1px solid var(--hf-border)', borderRadius: 20, background: 'var(--hf-surface-1)', padding: 28, boxShadow: 'var(--hf-shadow-md), var(--hf-sheen-top)' }}>

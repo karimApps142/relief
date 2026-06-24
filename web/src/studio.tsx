@@ -43,6 +43,7 @@ export function useStudio() {
   const tid = useRef(0)
   const abortRef = useRef<AbortController | null>(null)
   const t0 = useRef(0)
+  const runId = useRef(0)   // invalidates a superseded/cancelled in-flight run
 
   const addToast = useCallback((tone: string, msg: string) => {
     const id = ++tid.current
@@ -70,18 +71,13 @@ export function useStudio() {
   const refreshSystem = useCallback(() => { getSystem().then(setSystem).catch(() => {}) }, [])
   const refreshJobs = useCallback(() => { getJobs().then(setJobs).catch(() => {}) }, [])
 
+  // one cheap poll loop for engine/models/system (stable deps → no interval churn)
   useEffect(() => {
-    refreshComfy(); refreshModels(); refreshSystem()
-    const t = setInterval(() => { refreshComfy(); refreshSystem() }, 2800)
+    const tick = () => { refreshComfy(); refreshModels(); refreshSystem() }
+    tick()
+    const t = setInterval(tick, 2800)
     return () => clearInterval(t)
   }, [refreshComfy, refreshModels, refreshSystem])
-
-  // models status: keep polling only while not installed or busy
-  useEffect(() => {
-    if (models && models.installed && !models.busy) return
-    const t = setInterval(refreshModels, 2500)
-    return () => clearInterval(t)
-  }, [models, refreshModels])
 
   // ---- run flow ----
   const running = runState === 'submitting' || runState === 'running'
@@ -107,24 +103,29 @@ export function useStudio() {
     const f = active
     if (!f || running) return
     if (f.needs_image && !files[f.id]) return
+    const myId = ++runId.current
     t0.current = performance.now()
     setError(''); setRecord(null); setProgress(null); setElapsed(0); setRunState('submitting')
+    // fallback so fast jobs (no progress.active tick) still flip to 'running'
+    setTimeout(() => { if (runId.current === myId) setRunState((s) => (s === 'submitting' ? 'running' : s)) }, 700)
     const ac = new AbortController(); abortRef.current = ac
     try {
       const rec = await runFeature(f.id, files[f.id] || null, values[f.id] || {}, ac.signal)
+      if (runId.current !== myId) return        // cancelled/superseded → drop this result
       setRecord(rec); setRunState('result')
       addToast('success', `${f.name} complete · ${rec.meta.duration_s.toFixed(1)} s`)
       refreshJobs(); refreshSystem()
     } catch (e: any) {
-      if (ac.signal.aborted) { setRunState('idle') }
-      else { setError(e.message || String(e)); setRunState('error'); addToast('danger', `${f.name} failed`) }
-    } finally {
-      abortRef.current = null
+      if (runId.current !== myId) return         // cancelled → ignore (cancel already reset)
+      setError(e.message || String(e)); setRunState('error'); addToast('danger', `${f.name} failed`)
     }
   }, [active, running, files, values, addToast, refreshJobs, refreshSystem])
 
   const cancel = useCallback(() => {
-    abortRef.current?.abort(); setRunState('idle'); addToast('info', 'Run cancelled (the backend may still finish).')
+    runId.current++                              // invalidate the in-flight run
+    abortRef.current?.abort()
+    setRunState('idle'); setError(''); setProgress(null)
+    addToast('info', 'Run cancelled (the backend may still finish).')
   }, [addToast])
 
   // ---- actions ----
@@ -139,7 +140,10 @@ export function useStudio() {
 
   const onUpload = useCallback((file: File) => {
     setFiles((s) => ({ ...s, [activeId]: file }))
-    setPreviews((s) => ({ ...s, [activeId]: URL.createObjectURL(file) }))
+    setPreviews((s) => {
+      if (s[activeId]) URL.revokeObjectURL(s[activeId])   // free the prior preview
+      return { ...s, [activeId]: URL.createObjectURL(file) }
+    })
   }, [activeId])
 
   const downloadWeights = useCallback(() => {

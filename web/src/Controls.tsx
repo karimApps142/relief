@@ -68,7 +68,7 @@ function ParamField({ p, value, onChange }: { p: ParamSpec; value: any; onChange
 }
 
 export default function Controls({ s }: { s: Studio }) {
-  const f = s.active!
+  const f = s.active
   const [dims, setDims] = useState<{ w: number; h: number } | null>(null)
 
   useEffect(() => {
@@ -81,11 +81,12 @@ export default function Controls({ s }: { s: Studio }) {
     return () => URL.revokeObjectURL(url)
   }, [s.file])
 
+  if (!f) return null
   const visible = (p: ParamSpec) => !p.depends_on || s.values[p.depends_on.param] === p.depends_on.value
   const basic = f.params.filter((p) => p.group === 'basic' && visible(p))
   const advanced = f.params.filter((p) => p.group === 'advanced' && visible(p))
   const liteRelief = f.id === 'relief' && s.models && !s.models.installed
-  const px = Number(s.values.pixel_mm) || 0.1
+  const px = Number(s.values.pixel_mm ?? 0.1) || 0.1
   const finalSize = dims ? `${Math.round(dims.w * px)} × ${Math.round(dims.h * px)} mm` : '—'
 
   return (
