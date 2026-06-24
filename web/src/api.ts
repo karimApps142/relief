@@ -3,7 +3,7 @@
 
 export type ParamSpec = {
   name: string
-  type: 'number' | 'bool' | 'select'
+  type: 'number' | 'bool' | 'select' | 'text'
   default: any
   label: string
   min?: number | null
@@ -17,6 +17,7 @@ export type FeatureSchema = {
   name: string
   description: string
   inputs: string[]
+  needs_comfy?: boolean
   params: ParamSpec[]
 }
 
@@ -40,6 +41,31 @@ export async function getModelsStatus(): Promise<{ installed: boolean }> {
     return { installed: false }
   }
 }
+
+// ---- ComfyUI engine management (install / download / launch from the UI) ----
+export type ComfyStatus = {
+  installed: boolean
+  running: boolean
+  dir: string
+  url: string
+  models: Record<string, boolean>
+  busy: boolean
+  action: string | null
+  log: string[]
+  error: string | null
+  done: boolean
+}
+
+export async function getComfyStatus(): Promise<ComfyStatus> {
+  const r = await fetch('/api/comfy/status')
+  if (!r.ok) throw new Error(`GET /api/comfy/status failed (${r.status})`)
+  return r.json()
+}
+
+const post = (path: string) => fetch(path, { method: 'POST' }).then((r) => r.json())
+export const comfyInstall = () => post('/api/comfy/install')
+export const comfyDownload = () => post('/api/comfy/download')
+export const comfyStart = () => post('/api/comfy/start')
 
 export async function runFeature(
   id: string,

@@ -1,17 +1,17 @@
 # Phase 3 — Text-to-Image feature (Krea-2-Turbo, GGUF, via ComfyUI)
 
-Status: **CODE DONE — needs the box setup (ComfyUI + 3 model files) to run.**
+Status: **CODE DONE — ComfyUI setup is now handled in-app (see §8).**
 
 ✅ **Implemented (in repo):** `features/text2img.py` (a `ComfyUIClient` + the
 `Text2ImgFeature`, registered in `features/__init__.py`), a `"text"` ParamSpec type
 (`base.py`) + prompt `<textarea>` in the React UI. The API-format graph is
 **hand-authored from the verified Krea workflow's GGUF path** — no manual export
-needed. The feature already shows up at `/api/features` and in the UI; it just
-errors with "ComfyUI not reachable" until the box setup below is done.
+needed. The feature already shows up at `/api/features` and in the UI.
 
-⏳ **Remaining = box setup only:** install ComfyUI + ComfyUI-GGUF, drop in the 3
-model files, run it headless on :8188. Then point our server at it
-(`COMFYUI_URL=127.0.0.1:8188`, the default) and it works.
+✅ **ComfyUI is now a managed dependency** (`comfy_manager.py` + `/api/comfy/*` +
+the `ComfyGate` UI): the app **installs ComfyUI, downloads the model files, and
+launches it headless — all from buttons in our own UI** (§8). The user never opens
+ComfyUI directly. First real run still happens on the box (no ComfyUI on the Mac).
 
 ---
 
@@ -170,6 +170,44 @@ Two more drop-in feature modules, sharing `features/_comfy.py`:
 All four features (`relief`, `text2img`, `img2img`, `upscale`) appear automatically
 as tabs in the React UI — no frontend changes needed (schema-driven). img2img/upscale
 need the same ComfyUI on :8188; upscale additionally needs the upscale model file.
+
+## 8. In-app ComfyUI management (no manual setup)
+
+`comfy_manager.py` makes ComfyUI an invisible managed dependency. The user opens a
+ComfyUI-backed tab (Text→Image / Image→Image / Upscale) and a **setup wizard**
+(`web/src/ComfyGate.tsx`) walks them through three buttons; once green, the feature
+renders. No terminal, no second app.
+
+- **`GET /api/comfy/status`** — installed? running? which model files present? + live log.
+- **`POST /api/comfy/install`** — `git clone` ComfyUI + ComfyUI-GGUF, `pip install`
+  both requirements (background thread, streamed to the UI log).
+- **`POST /api/comfy/download`** — pulls the 4 files via `huggingface_hub` into
+  `ComfyUI/models/{unet,text_encoders,vae,upscale_models}`:
+
+  | File | HF repo |
+  |---|---|
+  | `krea2_turbo-Q4_K_M.gguf` | `vantagewithai/Krea-2-Turbo-GGUF` |
+  | `qwen3vl_4b_fp8_scaled.safetensors` | `Comfy-Org/Qwen3-VL` (`text_encoders/`) |
+  | `qwen_image_vae.safetensors` | `Comfy-Org/Qwen-Image_ComfyUI` (`split_files/vae/`) |
+  | `4x-UltraSharp.pth` | `lokCX/4x-Ultrasharp` |
+
+- **`POST /api/comfy/start`** — launches `ComfyUI/main.py --listen --port 8188` as a
+  child process if it's down. Also auto-started by `server.py` right before any
+  `needs_comfy` feature runs (`comfy_manager.ensure_running()`), which first calls
+  `models.unload_all()` to free the 12 GB for ComfyUI (relief ↔ image-AI are used
+  one at a time — they can't co-reside on a 3060).
+
+**Locations** (env-configurable): `COMFYUI_DIR` (default `<repo-parent>/ComfyUI`,
+i.e. outside the git repo) and `COMFYUI_URL` (default `127.0.0.1:8188`).
+
+**Disk tip:** set `HF_HOME` onto the same drive as `COMFYUI_DIR` (e.g. `F:\hf-cache`)
+so downloaded files are **hardlinked** into `ComfyUI/models/` instead of copied —
+otherwise the 7.5 GB GGUF is duplicated (cache + dest). The code tries `os.link`
+first and falls back to a copy across volumes.
+
+**Caveat (untested lifecycle):** the install/launch path can only be fully verified
+on the box. The pieces compile and the status/download logic is validated on the Mac;
+if `pip install` or the ComfyUI launch needs a tweak, it's isolated to `comfy_manager.py`.
 
 ## Sources
 - https://huggingface.co/krea/Krea-2-Turbo

@@ -22,6 +22,7 @@ class UpscaleFeature(Feature):
     id = "upscale"
     name = "Upscale"
     description = "Upscale an image with an ESRGAN model (ComfyUI; no diffusion model)."
+    needs_comfy = True
     inputs = ["image"]
     params = [
         ParamSpec("model_name", "select", "4x-UltraSharp.pth", "Upscale model",

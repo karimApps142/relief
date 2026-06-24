@@ -36,6 +36,8 @@ class Feature:
     description: str = ""
     inputs: list = ["image"]        # input kinds the UI should collect, e.g. ["image"] | ["text"]
     params: list = []               # list[ParamSpec]
+    needs_comfy: bool = False       # True if this feature runs on the ComfyUI engine
+                                    # (the UI shows a setup gate until ComfyUI is ready)
 
     def run(self, inputs: dict, params: dict, out_dir: Path) -> dict:
         """inputs: {kind: value} (e.g. {'image': '/path.png'} or {'text': '…'}).
@@ -45,7 +47,8 @@ class Feature:
     # ---- shared helpers (the API + UI use these; features don't override) ----
     def schema(self) -> dict:
         return {"id": self.id, "name": self.name, "description": self.description,
-                "inputs": self.inputs, "params": [p.as_dict() for p in self.params]}
+                "inputs": self.inputs, "needs_comfy": self.needs_comfy,
+                "params": [p.as_dict() for p in self.params]}
 
     def coerce(self, raw: dict) -> dict:
         """Validate / clamp incoming params against the schema; fill defaults."""

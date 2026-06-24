@@ -45,6 +45,7 @@ class Text2ImgFeature(Feature):
     id = "text2img"
     name = "Text → Image"
     description = "Generate an image from a prompt with Krea-2-Turbo (GGUF, via ComfyUI)."
+    needs_comfy = True
     inputs = []                                          # no image upload; prompt is a param
     params = [
         ParamSpec("prompt", "text", "", "Prompt"),

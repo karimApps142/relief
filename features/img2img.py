@@ -33,6 +33,7 @@ class Img2ImgFeature(Feature):
     id = "img2img"
     name = "Image → Image"
     description = "Transform an image with a prompt (Krea-2-Turbo img2img, via ComfyUI)."
+    needs_comfy = True
     inputs = ["image"]
     params = [
         ParamSpec("prompt", "text", "", "Prompt"),

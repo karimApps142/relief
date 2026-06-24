@@ -22,6 +22,7 @@ from fastapi.staticfiles import StaticFiles
 
 from features import REGISTRY
 import model_manager
+import comfy_manager
 
 app = FastAPI(title="Relief Studio API")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"],
@@ -45,6 +46,37 @@ def models_status():
     return {"installed": model_manager.models_present()}
 
 
+# ---- ComfyUI engine: install / download / launch, all driven from the UI ----
+@app.get("/api/comfy/status")
+def comfy_status():
+    return comfy_manager.status()
+
+
+@app.post("/api/comfy/install")
+def comfy_install():
+    return {"started": comfy_manager.install_async(), **comfy_manager.status()}
+
+
+@app.post("/api/comfy/download")
+def comfy_download():
+    return {"started": comfy_manager.download_async(), **comfy_manager.status()}
+
+
+@app.post("/api/comfy/start")
+def comfy_start():
+    return comfy_manager.start()
+
+
+def _free_relief_vram():
+    """Unload our in-process depth/matting models so ComfyUI (separate process)
+    can claim the 12 GB. Best-effort; harmless if nothing is loaded."""
+    try:
+        import models
+        models.unload_all()
+    except Exception:
+        pass
+
+
 @app.post("/api/features/{fid}/run")
 async def run_feature(fid: str, file: UploadFile = File(None), params: str = Form("{}")):
     feat = REGISTRY.get(fid)
@@ -64,6 +96,10 @@ async def run_feature(fid: str, file: UploadFile = File(None), params: str = For
         dst = out_dir / f"input_{file.filename}"
         dst.write_bytes(await file.read())
         inputs["image"] = str(dst)
+
+    if getattr(feat, "needs_comfy", False):               # ComfyUI-backed feature
+        _free_relief_vram()                               # free the GPU for ComfyUI
+        comfy_manager.ensure_running()                    # auto-start if installed & down
 
     try:
         artifacts = feat.run(inputs, feat.coerce(raw), out_dir)
