@@ -33,6 +33,7 @@ class ReliefParams:
     depth_model: str = "depth-anything"  # DA-V2-L: crop-friendly + input_size scalable (best for tiling)
     da3_variant: str = "DA3MONO-LARGE"   # only when depth_model == depth-anything-3
     tile_detail: str = "medium"     # off | low | medium | high  (tile density = facial detail)
+    face_crop: bool = True          # focus the tile budget on a detected face crop (sharper + faster)
     invert: bool = False            # flip near<->far if the subject comes out sunken
     flatten_bg: bool = True         # seat the subject on a flat base via the mask
     base_height: float = 0.50       # base plate level
@@ -63,13 +64,14 @@ def generate_relief(image_path, out_dir, params: ReliefParams = ReliefParams(),
     grids = _GRIDS.get(params.tile_detail, _GRIDS["medium"])
     try:
         ckey = (image_path, os.path.getmtime(image_path), params.depth_model,
-                params.tile_detail, params.da3_variant)
+                params.tile_detail, params.da3_variant, params.face_crop)
     except OSError:
         ckey = None
     cache = _RAW_CACHE.get(ckey, {}) if ckey is not None else {}
     if "depth" not in cache:
         cache["depth"] = be.estimate_depth(image, model=params.depth_model, tiling=tiling,
-                                           grids=grids, da3_variant=params.da3_variant)
+                                           grids=grids, da3_variant=params.da3_variant,
+                                           face_crop=params.face_crop)
     depth = cache["depth"]
     if ckey is not None:
         _RAW_CACHE.clear(); _RAW_CACHE[ckey] = cache

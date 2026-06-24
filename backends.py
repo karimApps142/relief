@@ -42,7 +42,7 @@ class LiteBackend:
         return (n + 1.0) / 2.0                      # HxWx3 in [0,1]
 
     def estimate_depth(self, image: Image.Image, model="lite", tiling=False,
-                       grids=None, da3_variant=None):
+                       grids=None, da3_variant=None, face_crop=True):
         # crude luminance pseudo-depth so the Mac/lite path still yields a heightmap
         rgb = np.asarray(image.convert("RGB"))
         g = cv2.cvtColor(rgb, cv2.COLOR_RGB2GRAY).astype(np.float32) / 255.0
@@ -69,15 +69,16 @@ class FullBackend:
         return self._m.estimate_normals_stable(image)
 
     def estimate_depth(self, image, model="depth-anything", tiling=False,
-                       grids=((3, 3), (6, 6)), da3_variant="DA3MONO-LARGE"):
+                       grids=((3, 3), (6, 6)), da3_variant="DA3MONO-LARGE", face_crop=True):
+        _tile = rc.tiled_depth_facecrop if face_crop else rc.tiled_depth
         if model == "depth-anything":                  # DA-V2-L: crop-friendly, input_size scalable
             if tiling:
-                return rc.tiled_depth(image, self._m.estimate_depth, grids=grids, input_size=768)
+                return _tile(image, self._m.estimate_depth, grids=grids, input_size=768)
             return self._m.estimate_depth(image)
         if model == "depth-anything-3":                # DA3 (capped ~504; tiling helps modestly)
             try:
                 D = lambda pil, **_: self._m.estimate_depth_da3(pil, variant=da3_variant)
-                return rc.tiled_depth(image, D, grids=grids) if tiling \
+                return _tile(image, D, grids=grids) if tiling \
                     else self._m.estimate_depth_da3(image, variant=da3_variant)
             except Exception:
                 return self._m.estimate_depth(image)   # fallback: Depth-Anything-V2

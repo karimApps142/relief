@@ -544,6 +544,66 @@ def _tzd_grid(im_uint8, D, global01, num_x, num_y):
     return acc
 
 
+def detect_face_box(image, expand=0.6):
+    """Largest frontal-face bbox (expanded by `expand` on each side), or None.
+    OpenCV Haar cascade — CPU, no model download."""
+    gray = cv2.cvtColor(np.asarray(image.convert("RGB")), cv2.COLOR_RGB2GRAY)
+    try:
+        cascade = cv2.CascadeClassifier(
+            cv2.data.haarcascades + "haarcascade_frontalface_default.xml")
+        faces = cascade.detectMultiScale(gray, 1.1, 5, minSize=(60, 60))
+    except Exception:
+        return None
+    if len(faces) == 0:
+        return None
+    x, y, w, h = max(faces, key=lambda f: f[2] * f[3])
+    H, W = gray.shape
+    ex, ey = int(w * expand), int(h * expand)
+    return (max(0, x - ex), max(0, y - ey), min(W, x + w + ex), min(H, y + h + ey))
+
+
+def _crop_feather(h, w, frac=0.12):
+    fy, fx = max(1, int(h * frac)), max(1, int(w * frac))
+    wy, wx = np.ones(h, np.float64), np.ones(w, np.float64)
+    wy[:fy] = np.linspace(0, 1, fy); wy[-fy:] = np.linspace(1, 0, fy)
+    wx[:fx] = np.linspace(0, 1, fx); wx[-fx:] = np.linspace(1, 0, fx)
+    return np.outer(wy, wx)
+
+
+def _call_D(D, pil, input_size):
+    import inspect
+    try:
+        if "input_size" in inspect.signature(D).parameters:
+            return D(pil, input_size=input_size)
+    except (TypeError, ValueError):
+        pass
+    return D(pil)
+
+
+def tiled_depth_facecrop(image, D, grids=((3, 3), (6, 6)), input_size=768,
+                         expand=0.6, feather=0.12):
+    """Spend the tile budget on the FACE: one cheap global pass for the body form,
+    the full overlapping-tile grid on a tight face crop (so the face fills the
+    model input -> max detail), then composite the face depth back in (scale/shift
+    aligned to the body depth + feathered). Falls back to whole-frame tiling if no
+    face is found. More facial detail for fewer passes than tiling the whole frame."""
+    img = image.convert("RGB")
+    box = detect_face_box(img, expand)
+    if box is None:
+        return tiled_depth(img, D, grids=grids, input_size=input_size)
+    body = _tzd_norm(np.asarray(_call_D(D, img, input_size), dtype=np.float64))  # 1 pass
+    x0, y0, x1, y1 = box
+    face = _tzd_norm(tiled_depth(img.crop(box), D, grids=grids,
+                                 input_size=input_size).astype(np.float64))
+    region = body[y0:y1, x0:x1]
+    if face.std() > 1e-6:                                 # match the body's local scale/shift
+        face = region.mean() + region.std() * (face - face.mean()) / face.std()
+    w = _crop_feather(y1 - y0, x1 - x0, feather)
+    out = body.copy()
+    out[y0:y1, x0:x1] = (1 - w) * region + w * face
+    return _tzd_norm(out).astype(np.float32)
+
+
 def tiled_depth(image, D, grids=((3, 3), (6, 6)), input_size=768):
     """High-res depth by fusing a global pass with two overlapping-tile grids
     (TilingZoeDepth). D(PIL[, input_size])->HxW float. Returns HxW [0,1] (near=large).
