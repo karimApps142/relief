@@ -223,22 +223,45 @@ def _http_download(url, target, label):
 
 
 # ----------------------------------------------------------------------------- launch
+def _pump(proc):
+    """Stream ComfyUI's stdout/stderr into our task log (and comfy.log) so boot errors
+    are visible in the UI instead of vanishing into DEVNULL."""
+    logfile = COMFY_DIR / "comfy.log"
+    try:
+        with open(logfile, "w", encoding="utf-8", errors="replace") as fh:
+            for line in proc.stdout:
+                line = line.rstrip()
+                fh.write(line + "\n"); fh.flush()
+                _log("[comfy] " + line)
+    except Exception:
+        pass
+
+
 def start():
-    """Launch ComfyUI headless if installed and not already up."""
+    """Launch ComfyUI headless if installed and not already up. Streams its boot log
+    into the UI and detects an early crash instead of silently 'starting' forever."""
     global _proc
     if not is_installed():
         return {"ok": False, "error": "ComfyUI is not installed yet"}
     if is_running():
         return {"ok": True, "already_running": True}
+    _log(f"starting ComfyUI ({sys.executable} main.py --listen {_HOST} --port {_PORT}) …")
     _proc = subprocess.Popen(
-        [sys.executable, "main.py", "--listen", _HOST, "--port", _PORT],
-        cwd=str(COMFY_DIR), stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+        [sys.executable, "-u", "main.py", "--listen", _HOST, "--port", _PORT],
+        cwd=str(COMFY_DIR), stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+        text=True, bufsize=1, encoding="utf-8", errors="replace",
     )
-    for _ in range(30):                                   # ComfyUI takes a few s to bind
+    threading.Thread(target=_pump, args=(_proc,), daemon=True).start()
+    for _ in range(120):                                  # up to 60s: torch + custom nodes load
         if is_running():
+            _log("✓ ComfyUI is up")
             return {"ok": True, "started": True}
+        if _proc.poll() is not None:                      # exited early → it crashed
+            _log(f"✗ ComfyUI exited with code {_proc.returncode} — see the [comfy] log above")
+            return {"ok": False, "error": f"ComfyUI exited with code {_proc.returncode} "
+                                          f"(see log / F:\\ComfyUI\\comfy.log)"}
         time.sleep(0.5)
-    return {"ok": True, "starting": True}                 # still warming; client retries
+    return {"ok": True, "starting": True}                 # still warming; client keeps polling
 
 
 def ensure_running():
