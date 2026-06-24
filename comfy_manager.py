@@ -11,18 +11,17 @@ work (the heavy bits no-op cleanly off the box).
   start()           -> launch ComfyUI headless on COMFYUI_URL if down
   ensure_running()  -> best-effort start before a ComfyUI-backed feature runs
 
-Model files download into a ComfyUI-LOCAL HF cache (on the same drive as ComfyUI) and
-are hardlinked into ComfyUI/models, so the big GGUF is stored once WITHOUT touching the
-global HF_HOME — the relief models keep using their own default cache.
+Model files stream DIRECTLY into ComfyUI/models over HTTP (HF resolve URLs) — no HF
+cache, no symlinks/hardlinks. The cache+hardlink approach broke on Windows (os.link of
+an HF symlink leaves a broken reparse point that even crashes `.exists()`), so we avoid
+it entirely. The global HF_HOME is never touched (relief keeps its own default cache).
 
 Locations are env-configurable:
   COMFYUI_DIR  (default: <repo-parent>/ComfyUI)   COMFYUI_URL (default 127.0.0.1:8188)
-  COMFY_HF_CACHE (default: <COMFYUI_DIR>/.hf-cache — must share ComfyUI's volume)
 """
 import os
 import sys
 import time
-import shutil
 import threading
 import subprocess
 import urllib.request
@@ -32,9 +31,6 @@ _ROOT = Path(__file__).resolve().parent
 COMFY_DIR = Path(os.environ.get("COMFYUI_DIR", _ROOT.parent / "ComfyUI")).resolve()
 COMFY_URL = os.environ.get("COMFYUI_URL", "127.0.0.1:8188")
 _HOST, _PORT = (COMFY_URL.split(":") + ["8188"])[:2]
-# ComfyUI's own HF cache — on the same volume as COMFY_DIR so downloads hardlink into
-# ComfyUI/models (stored once) instead of copying, and the global HF_HOME stays untouched.
-_HF_CACHE = Path(os.environ.get("COMFY_HF_CACHE", COMFY_DIR / ".hf-cache"))
 
 COMFY_GIT = "https://github.com/comfyanonymous/ComfyUI"
 GGUF_GIT = "https://github.com/city96/ComfyUI-GGUF"
@@ -68,6 +64,16 @@ def _dest(subdir, path_in_repo):
     return COMFY_DIR / "models" / subdir / path_in_repo.rsplit("/", 1)[-1]
 
 
+def _path_ok(path):
+    """Robust existence check: a non-empty real file. A broken Windows reparse point
+    makes .exists()/.stat() raise WinError 4392 — treat any such error as 'absent'
+    (so status() never 500s and the file gets re-downloaded clean)."""
+    try:
+        return path.exists() and path.stat().st_size > 0
+    except OSError:
+        return False
+
+
 def is_installed():
     return (COMFY_DIR / "main.py").exists()
 
@@ -81,7 +87,7 @@ def is_running(timeout=1.5):
 
 
 def models_status():
-    return {label: _dest(sub, p).exists() for label, (_, p, sub) in MODELS.items()}
+    return {label: _path_ok(_dest(sub, p)) for label, (_, p, sub) in MODELS.items()}
 
 
 def status():
@@ -164,30 +170,21 @@ def download_async(labels=None):
 
 
 def _download(labels):
-    from huggingface_hub import hf_hub_download
-    _HF_CACHE.mkdir(parents=True, exist_ok=True)           # ComfyUI-local cache (same volume)
     items = MODELS if not labels else {k: MODELS[k] for k in labels if k in MODELS}
     failures = []
     for label, (repo, path_in_repo, sub) in items.items():
-        # HF repo paths ALWAYS use '/', never os.sep — split with str ops, not Path
-        # (Path(...).parent on Windows yields a backslash → HF 404 on split_files%5Cvae).
-        name = path_in_repo.rsplit("/", 1)[-1]
-        subfolder = path_in_repo.rsplit("/", 1)[0] if "/" in path_in_repo else None
         dest_dir = COMFY_DIR / "models" / sub
         dest_dir.mkdir(parents=True, exist_ok=True)
-        target = dest_dir / name
-        if target.exists():
+        # HF repo paths ALWAYS use '/', never os.sep — split with str ops (Path.parent on
+        # Windows would yield a backslash → HF 404 on split_files%5Cvae).
+        target = dest_dir / path_in_repo.rsplit("/", 1)[-1]
+        if _path_ok(target):
             _log(f"✓ {label} — already present")
             continue
         try:
             _log(f"downloading {label} from {repo} …")
-            # cache_dir keeps this OFF the global HF_HOME (relief's cache is untouched).
-            cached = hf_hub_download(repo_id=repo, filename=name, subfolder=subfolder,
-                                     cache_dir=str(_HF_CACHE))
-            try:                                          # hardlink (instant, same volume)
-                os.link(cached, target)
-            except OSError:                               # cross-volume → copy
-                shutil.copy(cached, target)
+            _http_download(f"https://huggingface.co/{repo}/resolve/main/{path_in_repo}",
+                           target, label)
             _log(f"✓ {label} -> {target}")
         except Exception as e:                            # one bad file shouldn't block the rest
             failures.append(label)
@@ -197,6 +194,32 @@ def _download(labels):
     else:
         _log("✓ downloads complete")
         _end()
+
+
+def _http_download(url, target, label):
+    """Stream an HF resolve URL straight to `target` (atomic via a .part temp). Logs
+    throttled % progress so the big GGUF doesn't look frozen."""
+    req = urllib.request.Request(url, headers={"User-Agent": "relief-comfy-manager"})
+    tmp = target.with_name(target.name + ".part")
+    try:                                                  # clear any stale/broken target
+        target.unlink()
+    except OSError:
+        pass
+    with urllib.request.urlopen(req, timeout=60) as r:    # follows HF's 302 to the CDN
+        total = int(r.headers.get("Content-Length") or 0)
+        done = last = 0
+        step = max(total // 20, 32 << 20) if total else 0   # log ~every 5% (min 32 MB)
+        with open(tmp, "wb") as f:
+            while True:
+                chunk = r.read(1 << 20)                   # 1 MB
+                if not chunk:
+                    break
+                f.write(chunk)
+                done += len(chunk)
+                if step and done - last >= step:
+                    last = done
+                    _log(f"   {label}: {done / 1e9:.2f}/{total / 1e9:.2f} GB ({100 * done // total}%)")
+    os.replace(tmp, target)                               # atomic; no partial/broken target
 
 
 # ----------------------------------------------------------------------------- launch

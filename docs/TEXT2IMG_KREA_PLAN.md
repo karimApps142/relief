@@ -207,10 +207,10 @@ renders. No terminal, no second app.
 **Locations** (env-configurable): `COMFYUI_DIR` (default `<repo-parent>/ComfyUI`,
 i.e. outside the git repo) and `COMFYUI_URL` (default `127.0.0.1:8188`).
 
-**Disk:** the downloader uses a ComfyUI-local HF cache (`COMFY_HF_CACHE`, default
-`<COMFYUI_DIR>/.hf-cache`) on the same volume as ComfyUI, and **hardlinks** each file
-into `ComfyUI/models/` — so the 7.5 GB GGUF is stored once and you **do NOT set a
-global `HF_HOME`** (that would hide the relief models' own default cache). No env vars
+**Disk:** the downloader streams each file **directly** into `ComfyUI/models/` over
+HTTP (HF resolve URLs) with throttled % progress — no HF cache, no symlinks/hardlinks
+(the cache+`os.link` approach left broken Windows reparse points). Stored once, the
+global `HF_HOME` is never touched (relief keeps its own default cache). No env vars
 needed; just run `uvicorn`.
 
 **Caveat (untested lifecycle):** the install/launch path can only be fully verified
