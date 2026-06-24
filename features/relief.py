@@ -23,6 +23,7 @@ class ReliefFeature(Feature):
                   choices=["DA3MONO-LARGE", "DA3-LARGE", "DA3-GIANT", "DA3-BASE", "DA3-SMALL"]),
         ParamSpec("relief_depth_mm", "number", 8.0, "Relief depth (mm)", 2, 20, 0.5),
         ParamSpec("pixel_mm", "number", 0.1, "Pixel size (mm)", 0.02, 0.5, 0.01),
+        ParamSpec("black_bg", "bool", True, "Black background (vs mid-gray plate)"),
         ParamSpec("invert", "bool", False, "Invert (flip near/far)"),
         ParamSpec("flatten_bg", "bool", True, "Flatten background"),
         ParamSpec("make_solid", "bool", False, "Watertight solid (3D print)"),

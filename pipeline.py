@@ -34,6 +34,7 @@ class ReliefParams:
     da3_variant: str = "DA3MONO-LARGE"   # only when depth_model == depth-anything-3
     tile_detail: str = "medium"     # off | low | medium | high  (tile density = facial detail)
     face_crop: bool = True          # focus the tile budget on a detected face crop (sharper + faster)
+    black_bg: bool = True           # pure-black background (vs a mid-gray base plate)
     invert: bool = False            # flip near<->far if the subject comes out sunken
     flatten_bg: bool = True         # seat the subject on a flat base via the mask
     base_height: float = 0.50       # base plate level
@@ -79,7 +80,8 @@ def generate_relief(image_path, out_dir, params: ReliefParams = ReliefParams(),
     # 2. subject mask -> seat on a flat base. NO smoothing / refine / fusion / emboss.
     mask = be.remove_background(image) if params.flatten_bg else None
     height = rc.tiled_relief_heightmap(depth, mask, invert=params.invert,
-                                       base=params.base_height, fig_span=params.fig_span)
+                                       base=params.base_height, fig_span=params.fig_span,
+                                       bg=(0.0 if params.black_bg else None))
 
     # 3. export 16-bit (no renormalize — keep the shallow base/range we built)
     height16 = rc.to_heightmap_16bit(height, normalize=False)
