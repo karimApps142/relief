@@ -14,9 +14,9 @@ from PIL import Image
 
 import relief_core as rc
 
-# raw depth cache: geometry/refine sliders re-tune without re-invoking the GPU.
-# Keyed on (image, model, tiling); holds only the most recent (bounded memory).
-_DEPTH_CACHE = {}
+# raw depth + normals cache: geometry/refine/facial-detail sliders re-tune without
+# re-invoking the GPU. Keyed on (image, model, tiling); holds only the most recent.
+_RAW_CACHE = {}
 
 
 @dataclass
@@ -26,6 +26,7 @@ class ReliefParams:
     depth_model: str = "sapiens"    # "sapiens" | "depth-anything-3" | "depth-anything"
     da3_variant: str = "DA3-LARGE"  # DA3 hub variant (when depth_model == depth-anything-3)
     invert: bool = False            # flip near<->far if the subject comes out sunken
+    facial_detail: float = 0.7      # add surface-NORMAL facial detail (depth alone is featureless)
     depth_smooth: float = 0.5       # edge-preserving smoothing of the depth (de-noise)
     depth_compress: float = 1.0     # gamma; <1 flattens the near -> shallower/flatter relief
     refine: float = 0.6             # guided-filter edge refine: snap depth edges to the photo
@@ -47,26 +48,43 @@ def generate_relief(image_path, out_dir, params: ReliefParams = ReliefParams(),
     image = Image.open(image_path).convert("RGB")
     luma = np.asarray(image.convert("L")).astype(np.float32) / 255.0  # guide for edge refine
 
-    # 1. monocular depth — cached on (image, model, tiling) so the geometry/refine
-    #    sliders below re-tune instantly without re-invoking the GPU depth model.
+    # 1. raw depth (+ raw normal-integrated detail) — cached so the sliders below
+    #    (incl. facial_detail) re-tune instantly without re-invoking the GPU models.
     try:
         ckey = (image_path, os.path.getmtime(image_path), params.depth_model, params.tiling)
     except OSError:
         ckey = None
-    if ckey is not None and ckey in _DEPTH_CACHE:
-        depth = _DEPTH_CACHE[ckey]
-    else:
-        depth = be.estimate_depth(image, model=params.depth_model, tiling=params.tiling,
-                                  da3_variant=params.da3_variant)
-        if ckey is not None:
-            _DEPTH_CACHE.clear()                 # keep only the most recent (bounded memory)
-            _DEPTH_CACHE[ckey] = depth
+    cache = _RAW_CACHE.get(ckey, {}) if ckey is not None else {}
 
-    # 2. subject mask, to seat the figure on a flat base
+    if "depth" not in cache:
+        cache["depth"] = be.estimate_depth(image, model=params.depth_model,
+                                           tiling=params.tiling, da3_variant=params.da3_variant)
+    depth = cache["depth"]
+
+    # surface-NORMAL facial detail (depth alone is smooth/featureless). Computed
+    # once per image and cached. Unload the depth model first so two big models
+    # don't co-reside on the 12 GB card.
+    if params.facial_detail > 0 and "nh" not in cache:
+        if getattr(be, "name", "") == "full":
+            try:
+                import models
+                models.unload_all()
+            except Exception:
+                pass
+        nm = be.estimate_normals(image, which="marigold")
+        cache["nh"] = rc.integrate_normals(nm) if nm is not None else None
+
+    if ckey is not None:
+        _RAW_CACHE.clear(); _RAW_CACHE[ckey] = cache   # keep only the most recent image
+
+    # 2. fuse depth (form) + normal detail (face), then mask for the flat base
+    field = depth
+    if params.facial_detail > 0 and cache.get("nh") is not None:
+        field = rc.fuse_depth_normals(depth, cache["nh"], detail=params.facial_detail)
     mask = be.remove_background(image) if params.flatten_bg else None
 
-    # 3. depth -> clean smooth relief heightmap; guided refine snaps edges to the photo
-    height = rc.depth_to_heightmap(depth, mask, luma=luma,
+    # 3. -> clean relief heightmap; guided refine snaps edges to the photo
+    height = rc.depth_to_heightmap(field, mask, luma=luma,
                                    invert=params.invert,
                                    refine=params.refine,
                                    smooth=params.depth_smooth,

@@ -20,6 +20,8 @@ class ReliefFeature(Feature):
                            "DA3-GIANT", "DA3-GIANT-1.1", "DA3-BASE", "DA3-SMALL"]),
         ParamSpec("relief_depth_mm", "number", 8.0, "Relief depth (mm)", 2, 20, 0.5),
         ParamSpec("pixel_mm", "number", 0.1, "Pixel size (mm)", 0.02, 0.5, 0.01),
+        ParamSpec("facial_detail", "number", 0.7, "Facial detail (eyes/nose/lips, from normals)",
+                  0.0, 2.0, 0.05),
         ParamSpec("refine", "number", 0.6, "Edge refine (snap to photo)", 0.0, 1.0, 0.05),
         ParamSpec("depth_smooth", "number", 0.5, "Depth smoothing", 0.0, 1.0, 0.05),
         ParamSpec("depth_compress", "number", 1.0, "Depth range (lower=flatter)", 0.4, 1.5, 0.05),

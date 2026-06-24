@@ -336,6 +336,22 @@ def guided_refine_depth(depth, luma, r=8, eps=1e-3, strength=0.6):
     return ((1.0 - strength) * d + strength * q).astype(np.float32)
 
 
+def fuse_depth_normals(depth, normal_height, detail=0.7, sigma=12.0):
+    """Combine a smooth DEPTH map (reliable global form) with surface-NORMAL detail
+    (the crisp facial geometry depth smooths away): global low-frequency shape from
+    depth + high-frequency facial relief (eyes / nose / lips / cheekbones) from the
+    integrated normals. This is what turns a featureless depth blob into a defined
+    face. `detail` scales how strongly the normal-derived features stand out."""
+    norm = lambda a: (a - a.min()) / (a.max() - a.min() + 1e-8)
+    d = norm(depth.astype(np.float32))
+    n = norm(normal_height.astype(np.float32))
+    if n.shape[:2] != d.shape[:2]:
+        n = cv2.resize(n, (d.shape[1], d.shape[0]))
+    form = cv2.GaussianBlur(d, (0, 0), sigma)               # global shape from depth
+    feat = n - cv2.GaussianBlur(n, (0, 0), sigma)           # facial detail from normals
+    return (form + float(detail) * feat).astype(np.float32)
+
+
 # ----- DEPTH-FIRST: raw monocular depth -> clean smooth relief heightmap -----
 # The correct data for bas-relief / CNC / lithophane is a SMOOTH CONTINUOUS depth
 # field (near = high), NOT an emboss/edge map. This robust-normalizes the depth,
