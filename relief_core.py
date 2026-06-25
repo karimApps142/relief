@@ -36,8 +36,13 @@ def normal_to_gradients(normal_map, flip_y=False):
 
 
 def integrate_normals(normal_map, flip_y=False):
-    p, q = normal_to_gradients(normal_map, flip_y)
-    div = np.gradient(p, axis=1) + np.gradient(q, axis=0)
+    p, q = normal_to_gradients(normal_map, flip_y)      # p=dz/dx, q=dz/dy
+    # Divergence via BACKWARD differences so it matches the 5-point Laplacian the DCT
+    # Neumann solver inverts. (Central np.gradient is a wider stencil → inconsistent →
+    # the surface is NOT recovered: round-trip corr 0.46 vs 0.99 for backward.)
+    div = np.zeros_like(p)
+    div[:, 1:] += p[:, 1:] - p[:, :-1]; div[:, 0] += p[:, 0]
+    div[1:, :] += q[1:, :] - q[:-1, :]; div[0, :] += q[0, :]
     return solve_poisson_neumann(div)
 
 
@@ -384,17 +389,27 @@ def depth_to_heightmap(depth, mask=None, luma=None, invert=False, refine=0.6,
     return out.astype(np.float32)
 
 
-def tiled_relief_heightmap(depth, mask=None, invert=False, base=0.50, fig_span=0.45, bg=None):
+def tiled_relief_heightmap(depth, mask=None, invert=False, base=0.50, fig_span=0.45, bg=None,
+                           normal_map=None, normal_detail=0.7, normal_sigma=12.0):
     """LEAN heightmap for TILED depth: the tiling already baked the facial detail
     into the depth, so do only robust percentile-normalize -> (invert) -> re-stretch
     inside the subject -> seat on a flat base. NO bilateral / guided-refine / gamma /
     CLAHE / unsharp — any blur > ~1.5px would erase the sub-2px detail tiling recovered.
-    `bg` = background level: None -> `base` (mid-gray slab); 0.0 -> pure black."""
+    `bg` = background level: None -> `base` (mid-gray slab); 0.0 -> pure black.
+
+    If `normal_map` is given, fuse the surface-NORMAL high-frequency detail onto the
+    depth's low-frequency form (Poisson-integrate the normals, then keep depth's global
+    shape + the normals' crisp facial relief). This is the depth+normal fusion the
+    bas-relief literature uses for clean eyes/hair/lips; `normal_detail` scales it."""
     d = depth.astype(np.float32)
     lo, hi = np.percentile(d, [1, 99])                   # seam-spike-safe normalize
     d = np.clip((d - lo) / (hi - lo + 1e-8), 0.0, 1.0).astype(np.float32)
     if invert:
         d = (1.0 - d).astype(np.float32)
+    if normal_map is not None and float(normal_detail) > 0:
+        nh = integrate_normals(np.asarray(normal_map, np.float32))   # normals -> height
+        d = fuse_depth_normals(d, nh, detail=float(normal_detail), sigma=float(normal_sigma))
+        d = np.clip((d - d.min()) / (d.max() - d.min() + 1e-8), 0.0, 1.0).astype(np.float32)
     bg_lvl = base if bg is None else float(bg)
     if mask is not None and mask.shape[:2] == d.shape[:2]:
         m = mask > 0.5

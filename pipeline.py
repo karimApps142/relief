@@ -41,6 +41,8 @@ class ReliefParams:
     base_height: float = 0.50       # base plate level
     fig_span: float = 0.45          # subject relief height above the base
     make_solid: bool = False        # watertight solid (3D print) vs open surface (CNC)
+    normal_detail: bool = False     # fuse surface-normal facial relief onto the depth form
+    normal_gain: float = 0.7        # how strongly the normal-derived detail stands out
     backend: str = None             # "lite" | "full" | "auto" | None (env default)
     # --- legacy fields (ignored by the tiled engine; kept so service.py / app_gradio
     #     don't break). Detail now comes from tiling, not these. ---
@@ -93,12 +95,28 @@ def _generate_relief(image_path, out_dir, params, be):
     if ckey is not None:
         _RAW_CACHE.clear(); _RAW_CACHE[ckey] = cache
 
-    # 2. subject mask -> seat on a flat base. NO smoothing / refine / fusion / emboss.
+    # 2a. optional surface-normal map → fused as crisp facial detail onto the depth
+    #     form (eyes / hair / lips). Cached with the depth so the gain slider re-tunes
+    #     instantly. Graceful: if normals aren't available, fall back to depth-only.
+    normal_map = None
+    if params.normal_detail:
+        if "normals" not in cache:
+            try:
+                cache["normals"] = be.estimate_normals(image, which="marigold")
+            except Exception as e:
+                cache["normals"] = None
+                print(f"[relief] normal detail skipped ({e}) — using depth only")
+        normal_map = cache.get("normals")
+        if ckey is not None:
+            _RAW_CACHE[ckey] = cache
+
+    # 2b. subject mask -> seat on a flat base.
     relief_progress.phase(1)
     mask = be.remove_background(image) if params.flatten_bg else None
     height = rc.tiled_relief_heightmap(depth, mask, invert=params.invert,
                                        base=params.base_height, fig_span=params.fig_span,
-                                       bg=(0.0 if params.black_bg else None))
+                                       bg=(0.0 if params.black_bg else None),
+                                       normal_map=normal_map, normal_detail=params.normal_gain)
 
     # 3. export 16-bit (no renormalize — keep the shallow base/range we built)
     height16 = rc.to_heightmap_16bit(height, normalize=False)

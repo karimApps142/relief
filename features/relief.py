@@ -49,6 +49,12 @@ class ReliefFeature(Feature):
                   help="Push the background to a flat plane."),
         ParamSpec("make_solid", "bool", False, "Make solid", group="advanced",
                   help="Watertight solid (3D printing) vs surface (CNC)."),
+        ParamSpec("normal_detail", "bool", False, "Normal detail (fuse facial relief)", group="advanced",
+                  help="Estimate a surface-normal map and fuse its crisp facial detail (eyes/hair/lips) "
+                       "onto the depth. Sharper than depth alone; adds a slower normal pass."),
+        ParamSpec("normal_gain", "number", 0.7, "Detail strength", 0.0, 1.5, 0.05, control="slider",
+                  group="advanced", depends_on={"param": "normal_detail", "value": True},
+                  help="How strongly the normal-derived relief stands out."),
     ]
 
     def run(self, inputs, params, out_dir):
