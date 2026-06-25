@@ -46,12 +46,25 @@ export function ComfyWizard({ s }: { s: Studio }) {
   if (!c || !f) return (
     <div style={{ flex: 1, minHeight: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--hf-text-tertiary)', fontSize: 13 }}>Checking the image engine…</div>
   )
-  const models = Object.entries(c.models)
+  // feature-aware requirements: relight needs the IC-Light node + its own models
+  const isRelight = f.id === 'relight'
+  const models = isRelight ? Object.entries(c.relight_models || {}) : Object.entries(c.models)
   const allM = models.length > 0 && models.every(([, b]) => b)
+  const nodeOk = !!(c.nodes || {})[isRelight ? 'iclight' : 'gguf']
+  const installedOk = c.installed && nodeOk
+  const addNode = c.installed && !nodeOk         // engine there, just missing this tool's node
   const steps = [
-    { key: 'install', label: 'Install ComfyUI', desc: 'Clone the engine and Python dependencies.', done: c.installed, available: !c.installed, btn: 'Install', showModels: false },
-    { key: 'download', label: 'Download models', desc: 'Fetch the 4 model files (~11.7 GB total).', done: allM, available: c.installed && !allM, btn: 'Download', showModels: true },
-    { key: 'start', label: 'Start engine', desc: 'Launch ComfyUI on 127.0.0.1:8188.', done: c.running, available: c.installed && allM && !c.running, btn: 'Start', showModels: false },
+    { key: 'install', label: isRelight ? 'Install ComfyUI + IC-Light' : 'Install ComfyUI',
+      desc: addNode ? 'Add the IC-Light node and reload the engine.' : 'Clone the engine and Python dependencies.',
+      done: installedOk, available: !installedOk, btn: addNode ? 'Add node' : 'Install', showModels: false },
+    { key: 'download', label: 'Download models',
+      desc: isRelight ? 'Fetch the relight models (~3.7 GB).' : 'Fetch the 4 model files (~11.7 GB total).',
+      done: allM, available: c.installed && !allM, btn: 'Download', showModels: true },
+    c.running
+      ? { key: 'restart', label: 'Reload engine', desc: 'Restart ComfyUI to load newly-added tools.',
+          done: installedOk && allM, available: true, btn: 'Reload', showModels: false }
+      : { key: 'start', label: 'Start engine', desc: 'Launch ComfyUI on 127.0.0.1:8188.',
+          done: false, available: installedOk && allM, btn: 'Start', showModels: false },
   ]
   return (
     <div style={{ flex: 1, minHeight: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '34px 26px' }}>

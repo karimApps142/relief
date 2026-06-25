@@ -81,6 +81,11 @@ def comfy_start():
     return comfy_manager.start()
 
 
+@app.post("/api/comfy/restart")
+def comfy_restart():
+    return {"started": comfy_manager.restart_async(), **comfy_manager.status()}
+
+
 @app.get("/api/comfy/progress")
 def comfy_progress():
     """Live generation progress (sampler steps) for the in-flight ComfyUI job."""

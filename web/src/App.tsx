@@ -8,7 +8,15 @@ export default function App() {
   const s = useStudio()
   const { active, comfy, models, system } = s
 
-  const comfyReady = !!comfy && comfy.installed && comfy.running && Object.values(comfy.models).every(Boolean)
+  // Feature-aware engine readiness: relight needs its own node + models; the rest need Krea.
+  const comfyReady = (() => {
+    if (!comfy || !comfy.installed || !comfy.running) return false
+    if (active?.id === 'relight') {
+      const m = Object.values(comfy.relight_models || {})
+      return !!comfy.nodes?.iclight && m.length > 0 && m.every(Boolean)
+    }
+    return Object.values(comfy.models).every(Boolean)
+  })()
   const showComfyGate = !!active && active.engine === 'comfy' && !comfyReady
   const reliefDot = models?.installed ? 'var(--hf-accent)' : 'var(--hf-warning)'
   const comfyDot = comfyReady ? 'var(--hf-accent)' : comfy?.installed ? 'var(--hf-warning)' : 'var(--hf-text-tertiary)'

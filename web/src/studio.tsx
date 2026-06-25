@@ -5,7 +5,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import {
   FeatureSchema, RunRecord, Progress, SystemInfo, ModelsStatus, ComfyStatus,
   getFeatures, getProgress, getSystem, getJobs, getModelsStatus, modelsDownload,
-  getComfyStatus, comfyInstall, comfyDownload, comfyStart, runFeature,
+  getComfyStatus, comfyInstall, comfyDownload, comfyStart, comfyRestart, runFeature,
 } from './api'
 
 export type RunState = 'idle' | 'submitting' | 'running' | 'result' | 'error'
@@ -150,8 +150,9 @@ export function useStudio() {
     modelsDownload().then(() => { refreshModels(); addToast('info', 'Downloading depth weights…') }).catch(() => {})
   }, [refreshModels, addToast])
 
-  const doComfy = useCallback((which: 'install' | 'download' | 'start') => {
-    const fn = which === 'install' ? comfyInstall : which === 'download' ? comfyDownload : comfyStart
+  const doComfy = useCallback((which: 'install' | 'download' | 'start' | 'restart') => {
+    const fn = which === 'install' ? comfyInstall : which === 'download' ? comfyDownload
+      : which === 'restart' ? comfyRestart : comfyStart
     fn().then(refreshComfy).catch(() => {})
   }, [refreshComfy])
 

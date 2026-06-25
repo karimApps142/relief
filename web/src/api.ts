@@ -99,6 +99,8 @@ export type ComfyStatus = {
   dir: string
   url: string
   models: Record<string, boolean>
+  relight_models?: Record<string, boolean>
+  nodes?: Record<string, boolean>
   busy: boolean
   action: string | null
   log: string[]
@@ -126,6 +128,7 @@ export const getComfyStatus = (): Promise<ComfyStatus> => get('/api/comfy/status
 export const comfyInstall = () => post('/api/comfy/install')
 export const comfyDownload = () => post('/api/comfy/download')
 export const comfyStart = () => post('/api/comfy/start')
+export const comfyRestart = () => post('/api/comfy/restart')
 
 export async function runFeature(
   id: string,

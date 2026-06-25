@@ -100,6 +100,12 @@ def models_status():
     return {label: _path_ok(_dest(sub, p)) for label, (_, p, sub) in MODELS.items()}
 
 
+def _nodes_status():
+    cn = COMFY_DIR / "custom_nodes"
+    return {"gguf": (cn / "ComfyUI-GGUF").exists(),
+            "iclight": (cn / "ComfyUI-IC-Light").exists()}
+
+
 def status():
     installed = is_installed()
     return {
@@ -108,6 +114,8 @@ def status():
         "dir": str(COMFY_DIR),
         "url": COMFY_URL,
         "models": models_status(),
+        "relight_models": {label: _path_ok(_dest(sub, p)) for label, (_, p, sub) in RELIGHT_MODELS.items()},
+        "nodes": _nodes_status(),
         "busy": _task["running"],
         "action": _task["action"],
         "log": _task["log"][-60:],
@@ -165,10 +173,15 @@ def _install():
         if not iclight.exists():
             _log("cloning ComfyUI-IC-Light custom node (relight)")
             _run(["git", "clone", "--depth", "1", ICLIGHT_GIT, str(iclight)])
+            if (iclight / "requirements.txt").exists():
+                _run([py, "-m", "pip", "install", "-r", str(iclight / "requirements.txt")])
         _log("installing ComfyUI requirements (this can take a few minutes)…")
         _run([py, "-m", "pip", "install", "-r", str(COMFY_DIR / "requirements.txt")])
         _run([py, "-m", "pip", "install", "-r", str(gguf / "requirements.txt")])
         _align_torchaudio(py)
+        if is_running():                              # reload so newly-cloned nodes take effect
+            _log("restarting ComfyUI to load new nodes…")
+            restart()
         _log("✓ ComfyUI installed")
         _end()
     except Exception as e:
@@ -293,6 +306,52 @@ def start():
                                           f"(see log / F:\\ComfyUI\\comfy.log)"}
         time.sleep(0.5)
     return {"ok": True, "starting": True}                 # still warming; client keeps polling
+
+
+def stop(wait=12):
+    """Stop the ComfyUI we launched and wait for the port to release."""
+    global _proc
+    if _proc is not None:
+        try:
+            _proc.terminate()
+            for _ in range(wait * 2):
+                if _proc.poll() is not None:
+                    break
+                time.sleep(0.5)
+            if _proc.poll() is None:
+                _proc.kill()
+        except Exception:
+            pass
+        _proc = None
+    for _ in range(24):                                   # wait for :8188 to free
+        if not is_running():
+            return True
+        time.sleep(0.5)
+    return not is_running()
+
+
+def restart():
+    """Stop + start ComfyUI (e.g. to load a newly-installed custom node). Synchronous;
+    used internally by _install (which already holds the task lock)."""
+    if not is_installed():
+        return {"ok": False, "error": "ComfyUI is not installed yet"}
+    _log("restarting ComfyUI …")
+    stop()
+    return start()
+
+
+def restart_async():
+    """Background restart for the /api/comfy/restart endpoint (so the UI shows it busy)."""
+    if not _begin("restart"):
+        return False
+
+    def _r():
+        try:
+            restart(); _end()
+        except Exception as e:
+            _log(f"ERROR: {e}"); _end(str(e))
+    threading.Thread(target=_r, daemon=True).start()
+    return True
 
 
 def ensure_running():
