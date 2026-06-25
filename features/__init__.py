@@ -8,6 +8,8 @@ The API (server.py) and UI enumerate REGISTRY automatically — no other changes
 """
 from .relief import ReliefFeature
 from .portrait_relief import PortraitReliefFeature
+from .cutout import CutoutFeature
+from .depthmap import DepthMapFeature
 from .text2img import Text2ImgFeature
 from .img2img import Img2ImgFeature
 from .upscale import UpscaleFeature
@@ -22,6 +24,8 @@ def register(feature):
 
 register(ReliefFeature())            # local (Sapiens/DA-V2/DA3 depth tiling + normal fusion)
 register(PortraitReliefFeature())    # Pro pipeline: delight (ComfyUI) → upscale → relief (local)
+register(CutoutFeature())            # local background removal (BiRefNet)
+register(DepthMapFeature())          # local depth + normal map export
 register(Text2ImgFeature())          # Krea-2-Turbo GGUF via ComfyUI (:8188)
 register(Img2ImgFeature())           # Krea-2-Turbo img2img via ComfyUI
 register(UpscaleFeature())           # ESRGAN upscale via ComfyUI
