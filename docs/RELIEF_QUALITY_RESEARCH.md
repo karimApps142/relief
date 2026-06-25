@@ -35,6 +35,13 @@ So the delight/stylize branch should be **A/B tested on our own portraits** befo
   Full *textured* Hunyuan needs 21–29 GB — but relief only needs geometry, so shape-only is fine.
 - **FaceLift** (dedicated head model) needs ~80 GB — NOT 3060-runnable as shipped.
 
+## ✅ Portrait Relief — the one-click pipeline (`features/portrait_relief.py`)
+The research's recommended flow, automated into one feature: **delight (IC-Light 'even')
+→ optional upscale → local depth + Sapiens-normal-fusion relief**. Cross-engine (ComfyUI
+for delight/upscale, local for relief); ComfyUI VRAM is freed before the local models load.
+The `delight` toggle doubles as the A/B harness (on vs off). Needs the relight assets, NOT
+the 11.7 GB Krea models — so a relief-only user provisions just ~3.7 GB + the IC-Light node.
+
 ## Roadmap (by value × feasibility on a 12 GB 3060)
 1. **Normal-fusion relief** — ✅ **IMPLEMENTED**. Estimate a normal map, Poisson-integrate, fuse
    its high-frequency detail onto the Depth-Anything base. Relief Advanced params: `normal_detail`

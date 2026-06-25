@@ -46,8 +46,8 @@ export function ComfyWizard({ s }: { s: Studio }) {
   if (!c || !f) return (
     <div style={{ flex: 1, minHeight: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--hf-text-tertiary)', fontSize: 13 }}>Checking the image engine…</div>
   )
-  // feature-aware requirements: relight needs the IC-Light node + its own models
-  const isRelight = f.id === 'relight'
+  // feature-aware requirements: relight + portrait need the IC-Light node + relight models
+  const isRelight = f.id === 'relight' || f.id === 'portrait'
   const models = isRelight ? Object.entries(c.relight_models || {}) : Object.entries(c.models)
   const allM = models.length > 0 && models.every(([, b]) => b)
   const nodeOk = !!(c.nodes || {})[isRelight ? 'iclight' : 'gguf']

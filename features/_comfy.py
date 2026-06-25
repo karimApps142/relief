@@ -115,6 +115,17 @@ class ComfyUIClient:
         return f"{j['subfolder']}/{j['name']}" if j.get("subfolder") else j["name"]
 
     # ----------------------------------------------------------------- internals
+    def free(self):
+        """Ask ComfyUI to unload its models + free VRAM, so the local depth/normal
+        models have room on a 12 GB card (cross-engine pipelines run sequentially)."""
+        try:
+            data = json.dumps({"unload_models": True, "free_memory": True}).encode()
+            req = urllib.request.Request(f"{self.base}/free", data=data, method="POST",
+                                         headers={"Content-Type": "application/json"})
+            urllib.request.urlopen(req, timeout=self.timeout)
+        except Exception:
+            pass
+
     def _submit(self, graph):
         data = json.dumps({"prompt": graph, "client_id": self.client_id}).encode()
         req = urllib.request.Request(f"{self.base}/prompt", data=data, method="POST",
