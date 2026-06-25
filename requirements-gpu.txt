@@ -12,6 +12,8 @@ accelerate
 einops
 kornia                   # BiRefNet (background removal) loads remote code that imports kornia
 timm                     # BiRefNet backbone (timm) — without it from_pretrained raises ImportError
+facexlib                 # Face Restore: detect/align/paste (no basicsr — numpy-2 clean)
+spandrel                 # Face Restore: loads the GFPGAN net (clean loader, ComfyUI-proven)
 # Depth Anything 3 (optional depth backend). Its full deps (open3d -> numpy<2,
 # moviepy, pycolmap, xformers>=torch2.10) CONFLICT with our cu121/numpy-2 stack,
 # so install the package WITHOUT deps + only the light leaf deps the monocular

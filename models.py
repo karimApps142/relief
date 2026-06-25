@@ -19,7 +19,8 @@ DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 def unload_all():
     """Free cached models + VRAM. Call between heavy stages on small GPUs."""
     for fn in (_birefnet, _stablenormal, _marigold_normals, _depth_pipe,
-               _face_parser, _sapiens_depth, _sapiens_normal, _da3):
+               _face_parser, _sapiens_depth, _sapiens_normal, _da3,
+               _face_restore_model, _face_helper):
         fn.cache_clear()
     gc.collect()
     if torch.cuda.is_available():
@@ -251,6 +252,67 @@ def estimate_normals_sapiens(image: Image.Image) -> np.ndarray:
     if float(np.nanmean(n[..., 2])) < 0:            # ensure +Z faces the camera
         n = -n
     return ((n + 1.0) / 2.0).astype(np.float32)     # -> [0,1]
+
+
+# ---------- Face restoration (GFPGAN weights via spandrel + facexlib; NO basicsr) ----------
+# basicsr breaks on torchvision>=0.17 (functional_tensor removed) and numpy 2, so we drive
+# the GFPGAN network through spandrel (clean loader) and use facexlib for detect/align/paste
+# — the same libraries ComfyUI uses. Faces are restored; the background is left untouched.
+_GFPGAN_URL = "https://github.com/TencentARC/GFPGAN/releases/download/v1.3.0/GFPGANv1.4.pth"
+
+
+@functools.lru_cache(maxsize=1)
+def _face_restore_model():
+    from pathlib import Path
+    from spandrel import ModelLoader
+    cache = Path(torch.hub.get_dir()) / "facerestore"
+    cache.mkdir(parents=True, exist_ok=True)
+    mp = cache / "GFPGANv1.4.pth"
+    if not mp.exists():
+        torch.hub.download_url_to_file(_GFPGAN_URL, str(mp))
+    return ModelLoader().load_from_file(str(mp)).to(DEVICE).eval()
+
+
+@functools.lru_cache(maxsize=1)
+def _face_helper():
+    from facexlib.utils.face_restoration_helper import FaceRestoreHelper
+    return FaceRestoreHelper(upscale_factor=1, face_size=512, crop_ratio=(1, 1),
+                             det_model="retinaface_resnet50", save_ext="png",
+                             use_parse=True, device=DEVICE)
+
+
+def restore_faces(image: Image.Image, weight: float = 0.5) -> np.ndarray:
+    """Detect every face, restore it with GFPGAN, paste back onto the original image.
+    `weight` 0..1 blends restored↔original (0 = full restoration, 1 = untouched).
+    Returns an RGB ndarray. No-op (returns the input) if no face is detected."""
+    helper = _face_helper()
+    model = _face_restore_model()
+    bgr = cv2.cvtColor(np.asarray(image.convert("RGB")), cv2.COLOR_RGB2BGR)
+    helper.clean_all()
+    helper.read_image(bgr)
+    helper.get_face_landmarks_5(only_center_face=False, resize=640, eye_dist_threshold=5)
+    helper.align_warp_face()
+    for cropped in helper.cropped_faces:                  # BGR uint8 512x512
+        t = (torch.from_numpy(cv2.cvtColor(cropped, cv2.COLOR_BGR2RGB))
+             .float().div(255.0).permute(2, 0, 1).unsqueeze(0).to(DEVICE))
+        with torch.inference_mode():
+            out = _spandrel_call(model, t)
+        rgb = (out.clamp(0, 1).squeeze(0).permute(1, 2, 0).cpu().numpy() * 255).astype(np.uint8)
+        restored = cv2.cvtColor(rgb, cv2.COLOR_RGB2BGR)
+        if weight and weight > 0:                         # fidelity blend toward original
+            restored = cv2.addWeighted(restored, 1.0 - weight, cropped, weight, 0)
+        helper.add_restored_face(restored)
+    helper.get_inverse_affine(None)
+    result = helper.paste_faces_to_input_image()
+    return cv2.cvtColor(result, cv2.COLOR_BGR2RGB)
+
+
+def _spandrel_call(model, t):
+    """Call a spandrel descriptor across versions (descriptor is callable; fall back to .model)."""
+    try:
+        return model(t)
+    except Exception:
+        return model.model(t)
 
 
 # ---------- Depth: Depth Anything 3 (ByteDance, SOTA monocular/geometry) ----------
