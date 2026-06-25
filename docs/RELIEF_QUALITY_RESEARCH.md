@@ -41,8 +41,14 @@ So the delight/stylize branch should be **A/B tested on our own portraits** befo
    toggle + `normal_gain` + **`normal_source`** (**Sapiens** = human-specialist, default + sharpest
    faces/hair, via `facebook/sapiens-normal-1b-torchscript`; **Marigold** = general fallback).
    (`relief_core.integrate_normals` / `fuse_depth_normals`; round-trip verified corr 0.9946.)
-2. **Delight / Relight (IC-Light)** — strip shadows before depth; also a standalone tool. + an
-   A/B harness (raw vs delit vs clay-render) to settle the stylize question on real portraits.
+2. **Delight / Relight (IC-Light)** — ✅ **IMPLEMENTED** as a standalone **Relight** feature
+   (`features/relight.py`, ComfyUI/IC-Light FC). The **Even** preset delights (flat, shadow-free) —
+   feed its output back into Relief to A/B raw-vs-delit. Box setup: `comfy_manager` install clones
+   `kijai/ComfyUI-IC-Light`; download adds `iclight_sd15_fc.safetensors` + an SD1.5 checkpoint
+   (NOT in the engine gate, so it never blocks text2img/img2img/upscale). **Existing engine
+   installs** add it once on the box: `git clone https://github.com/kijai/ComfyUI-IC-Light
+   F:\ComfyUI\custom_nodes\ComfyUI-IC-Light`, then `curl -X POST http://127.0.0.1:8000/api/comfy/download`
+   (re-runs download, skips present Krea, grabs the 2 relight files), then restart ComfyUI so the node loads.
 3. **Image → 3D (Hunyuan3D-2mv, shape-only)** — full 3D busts → orthographic heightmap; biggest
    new capability, recovers true z-order (ears, nose overhang).
 4. Quick wins: background removal (expose BiRefNet), face restoration (GFPGAN/CodeFormer),

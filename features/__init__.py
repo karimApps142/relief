@@ -10,6 +10,7 @@ from .relief import ReliefFeature
 from .text2img import Text2ImgFeature
 from .img2img import Img2ImgFeature
 from .upscale import UpscaleFeature
+from .relight import RelightFeature
 
 REGISTRY = {}
 
@@ -18,7 +19,8 @@ def register(feature):
     REGISTRY[feature.id] = feature
 
 
-register(ReliefFeature())            # local (Sapiens/DA-V2/DA3 depth tiling)
+register(ReliefFeature())            # local (Sapiens/DA-V2/DA3 depth tiling + normal fusion)
 register(Text2ImgFeature())          # Krea-2-Turbo GGUF via ComfyUI (:8188)
 register(Img2ImgFeature())           # Krea-2-Turbo img2img via ComfyUI
 register(UpscaleFeature())           # ESRGAN upscale via ComfyUI
+register(RelightFeature())           # IC-Light relight/delight via ComfyUI

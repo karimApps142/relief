@@ -34,9 +34,11 @@ _HOST, _PORT = (COMFY_URL.split(":") + ["8188"])[:2]
 
 COMFY_GIT = "https://github.com/comfyanonymous/ComfyUI"
 GGUF_GIT = "https://github.com/city96/ComfyUI-GGUF"
+ICLIGHT_GIT = "https://github.com/kijai/ComfyUI-IC-Light"
 
 # label -> (hf_repo, path_within_repo, dest_subdir_under_ComfyUI/models)
 # path_within_repo may contain a subfolder; only the basename lands in dest.
+# MODELS = the Krea core that GATES the image engine (text2img/img2img/upscale).
 MODELS = {
     "transformer · Krea-2-Turbo Q4_K_M (~7.5 GB)":
         ("vantagewithai/Krea-2-Turbo-GGUF", "krea2_turbo-Q4_K_M.gguf", "unet"),
@@ -46,6 +48,14 @@ MODELS = {
         ("Comfy-Org/Qwen-Image_ComfyUI", "split_files/vae/qwen_image_vae.safetensors", "vae"),
     "upscaler · 4x-UltraSharp (~67 MB)":
         ("lokCX/4x-Ultrasharp", "4x-UltraSharp.pth", "upscale_models"),
+}
+# RELIGHT = IC-Light (SD1.5) — downloaded alongside the core but NOT part of the gate,
+# so it never blocks the other features. Used only by the Relight feature.
+RELIGHT_MODELS = {
+    "relight · IC-Light FC (~1.7 GB)":
+        ("lllyasviel/ic-light", "iclight_sd15_fc.safetensors", "unet/IC-Light"),
+    "relight · SD1.5 base (~2 GB)":
+        ("Comfy-Org/stable-diffusion-v1-5-archive", "v1-5-pruned-emaonly-fp16.safetensors", "checkpoints"),
 }
 
 _proc = None                                              # the launched ComfyUI process
@@ -151,6 +161,10 @@ def _install():
         if not gguf.exists():
             _log("cloning ComfyUI-GGUF custom node")
             _run(["git", "clone", "--depth", "1", GGUF_GIT, str(gguf)])
+        iclight = COMFY_DIR / "custom_nodes" / "ComfyUI-IC-Light"
+        if not iclight.exists():
+            _log("cloning ComfyUI-IC-Light custom node (relight)")
+            _run(["git", "clone", "--depth", "1", ICLIGHT_GIT, str(iclight)])
         _log("installing ComfyUI requirements (this can take a few minutes)…")
         _run([py, "-m", "pip", "install", "-r", str(COMFY_DIR / "requirements.txt")])
         _run([py, "-m", "pip", "install", "-r", str(gguf / "requirements.txt")])
@@ -186,7 +200,8 @@ def download_async(labels=None):
 
 
 def _download(labels):
-    items = MODELS if not labels else {k: MODELS[k] for k in labels if k in MODELS}
+    all_models = {**MODELS, **RELIGHT_MODELS}              # gate uses MODELS; download grabs both
+    items = all_models if not labels else {k: all_models[k] for k in labels if k in all_models}
     failures = []
     for label, (repo, path_in_repo, sub) in items.items():
         dest_dir = COMFY_DIR / "models" / sub
