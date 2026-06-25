@@ -55,6 +55,11 @@ class ReliefFeature(Feature):
         ParamSpec("normal_gain", "number", 0.7, "Detail strength", 0.0, 1.5, 0.05, control="slider",
                   group="advanced", depends_on={"param": "normal_detail", "value": True},
                   help="How strongly the normal-derived relief stands out."),
+        ParamSpec("normal_source", "select", "sapiens", "Normal source", control="seg",
+                  group="advanced", depends_on={"param": "normal_detail", "value": True},
+                  help="Sapiens = human-specialist (sharpest faces/hair); Marigold = general.",
+                  choices=[{"value": "sapiens", "label": "Sapiens"},
+                           {"value": "marigold", "label": "Marigold"}]),
     ]
 
     def run(self, inputs, params, out_dir):

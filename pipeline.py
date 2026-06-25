@@ -43,6 +43,7 @@ class ReliefParams:
     make_solid: bool = False        # watertight solid (3D print) vs open surface (CNC)
     normal_detail: bool = False     # fuse surface-normal facial relief onto the depth form
     normal_gain: float = 0.7        # how strongly the normal-derived detail stands out
+    normal_source: str = "sapiens"  # which normal model: sapiens (human, sharpest) | marigold
     backend: str = None             # "lite" | "full" | "auto" | None (env default)
     # --- legacy fields (ignored by the tiled engine; kept so service.py / app_gradio
     #     don't break). Detail now comes from tiling, not these. ---
@@ -100,12 +101,13 @@ def _generate_relief(image_path, out_dir, params, be):
     #     instantly. Graceful: if normals aren't available, fall back to depth-only.
     normal_map = None
     if params.normal_detail:
-        if "normals" not in cache:
+        if cache.get("normal_source") != params.normal_source or "normals" not in cache:
             try:
-                cache["normals"] = be.estimate_normals(image, which="marigold")
+                cache["normals"] = be.estimate_normals(image, which=params.normal_source)
             except Exception as e:
                 cache["normals"] = None
                 print(f"[relief] normal detail skipped ({e}) — using depth only")
+            cache["normal_source"] = params.normal_source
         normal_map = cache.get("normals")
         if ckey is not None:
             _RAW_CACHE[ckey] = cache

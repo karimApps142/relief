@@ -19,7 +19,7 @@ DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 def unload_all():
     """Free cached models + VRAM. Call between heavy stages on small GPUs."""
     for fn in (_birefnet, _stablenormal, _marigold_normals, _depth_pipe,
-               _face_parser, _sapiens_depth, _da3):
+               _face_parser, _sapiens_depth, _sapiens_normal, _da3):
         fn.cache_clear()
     gc.collect()
     if torch.cuda.is_available():
@@ -213,6 +213,44 @@ def estimate_depth_sapiens(image: Image.Image) -> np.ndarray:
                                           mode="bilinear", align_corners=False)
     d = out.float().squeeze().cpu().numpy()         # HxW relative depth (near = small)
     return -d                                       # negate -> larger = nearer
+
+
+# ---------- Surface normals: Sapiens-1B (human-specialist, sharpest faces/hair) ----------
+_SAPIENS_NORMAL_REPO = "facebook/sapiens-normal-1b-torchscript"
+_SAPIENS_NORMAL_FILE = "sapiens_1b_normal_render_people_epoch_115_torchscript.pt2"
+
+
+@functools.lru_cache(maxsize=1)
+def _sapiens_normal():
+    from huggingface_hub import hf_hub_download
+    path = hf_hub_download(_SAPIENS_NORMAL_REPO, _SAPIENS_NORMAL_FILE)
+    return torch.jit.load(path, map_location=DEVICE).eval()
+
+
+def estimate_normals_sapiens(image: Image.Image) -> np.ndarray:
+    """Per-pixel surface normals from Sapiens-1B (trained on human 3D scans → the
+    crispest facial/hair normals among the options). Returns HxWx3 in [0,1], camera
+    frame, with +Z forced toward the camera so it's compatible with integrate_normals
+    regardless of the model's sign convention (front-facing detail raises, not carves)."""
+    from torchvision import transforms
+    img = image.convert("RGB"); W0, H0 = img.size
+    tf = transforms.Compose([
+        transforms.Resize((1024, 768)),
+        transforms.ToTensor(),
+        transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225]),
+    ])
+    x = tf(img).unsqueeze(0).to(DEVICE)
+    with torch.inference_mode():
+        out = _sapiens_normal()(x)                  # (1,3,H,W) normals
+    if out.dim() == 3:
+        out = out.unsqueeze(0)
+    out = torch.nn.functional.interpolate(out[:, :3], size=(H0, W0),
+                                          mode="bilinear", align_corners=False)
+    n = out.float().squeeze(0).permute(1, 2, 0).cpu().numpy()    # HxWx3
+    n = n / (np.linalg.norm(n, axis=-1, keepdims=True) + 1e-8)   # unit normals
+    if float(np.nanmean(n[..., 2])) < 0:            # ensure +Z faces the camera
+        n = -n
+    return ((n + 1.0) / 2.0).astype(np.float32)     # -> [0,1]
 
 
 # ---------- Depth: Depth Anything 3 (ByteDance, SOTA monocular/geometry) ----------

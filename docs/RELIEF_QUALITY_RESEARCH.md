@@ -36,10 +36,11 @@ So the delight/stylize branch should be **A/B tested on our own portraits** befo
 - **FaceLift** (dedicated head model) needs ~80 GB — NOT 3060-runnable as shipped.
 
 ## Roadmap (by value × feasibility on a 12 GB 3060)
-1. **Normal-fusion relief** — ✅ **IMPLEMENTED** (this commit). Estimate a normal map, Poisson-
-   integrate, fuse its high-frequency detail onto the Depth-Anything base. Toggle `normal_detail`
-   + `normal_gain` in the relief Advanced params. (`relief_core.integrate_normals` /
-   `fuse_depth_normals`; round-trip integration verified corr 0.9946.)
+1. **Normal-fusion relief** — ✅ **IMPLEMENTED**. Estimate a normal map, Poisson-integrate, fuse
+   its high-frequency detail onto the Depth-Anything base. Relief Advanced params: `normal_detail`
+   toggle + `normal_gain` + **`normal_source`** (**Sapiens** = human-specialist, default + sharpest
+   faces/hair, via `facebook/sapiens-normal-1b-torchscript`; **Marigold** = general fallback).
+   (`relief_core.integrate_normals` / `fuse_depth_normals`; round-trip verified corr 0.9946.)
 2. **Delight / Relight (IC-Light)** — strip shadows before depth; also a standalone tool. + an
    A/B harness (raw vs delit vs clay-render) to settle the stylize question on real portraits.
 3. **Image → 3D (Hunyuan3D-2mv, shape-only)** — full 3D busts → orthographic heightmap; biggest

@@ -63,7 +63,9 @@ class FullBackend:
     def remove_background(self, image):
         return self._m.remove_background(image)
 
-    def estimate_normals(self, image, which="stable", **_):
+    def estimate_normals(self, image, which="sapiens", **_):
+        if which == "sapiens":                        # human-specialist, sharpest faces/hair
+            return self._m.estimate_normals_sapiens(image)
         if which == "marigold":
             return self._m.estimate_normals_marigold(image)
         return self._m.estimate_normals_stable(image)
