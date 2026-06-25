@@ -1,0 +1,70 @@
+/* ============================================================
+   HIGGSFIELD — BASE / RESET
+   Minimal, opinionated dark base + reusable utility classes that
+   express the brand (eyebrow, display, glass, scrim, etc).
+   ============================================================ */
+
+*, *::before, *::after { box-sizing: border-box; }
+
+html { -webkit-text-size-adjust: 100%; }
+
+body {
+  margin: 0;
+  background: var(--hf-bg);
+  color: var(--hf-text-primary);
+  font-family: var(--hf-font-sans);
+  font-size: var(--hf-body-size);
+  line-height: var(--hf-body-leading);
+  font-weight: var(--hf-weight-regular);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+::selection { background: rgba(255, 255, 255, 0.20); color: #fff; }
+
+a { color: inherit; text-decoration: none; }
+
+/* Custom scrollbar — thin, dark, unobtrusive */
+* { scrollbar-width: thin; scrollbar-color: var(--hf-neutral-700) transparent; }
+*::-webkit-scrollbar { width: 10px; height: 10px; }
+*::-webkit-scrollbar-thumb {
+  background: var(--hf-neutral-700);
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+*::-webkit-scrollbar-thumb:hover { background: var(--hf-neutral-600); }
+
+/* ---- Brand utility classes ---- */
+.hf-eyebrow {
+  font-size: var(--hf-eyebrow-size);
+  font-weight: var(--hf-eyebrow-weight);
+  letter-spacing: var(--hf-eyebrow-spacing);
+  text-transform: uppercase;
+  color: var(--hf-text-tertiary);
+}
+
+.hf-display {
+  font-family: var(--hf-display-font);
+  font-weight: var(--hf-display-weight);
+  letter-spacing: var(--hf-display-spacing);
+  line-height: var(--hf-display-leading);
+}
+
+.hf-label-vfx {
+  font-weight: var(--hf-label-weight);
+  letter-spacing: var(--hf-label-spacing);
+  text-transform: uppercase;
+}
+
+.hf-mono { font-family: var(--hf-font-mono); }
+
+.hf-glass {
+  background: var(--hf-glass-bg);
+  -webkit-backdrop-filter: var(--hf-blur-md);
+  backdrop-filter: var(--hf-blur-md);
+  border: 1px solid var(--hf-glass-border);
+}
+
+.hf-scrim-bottom { background: var(--hf-grad-scrim); }

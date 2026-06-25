@@ -1,0 +1,73 @@
+/* ============================================================
+   HIGGSFIELD — TYPOGRAPHY TOKENS
+   Neutral grotesque (Geist ≈ SF Pro / Suisse). Tight tracking on
+   display, wide tracking + uppercase on eyebrows & preset labels.
+   ============================================================ */
+
+:root {
+  /* ---- Families ---- */
+  --hf-font-sans: 'Geist', -apple-system, BlinkMacSystemFont, 'SF Pro Display',
+                  'Helvetica Neue', Arial, sans-serif;
+  --hf-font-display: var(--hf-font-sans);
+  --hf-font-mono: 'Geist Mono', 'SF Mono', ui-monospace, 'Roboto Mono',
+                  Menlo, Consolas, monospace;
+
+  /* ---- Weights ---- */
+  --hf-weight-regular:  400;
+  --hf-weight-medium:   500;
+  --hf-weight-semibold: 600;
+  --hf-weight-bold:     700;
+  --hf-weight-black:    800;
+
+  /* ---- Type scale (px) ---- */
+  --hf-text-2xs:  11px;
+  --hf-text-xs:   12px;
+  --hf-text-sm:   13px;
+  --hf-text-base: 15px;  /* body default */
+  --hf-text-md:   16px;
+  --hf-text-lg:   18px;
+  --hf-text-xl:   22px;
+  --hf-text-2xl:  28px;
+  --hf-text-3xl:  36px;
+  --hf-text-4xl:  48px;
+  --hf-text-5xl:  64px;
+  --hf-text-6xl:  84px;
+  --hf-text-7xl:  112px;
+
+  /* ---- Line heights ---- */
+  --hf-leading-none:    1;
+  --hf-leading-tight:   1.1;
+  --hf-leading-snug:    1.25;
+  --hf-leading-normal:  1.45;
+  --hf-leading-relaxed: 1.6;
+
+  /* ---- Letter spacing ---- */
+  --hf-tracking-tighter: -0.03em;  /* big display */
+  --hf-tracking-tight:   -0.015em; /* headings */
+  --hf-tracking-normal:  0;
+  --hf-tracking-wide:    0.04em;
+  --hf-tracking-wider:   0.12em;   /* eyebrows, uppercase preset labels */
+
+  /* ---- Composed roles ---- */
+  /* Display — hero, marketing, big numbers */
+  --hf-display-font:    var(--hf-font-display);
+  --hf-display-weight:  var(--hf-weight-bold);
+  --hf-display-spacing: var(--hf-tracking-tighter);
+  --hf-display-leading: var(--hf-leading-tight);
+
+  /* Eyebrow / kicker — uppercase, tracked-out, small */
+  --hf-eyebrow-size:    var(--hf-text-xs);
+  --hf-eyebrow-weight:  var(--hf-weight-semibold);
+  --hf-eyebrow-spacing: var(--hf-tracking-wider);
+
+  /* Preset / VFX label — bold uppercase over media */
+  --hf-label-weight:    var(--hf-weight-bold);
+  --hf-label-spacing:   var(--hf-tracking-wide);
+
+  /* Body */
+  --hf-body-size:    var(--hf-text-base);
+  --hf-body-leading: var(--hf-leading-normal);
+
+  /* Mono / technical (model names, prompts, credits) */
+  --hf-mono-spacing: 0;
+}

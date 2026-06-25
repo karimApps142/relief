@@ -1,0 +1,9 @@
+/* ============================================================
+   HIGGSFIELD — FONTS
+   Brand uses a neutral grotesque (Inter / SF Pro family on the
+   live site). SUBSTITUTION: shipped here with Geist + Geist Mono
+   (close metrics, freely hosted, less "default-y" than Inter).
+   Replace with the official webfont binaries if provided.
+   ============================================================ */
+
+@import url('https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700;800&family=Geist+Mono:wght@400;500;600&display=swap');

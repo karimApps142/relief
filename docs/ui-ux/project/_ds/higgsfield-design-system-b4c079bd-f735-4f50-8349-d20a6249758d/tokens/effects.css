@@ -1,0 +1,57 @@
+/* ============================================================
+   HIGGSFIELD — EFFECTS TOKENS
+   Radii, shadows, glass/blur, motion. Dark-native: shadows are
+   deep & soft; elevation also reads via subtle white top-sheen
+   and hairline borders. Generous rounding on media + cards.
+   ============================================================ */
+
+:root {
+  /* ---- Radii ---- */
+  --hf-radius-xs:   6px;
+  --hf-radius-sm:   8px;
+  --hf-radius-md:   12px;   /* buttons, inputs */
+  --hf-radius-lg:   16px;   /* cards */
+  --hf-radius-xl:   20px;   /* media tiles */
+  --hf-radius-2xl:  28px;   /* hero panels, sheets */
+  --hf-radius-pill: 999px;  /* chips, segmented, avatars */
+
+  /* ---- Shadows (deep, soft — for dark UI) ---- */
+  --hf-shadow-xs:  0 1px 2px rgba(0, 0, 0, 0.40);
+  --hf-shadow-sm:  0 2px 8px rgba(0, 0, 0, 0.45);
+  --hf-shadow-md:  0 8px 24px rgba(0, 0, 0, 0.50);
+  --hf-shadow-lg:  0 20px 48px rgba(0, 0, 0, 0.55);
+  --hf-shadow-xl:  0 32px 80px rgba(0, 0, 0, 0.62);
+
+  /* Inner top-sheen that fakes elevation on dark cards */
+  --hf-sheen-top: inset 0 1px 0 rgba(255, 255, 255, 0.06); /* @kind shadow */
+
+  /* Glow rings (active media / generating state) */
+  --hf-glow-white: 0 0 0 1px rgba(255, 255, 255, 0.9), 0 0 24px rgba(255, 255, 255, 0.25); /* @kind shadow */
+  --hf-glow-accent: 0 0 0 1px var(--hf-accent), 0 0 28px rgba(79, 224, 166, 0.35); /* @kind shadow */
+  --hf-glow-live:  0 0 0 1px var(--hf-live), 0 0 24px rgba(255, 77, 109, 0.35); /* @kind shadow */
+
+  /* Focus ring */
+  --hf-focus-ring: 0 0 0 2px var(--hf-bg), 0 0 0 4px rgba(255, 255, 255, 0.85); /* @kind shadow */
+
+  /* ---- Glass / blur ---- */
+  --hf-blur-sm:  blur(8px); /* @kind other */
+  --hf-blur-md:  blur(18px); /* @kind other */
+  --hf-blur-lg:  blur(32px); /* @kind other */
+  --hf-glass-bg: rgba(20, 22, 25, 0.72); /* @kind color */
+  --hf-glass-border: rgba(255, 255, 255, 0.10); /* @kind color */
+
+  /* ---- Motion ---- */
+  --hf-ease-out:   cubic-bezier(0.22, 1, 0.36, 1); /* @kind other */
+  --hf-ease-in-out: cubic-bezier(0.65, 0, 0.35, 1); /* @kind other */
+  --hf-ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1); /* @kind other */
+
+  --hf-dur-instant: 80ms; /* @kind other */
+  --hf-dur-fast:    140ms; /* @kind other */
+  --hf-dur-base:    220ms; /* @kind other */
+  --hf-dur-slow:    360ms; /* @kind other */
+  --hf-dur-slower:  560ms; /* @kind other */
+
+  /* Hover / press conventions (documented, reusable) */
+  --hf-press-scale: 0.97; /* @kind other */
+  --hf-hover-lift:  -2px; /* @kind other */
+}

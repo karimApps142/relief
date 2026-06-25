@@ -1,0 +1,56 @@
+/* ============================================================
+   HIGGSFIELD — SPACING & LAYOUT TOKENS
+   4px base grid. Dense, gallery-style layouts; generous gutters
+   between media cards.
+   ============================================================ */
+
+:root {
+  /* ---- Space scale (4px base) ---- */
+  --hf-space-0:   0;
+  --hf-space-1:   2px;
+  --hf-space-2:   4px;
+  --hf-space-3:   8px;
+  --hf-space-4:   12px;
+  --hf-space-5:   16px;
+  --hf-space-6:   20px;
+  --hf-space-7:   24px;
+  --hf-space-8:   32px;
+  --hf-space-9:   40px;
+  --hf-space-10:  48px;
+  --hf-space-11:  64px;
+  --hf-space-12:  80px;
+  --hf-space-13:  96px;
+  --hf-space-14:  128px;
+
+  /* ---- Component sizing ---- */
+  --hf-control-h-sm: 32px;
+  --hf-control-h-md: 40px;
+  --hf-control-h-lg: 48px;
+  --hf-control-h-xl: 56px;
+
+  --hf-icon-xs: 14px;
+  --hf-icon-sm: 16px;
+  --hf-icon-md: 20px;
+  --hf-icon-lg: 24px;
+  --hf-icon-xl: 32px;
+
+  /* ---- Layout ---- */
+  --hf-container:    1280px;
+  --hf-container-wide: 1600px;
+  --hf-gutter:       24px;
+  --hf-sidebar-w:    248px;
+  --hf-sidebar-w-collapsed: 64px;
+  --hf-topbar-h:     60px;
+
+  /* ---- Media gallery grid ---- */
+  --hf-grid-gap:     12px;
+  --hf-card-min:     220px;
+
+  /* ---- Z-index ---- */
+  --hf-z-base:    0; /* @kind other */
+  --hf-z-sticky:  100; /* @kind other */
+  --hf-z-overlay: 200; /* @kind other */
+  --hf-z-modal:   300; /* @kind other */
+  --hf-z-toast:   400; /* @kind other */
+  --hf-z-tooltip: 500; /* @kind other */
+}

@@ -1,0 +1,1118 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="_ds/higgsfield-design-system-b4c079bd-f735-4f50-8349-d20a6249758d/tokens/fonts.css">
+  <link rel="stylesheet" href="_ds/higgsfield-design-system-b4c079bd-f735-4f50-8349-d20a6249758d/tokens/colors.css">
+  <link rel="stylesheet" href="_ds/higgsfield-design-system-b4c079bd-f735-4f50-8349-d20a6249758d/tokens/typography.css">
+  <link rel="stylesheet" href="_ds/higgsfield-design-system-b4c079bd-f735-4f50-8349-d20a6249758d/tokens/spacing.css">
+  <link rel="stylesheet" href="_ds/higgsfield-design-system-b4c079bd-f735-4f50-8349-d20a6249758d/tokens/effects.css">
+  <link rel="stylesheet" href="_ds/higgsfield-design-system-b4c079bd-f735-4f50-8349-d20a6249758d/tokens/base.css">
+  <link rel="stylesheet" href="_ds/higgsfield-design-system-b4c079bd-f735-4f50-8349-d20a6249758d/styles.css">
+  <script src="_ds/higgsfield-design-system-b4c079bd-f735-4f50-8349-d20a6249758d/_ds_bundle.js"></script>
+  <style>
+    /* ---- LIGHT THEME OVERRIDE (design system is dark-native; remap semantic tokens) ---- */
+    :root{
+      --hf-bg:#F5F6F8; --hf-bg-base:#FFFFFF;
+      --hf-surface-1:#FFFFFF; --hf-surface-2:#F1F3F6; --hf-surface-3:#E7EAEF; --hf-surface-inset:#ECEFF3;
+      --hf-scrim:rgba(15,18,22,0.40);
+      --hf-border-subtle:rgba(15,20,28,0.07); --hf-border:rgba(15,20,28,0.12);
+      --hf-border-strong:rgba(15,20,28,0.20); --hf-border-focus:rgba(15,20,28,0.75);
+      --hf-text-primary:#0E1116; --hf-text-secondary:rgba(14,17,22,0.64);
+      --hf-text-tertiary:rgba(14,17,22,0.46); --hf-text-disabled:rgba(14,17,22,0.28); --hf-text-inverse:#FFFFFF;
+      --hf-white:#16191F; --hf-action:#16191F; --hf-action-hover:#2C313A; --hf-action-active:#000000;
+      --hf-action-fg:#FFFFFF; --hf-action-disabled:rgba(14,17,22,0.18);
+      --hf-accent:#0E9A66; --hf-accent-hover:#0BB377; --hf-accent-dim:rgba(14,154,102,0.14); --hf-accent-fg:#FFFFFF;
+      --hf-success:#0E9A66; --hf-success-dim:rgba(14,154,102,0.14);
+      --hf-warning:#B5790B; --hf-warning-dim:rgba(181,121,11,0.14);
+      --hf-danger:#D6453F; --hf-danger-dim:rgba(214,69,63,0.12);
+      --hf-info:#2D6FE0; --hf-info-dim:rgba(45,111,224,0.12); --hf-live:#E23A5C;
+      --hf-fill-soft:rgba(15,20,28,0.04); --hf-fill-medium:rgba(15,20,28,0.07); --hf-fill-strong:rgba(15,20,28,0.12);
+      --hf-glass-bg:rgba(255,255,255,0.74); --hf-glass-border:rgba(15,20,28,0.12);
+      --hf-sheen-top:inset 0 1px 0 rgba(255,255,255,0.7);
+      --hf-shadow-xs:0 1px 2px rgba(15,20,28,0.08); --hf-shadow-sm:0 2px 8px rgba(15,20,28,0.10);
+      --hf-shadow-md:0 8px 24px rgba(15,20,28,0.12); --hf-shadow-lg:0 18px 44px rgba(15,20,28,0.16);
+      --hf-shadow-xl:0 30px 72px rgba(15,20,28,0.20);
+    }
+    *{ box-sizing:border-box; }
+    html,body{ margin:0; height:100%; background:var(--hf-bg); }
+    body{ font-family:var(--hf-font-sans); color:var(--hf-text-primary); -webkit-font-smoothing:antialiased; }
+    ::-webkit-scrollbar{ width:10px; height:10px; }
+    ::-webkit-scrollbar-thumb{ background:rgba(15,20,28,.16); border-radius:99px; border:2px solid transparent; background-clip:padding-box; }
+    ::-webkit-scrollbar-thumb:hover{ background:rgba(15,20,28,.28); background-clip:padding-box; }
+    textarea::placeholder,input::placeholder{ color:var(--hf-text-tertiary); }
+    ::selection{ background:#16191F; color:#FFFFFF; }
+    ::-moz-selection{ background:#16191F; color:#FFFFFF; }
+    @keyframes rs-pulse{ 0%{ box-shadow:0 0 0 0 rgba(255,77,109,.55);} 70%{ box-shadow:0 0 0 7px rgba(255,77,109,0);} 100%{ box-shadow:0 0 0 0 rgba(255,77,109,0);} }
+    @keyframes rs-shimmer{ 0%{ transform:translateX(-100%);} 100%{ transform:translateX(260%);} }
+    @keyframes rs-spin{ to{ transform:rotate(360deg);} }
+    @keyframes rs-rise{ from{ opacity:0; transform:translateY(8px);} to{ opacity:1; transform:translateY(0);} }
+    @keyframes rs-orbit{ from{ transform:rotateX(58deg) rotateZ(0deg);} to{ transform:rotateX(58deg) rotateZ(360deg);} }
+  </style>
+</helmet>
+
+<div style="display:flex; height:100vh; width:100%; overflow:hidden; background:var(--hf-bg);">
+
+  <!-- ======================= ICON RAIL (collapsed) ======================= -->
+  <aside data-screen-label="icon-rail" style="width:72px; flex-shrink:0; display:flex; flex-direction:column; align-items:center; gap:6px; padding:16px 0 14px; border-right:1px solid var(--hf-border); background:var(--hf-bg-base);">
+    <span title="Relief Studio · local · RTX 3060" style="width:38px; height:38px; border-radius:11px; background:var(--hf-white); color:var(--hf-text-inverse); display:flex; align-items:center; justify-content:center; flex-shrink:0;">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2 9.5 9.5 2 12l7.5 2.5L12 22l2.5-7.5L22 12l-7.5-2.5z"/></svg>
+    </span>
+    <div style="width:26px; height:1px; background:var(--hf-border); margin:9px 0 7px;"></div>
+
+    <button onClick="{{ onTabRelief }}" title="Image → Relief" style="{{ railRelief }}" style-hover="background:var(--hf-fill-soft);">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></svg>
+      <sc-if value="{{ liteFlag }}" hint-placeholder-val="{{ true }}"><span style="position:absolute; top:7px; right:7px; width:7px; height:7px; border-radius:99px; background:var(--hf-warning); border:1.5px solid var(--hf-bg-base);"></span></sc-if>
+    </button>
+
+    <button onClick="{{ onTabText }}" title="Text → Image" style="{{ railText }}" style-hover="background:var(--hf-fill-soft);">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7V4h16v3"/><path d="M9 20h6"/><path d="M12 4v16"/></svg>
+    </button>
+
+    <button onClick="{{ onTabImg }}" title="Image → Image" style="{{ railImg }}" style-hover="background:var(--hf-fill-soft);">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.1-3.1a2 2 0 0 0-2.8 0L6 21"/></svg>
+    </button>
+
+    <button onClick="{{ onTabUp }}" title="Upscale" style="{{ railUp }}" style-hover="background:var(--hf-fill-soft);">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h6v6"/><path d="M9 21H3v-6"/><path d="M21 3l-7 7"/><path d="M3 21l7-7"/></svg>
+    </button>
+
+    <div style="flex:1;"></div>
+
+    <!-- VRAM mini gauge -->
+    <button onClick="{{ onOpenSys }}" title="{{ vramReadout }}" style="width:46px; display:flex; flex-direction:column; align-items:center; gap:5px; padding:8px 0; border-radius:13px; border:none; background:transparent; cursor:pointer;" style-hover="background:var(--hf-fill-soft);">
+      <div style="width:7px; height:30px; border-radius:99px; background:var(--hf-fill-strong); overflow:hidden; display:flex; flex-direction:column; justify-content:flex-end;">
+        <div style="width:100%; height:{{ vramPctStr }}; background:{{ vramColor }}; transition:height .2s var(--hf-ease-out);"></div>
+      </div>
+      <span style="font:600 9px var(--hf-font-sans); letter-spacing:.04em; color:var(--hf-text-tertiary);">VRAM</span>
+    </button>
+
+    <button onClick="{{ onOpenSys }}" title="System & health" style="width:46px; height:46px; display:flex; align-items:center; justify-content:center; border-radius:13px; border:none; background:transparent; color:var(--hf-text-secondary); cursor:pointer;" style-hover="background:var(--hf-fill-soft); color:var(--hf-text-primary);">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect width="16" height="16" x="4" y="4" rx="2"/><rect width="6" height="6" x="9" y="9" rx="1"/><path d="M15 2v2M15 20v2M2 15h2M2 9h2M20 15h2M20 9h2M9 2v2M9 20v2"/></svg>
+    </button>
+  </aside>
+
+  <!-- ======================= MAIN ======================= -->
+  <div style="flex:1; min-width:0; display:flex; flex-direction:column;">
+
+    <!-- TOP BAR -->
+    <header style="height:62px; flex-shrink:0; display:flex; align-items:center; justify-content:space-between; gap:16px; padding:0 26px; border-bottom:1px solid var(--hf-border); background:var(--hf-bg-base);">
+      <div style="display:flex; align-items:center; gap:9px; min-width:0;">
+        <span style="font:700 14.5px var(--hf-font-sans); letter-spacing:-.01em;">Relief Studio</span>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--hf-text-tertiary); flex-shrink:0;"><path d="m9 18 6-6-6-6"/></svg>
+        <span style="font:600 14px var(--hf-font-sans); color:var(--hf-text-secondary); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">{{ featureName }}</span>
+      </div>
+      <div style="display:flex; align-items:center; gap:8px; flex-shrink:0;">
+        <div style="display:flex; align-items:center; gap:7px; height:32px; padding:0 11px; border-radius:99px; border:1px solid var(--hf-border); background:var(--hf-surface-1); font-size:12px; color:var(--hf-text-secondary);">
+          <span style="width:7px; height:7px; border-radius:99px; background:{{ reliefHealthDot }};"></span>Depth weights
+        </div>
+        <div style="display:flex; align-items:center; gap:7px; height:32px; padding:0 11px; border-radius:99px; border:1px solid var(--hf-border); background:var(--hf-surface-1); font-size:12px; color:var(--hf-text-secondary);">
+          <span style="width:7px; height:7px; border-radius:99px; background:{{ comfyHealthDot }};"></span>Image engine
+        </div>
+        <button onClick="{{ onToggleHistory }}" style="{{ historyBtnStyle }}" style-hover="border-color:var(--hf-border-strong);" title="Recent generations">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v5h5"/><path d="M3.05 13A9 9 0 1 0 6 5.3L3 8"/><path d="M12 7v5l4 2"/></svg>
+        </button>
+        <button onClick="{{ onOpenSys }}" style="width:34px; height:34px; display:flex; align-items:center; justify-content:center; border-radius:10px; border:1px solid var(--hf-border); background:var(--hf-surface-1); color:var(--hf-text-secondary); cursor:pointer;" style-hover="color:var(--hf-text-primary); border-color:var(--hf-border-strong);" title="System & health">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect width="16" height="16" x="4" y="4" rx="2"/><rect width="6" height="6" x="9" y="9" rx="1"/><path d="M15 2v2M15 20v2M2 15h2M2 9h2M20 15h2M20 9h2M9 2v2M9 20v2"/></svg>
+        </button>
+      </div>
+    </header>
+
+    <!-- CONTENT -->
+    <div style="flex:1; min-height:0; display:flex; flex-direction:column; overflow:auto;">
+
+      <!-- relief lite banner -->
+      <sc-if value="{{ showBanner }}" hint-placeholder-val="{{ true }}">
+        <div data-screen-label="relief-lite-banner" style="margin:16px 26px 0; border:1px solid var(--hf-border); border-left:3px solid var(--hf-warning); border-radius:12px; background:var(--hf-surface-1); box-shadow:var(--hf-sheen-top); overflow:hidden;">
+          <!-- downloading -->
+          <sc-if value="{{ weightsBusy }}" hint-placeholder-val="{{ false }}">
+            <div style="padding:12px 16px; display:flex; flex-direction:column; gap:9px;">
+              <div style="display:flex; align-items:center; gap:10px;">
+                <span style="width:17px; height:17px; flex-shrink:0; border-radius:99px; border:2px solid var(--hf-fill-strong); border-top-color:var(--hf-warning); animation:rs-spin .8s linear infinite;"></span>
+                <strong style="font-size:13px;">Downloading depth weights</strong>
+                <span style="margin-left:auto; font:600 13px var(--hf-font-mono); color:var(--hf-text-primary);">{{ weightsPct }}</span>
+              </div>
+              <div style="position:relative; height:6px; border-radius:99px; background:var(--hf-fill-strong); overflow:hidden;">
+                <div style="position:absolute; top:0; bottom:0; left:0; width:{{ weightsBar }}; border-radius:99px; background:var(--hf-warning); transition:width .12s linear;"></div>
+                <div style="position:absolute; top:0; bottom:0; left:0; width:40%; background:linear-gradient(90deg,transparent,rgba(255,255,255,.45),transparent); animation:rs-shimmer 1.3s linear infinite;"></div>
+              </div>
+              <div style="display:flex; align-items:center; gap:9px; font:500 11px var(--hf-font-mono); color:var(--hf-text-tertiary);">
+                <span>{{ weightsStats }}</span>
+                <span style="width:3px; height:3px; border-radius:99px; background:var(--hf-text-disabled);"></span>
+                <span>{{ weightsSpeed }}</span>
+                <span style="margin-left:auto;">{{ weightsEta }}</span>
+              </div>
+            </div>
+          </sc-if>
+          <!-- idle (compact) -->
+          <sc-if value="{{ weightsIdle }}" hint-placeholder-val="{{ true }}">
+            <div style="padding:11px 13px 11px 14px; display:flex; align-items:center; gap:12px;">
+              <span style="width:30px; height:30px; flex-shrink:0; border-radius:9px; background:var(--hf-warning-dim); color:var(--hf-warning); display:flex; align-items:center; justify-content:center;">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 9v4M12 17h.01"/><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/></svg>
+              </span>
+              <div style="flex:1; min-width:0;">
+                <div style="display:flex; align-items:center; gap:7px;">
+                  <strong style="font-size:13px;">Running in lite mode</strong>
+                  <span style="font:700 8.5px var(--hf-font-sans); letter-spacing:.08em; text-transform:uppercase; color:var(--hf-warning); background:var(--hf-warning-dim); padding:2px 6px; border-radius:99px;">Crude</span>
+                </div>
+                <span style="display:block; font-size:11.5px; color:var(--hf-text-tertiary); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin-top:1px;">Facial detail is smoothed — install depth weights for full resolution.</span>
+              </div>
+              <div style="flex-shrink:0;">
+                <x-import component-from-global-scope="HiggsfieldDesignSystem_b4c079.Button" variant="primary" size="sm" onClick="{{ onDownloadWeights }}" hint-size="auto,32px">Download · 1.3 GB</x-import>
+              </div>
+            </div>
+          </sc-if>
+        </div>
+      </sc-if>
+
+      <!-- ======= COMFY SETUP GATE ======= -->
+      <sc-if value="{{ showComfyGate }}" hint-placeholder-val="{{ false }}">
+        <div data-screen-label="comfy-setup-wizard" style="flex:1; min-height:0; display:flex; align-items:center; justify-content:center; padding:34px 26px;">
+          <div style="width:100%; max-width:620px; border:1px solid var(--hf-border); border-radius:20px; background:var(--hf-surface-1); padding:28px; box-shadow:var(--hf-shadow-md), var(--hf-sheen-top);">
+            <div style="display:flex; align-items:center; gap:12px; margin-bottom:6px;">
+              <span style="width:40px; height:40px; border-radius:12px; background:var(--hf-fill-medium); display:flex; align-items:center; justify-content:center;">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3z"/></svg>
+              </span>
+              <div>
+                <h2 style="margin:0; font-size:18px; font-weight:700; letter-spacing:-.01em;">Set up the image engine</h2>
+                <p style="margin:2px 0 0; font-size:13px; color:var(--hf-text-secondary);">{{ featureName }} runs on ComfyUI. Complete the steps to unlock it.</p>
+              </div>
+            </div>
+
+            <div style="display:flex; flex-direction:column; gap:10px; margin-top:20px;">
+              <sc-for list="{{ wizardSteps }}" as="s" hint-placeholder-count="3">
+                <div style="display:flex; align-items:flex-start; gap:14px; padding:14px 15px; border:1px solid {{ s.borderColor }}; border-radius:14px; background:{{ s.bgColor }};">
+                  <span style="width:28px; height:28px; flex-shrink:0; border-radius:99px; display:flex; align-items:center; justify-content:center; font:700 13px var(--hf-font-sans); background:{{ s.numBg }}; color:{{ s.numColor }};">{{ s.numText }}</span>
+                  <div style="flex:1; min-width:0;">
+                    <div style="display:flex; align-items:center; gap:8px;">
+                      <strong style="font-size:14px; color:{{ s.titleColor }};">{{ s.label }}</strong>
+                      <span style="font-size:11px; font-weight:600; color:{{ s.statusColor }};">{{ s.statusText }}</span>
+                    </div>
+                    <p style="margin:3px 0 0; font-size:12px; color:var(--hf-text-tertiary); line-height:1.45;">{{ s.desc }}</p>
+                    <sc-if value="{{ s.showModels }}" hint-placeholder-val="{{ false }}">
+                      <div style="display:flex; flex-direction:column; gap:5px; margin-top:10px;">
+                        <sc-for list="{{ comfyModels }}" as="cm" hint-placeholder-count="4">
+                          <div style="display:flex; align-items:center; gap:8px; font:400 11.5px var(--hf-font-mono); color:var(--hf-text-secondary);">
+                            <span style="color:{{ cm.color }};">{{ cm.mark }}</span><span style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">{{ cm.label }}</span>
+                          </div>
+                        </sc-for>
+                      </div>
+                    </sc-if>
+                  </div>
+                  <sc-if value="{{ s.showBtn }}" hint-placeholder-val="{{ false }}">
+                    <div style="flex-shrink:0;">
+                      <x-import component-from-global-scope="HiggsfieldDesignSystem_b4c079.Button" variant="primary" size="sm" loading="{{ s.loading }}" onClick="{{ s.onAction }}" hint-size="auto,32px">{{ s.btnLabel }}</x-import>
+                    </div>
+                  </sc-if>
+                </div>
+              </sc-for>
+            </div>
+
+            <sc-if value="{{ comfyHasLog }}" hint-placeholder-val="{{ false }}">
+              <div style="margin-top:16px; background:var(--hf-surface-inset); border:1px solid var(--hf-border-subtle); border-radius:12px; padding:12px 14px; max-height:140px; overflow:auto; font:400 11.5px var(--hf-font-mono); color:var(--hf-text-tertiary); line-height:1.75;">
+                <sc-for list="{{ comfyLog }}" as="line" hint-placeholder-count="3"><div>{{ line }}</div></sc-for>
+              </div>
+            </sc-if>
+          </div>
+        </div>
+      </sc-if>
+
+      <!-- ======= WORKSPACE ======= -->
+      <sc-if value="{{ showWorkspace }}" hint-placeholder-val="{{ true }}">
+        <div style="flex:1; min-height:0; display:grid; grid-template-columns:430px 1fr; gap:0;">
+
+          <!-- CONTROLS -->
+          <section data-screen-label="controls-region" style="border-right:1px solid var(--hf-border); display:flex; flex-direction:column; min-height:0; background:var(--hf-bg-base);">
+            <!-- panel header -->
+            <div style="flex-shrink:0; display:flex; align-items:center; gap:12px; padding:17px 22px; border-bottom:1px solid var(--hf-border);">
+              <span style="width:38px; height:38px; flex-shrink:0; border-radius:11px; background:var(--hf-fill-medium); color:var(--hf-text-primary); display:flex; align-items:center; justify-content:center;">{{ featureIconEl }}</span>
+              <div style="flex:1; min-width:0;">
+                <div style="display:flex; align-items:center; gap:8px;">
+                  <strong style="font-size:15px; letter-spacing:-.01em;">{{ featureName }}</strong>
+                  <sc-if value="{{ showHeaderLite }}" hint-placeholder-val="{{ true }}"><span style="font:700 9px var(--hf-font-sans); letter-spacing:.08em; text-transform:uppercase; color:var(--hf-warning); background:var(--hf-warning-dim); padding:2px 7px; border-radius:99px;">Lite</span></sc-if>
+                </div>
+                <span style="display:block; font-size:11.5px; color:var(--hf-text-tertiary); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin-top:2px;">{{ featureDesc }}</span>
+              </div>
+            </div>
+            <div style="flex:1; min-height:0; overflow:auto; padding:22px 24px 16px; display:flex; flex-direction:column; gap:22px;">
+
+              <!-- IMAGE INPUT -->
+              <sc-if value="{{ needsImage }}" hint-placeholder-val="{{ true }}">
+                <div style="display:flex; flex-direction:column; gap:10px;">
+                  <span style="font:600 11px var(--hf-font-sans); letter-spacing:.12em; text-transform:uppercase; color:var(--hf-text-tertiary);">Input image</span>
+                  <sc-if value="{{ hasImage }}" hint-placeholder-val="{{ false }}">
+                    <div style="position:relative; border-radius:16px; overflow:hidden; border:1px solid var(--hf-border); background:var(--hf-surface-inset); aspect-ratio:16/10;">
+                      {{ inputImgEl }}
+                      <div style="position:absolute; inset:0; background:var(--hf-grad-scrim); opacity:.5;"></div>
+                      <div style="position:absolute; left:11px; bottom:11px; display:flex; align-items:center; gap:6px; height:24px; padding:0 9px; border-radius:99px; background:var(--hf-glass-bg); backdrop-filter:blur(18px); -webkit-backdrop-filter:blur(18px); border:1px solid var(--hf-glass-border); font:500 11px var(--hf-font-mono); color:#fff;">{{ inputName }}</div>
+                      <button onClick="{{ onUpload }}" style="position:absolute; right:11px; bottom:11px; height:28px; padding:0 12px; border-radius:99px; background:var(--hf-glass-bg); backdrop-filter:blur(18px); -webkit-backdrop-filter:blur(18px); border:1px solid var(--hf-glass-border); color:#fff; font:600 12px var(--hf-font-sans); cursor:pointer;">Replace</button>
+                    </div>
+                  </sc-if>
+                  <sc-if value="{{ noImage }}" hint-placeholder-val="{{ false }}">
+                    <button onClick="{{ onUpload }}" style="border:1.5px dashed var(--hf-border-strong); background:var(--hf-surface-1); border-radius:16px; aspect-ratio:16/10; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:9px; cursor:pointer; color:var(--hf-text-tertiary);" style-hover="border-color:var(--hf-border-focus); color:var(--hf-text-secondary);">
+                      <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 13v8M8 17l4-4 4 4"/><path d="M20 16.7A5 5 0 0 0 18 7h-1.3A8 8 0 1 0 4 15.3"/></svg>
+                      <span style="font-size:13px; font-weight:500;">Drop an image or click to upload</span>
+                      <span style="font-size:11px;">PNG · JPG</span>
+                    </button>
+                  </sc-if>
+                </div>
+              </sc-if>
+
+              <!-- BASIC PARAMS -->
+              <div style="display:flex; flex-direction:column; gap:19px;">
+                <sc-for list="{{ paramsBasic }}" as="p" hint-placeholder-count="5">
+                  <sc-if value="{{ p.visible }}" hint-placeholder-val="{{ true }}">
+                    <div style="display:flex; flex-direction:column; gap:9px;">
+                      <sc-if value="{{ p.isBool }}">
+                        <div style="display:flex; align-items:flex-start; justify-content:space-between; gap:14px;">
+                          <div style="display:flex; flex-direction:column; gap:2px; min-width:0;">
+                            <span style="font:600 13px var(--hf-font-sans); color:var(--hf-text-primary);">{{ p.label }}</span>
+                            <span style="font:400 11.5px var(--hf-font-sans); color:var(--hf-text-tertiary); line-height:1.4;">{{ p.help }}</span>
+                          </div>
+                          <div style="flex-shrink:0; padding-top:1px;"><x-import component-from-global-scope="HiggsfieldDesignSystem_b4c079.Switch" checked="{{ p.value }}" onChange="{{ p.onChange }}" hint-size="40px,24px"></x-import></div>
+                        </div>
+                      </sc-if>
+                      <sc-if value="{{ p.notBool }}">
+                        <div style="display:flex; align-items:baseline; justify-content:space-between; gap:10px;">
+                          <span style="font:600 13px var(--hf-font-sans); color:var(--hf-text-secondary);">{{ p.label }}</span>
+                          <span style="font:500 12px var(--hf-font-mono); color:var(--hf-text-primary); background:var(--hf-fill-soft); padding:2px 8px; border-radius:7px;">{{ p.valueText }}</span>
+                        </div>
+                        <sc-if value="{{ p.isSlider }}"><div style="width:100%; padding:6px 0 2px;"><x-import component-from-global-scope="HiggsfieldDesignSystem_b4c079.Slider" label="" show-value="{{ false }}" value="{{ p.value }}" min="{{ p.min }}" max="{{ p.max }}" step="{{ p.step }}" onChange="{{ p.onChange }}" hint-size="100%,18px"></x-import></div></sc-if>
+                        <sc-if value="{{ p.isSeg }}"><x-import component-from-global-scope="HiggsfieldDesignSystem_b4c079.SegmentedControl" options="{{ p.choices }}" value="{{ p.value }}" onChange="{{ p.onChange }}" size="sm" hint-size="100%,36px"></x-import></sc-if>
+                        <sc-if value="{{ p.isSelect }}"><div style="width:100%;"><x-import component-from-global-scope="HiggsfieldDesignSystem_b4c079.Select" options="{{ p.choices }}" value="{{ p.value }}" onChange="{{ p.onChange }}" style="width:100%" hint-size="100%,40px"></x-import></div></sc-if>
+                        <sc-if value="{{ p.isStepper }}">
+                          <div style="display:flex; gap:8px; align-items:center;">
+                            <div style="flex:1; display:flex; align-items:center; height:40px; background:var(--hf-surface-2); border:1px solid var(--hf-border); border-radius:12px; padding:0 12px;">
+                              <input type="number" value="{{ p.value }}" onChange="{{ p.onInput }}" style="flex:1; min-width:0; background:none; border:none; outline:none; color:var(--hf-text-primary); font:400 14px var(--hf-font-mono);" />
+                            </div>
+                            <button onClick="{{ p.onRandomize }}" title="Randomize" style="width:40px; height:40px; flex-shrink:0; display:flex; align-items:center; justify-content:center; border-radius:12px; border:1px solid var(--hf-border); background:var(--hf-surface-2); color:var(--hf-text-secondary); cursor:pointer;" style-hover="color:var(--hf-text-primary); border-color:var(--hf-border-strong);">
+                              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 2v6h-6M3 12a9 9 0 0 1 15-6.7L21 8M3 22v-6h6M21 12a9 9 0 0 1-15 6.7L3 16"/></svg>
+                            </button>
+                          </div>
+                        </sc-if>
+                        <sc-if value="{{ p.isText }}">
+                          <textarea value="{{ p.value }}" onChange="{{ p.onInput }}" placeholder="{{ p.placeholder }}" rows="4" style="width:100%; resize:vertical; min-height:104px; background:var(--hf-surface-2); border:1px solid var(--hf-border); border-radius:12px; padding:12px 14px; color:var(--hf-text-primary); font:400 14px var(--hf-font-sans); line-height:1.55; outline:none;"></textarea>
+                        </sc-if>
+                        <sc-if value="{{ p.showHelp }}"><span style="font:400 11.5px var(--hf-font-sans); color:var(--hf-text-tertiary); line-height:1.4;">{{ p.help }}</span></sc-if>
+                      </sc-if>
+                    </div>
+                  </sc-if>
+                </sc-for>
+              </div>
+
+              <!-- FINAL SIZE (relief, proposed) -->
+              <sc-if value="{{ isRelief }}" hint-placeholder-val="{{ true }}">
+                <div style="display:flex; align-items:center; justify-content:space-between; gap:10px; padding:13px 15px; border:1px solid var(--hf-border); border-radius:13px; background:var(--hf-surface-1);">
+                  <div style="display:flex; flex-direction:column; gap:2px;">
+                    <span style="display:flex; align-items:center; gap:7px; font:600 12px var(--hf-font-sans); color:var(--hf-text-secondary);">Final STL size <sc-if value="{{ showProvenance }}"><span style="font:700 8.5px var(--hf-font-sans); letter-spacing:.07em; text-transform:uppercase; color:var(--hf-info); background:var(--hf-info-dim); padding:2px 6px; border-radius:99px;">Proposed</span></sc-if></span>
+                    <span style="font:400 11px var(--hf-font-sans); color:var(--hf-text-tertiary);">derived from pixel size × heightmap</span>
+                  </div>
+                  <span style="font:500 14px var(--hf-font-mono); color:var(--hf-text-primary);">{{ finalSize }}</span>
+                </div>
+              </sc-if>
+
+              <!-- ADVANCED -->
+              <sc-if value="{{ hasAdvanced }}" hint-placeholder-val="{{ false }}">
+                <div style="display:flex; flex-direction:column; gap:18px;">
+                  <button onClick="{{ onToggleAdvanced }}" style="display:flex; align-items:center; gap:8px; background:none; border:none; padding:6px 0; cursor:pointer; color:var(--hf-text-secondary); font:600 11px var(--hf-font-sans); letter-spacing:.12em; text-transform:uppercase;" style-hover="color:var(--hf-text-primary);">
+                    <span style="flex:1; text-align:left;">Advanced</span>
+                    <span style="font:400 11px var(--hf-font-mono); letter-spacing:0; text-transform:none; color:var(--hf-text-tertiary);">{{ advancedCount }}</span>
+                    <span style="transform:{{ advancedChevron }}; transition:transform .18s;"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6l4 4 4-4"/></svg></span>
+                  </button>
+                  <sc-if value="{{ advancedOpen }}" hint-placeholder-val="{{ false }}">
+                    <div style="display:flex; flex-direction:column; gap:19px;">
+                      <sc-for list="{{ paramsAdvanced }}" as="p" hint-placeholder-count="3">
+                        <sc-if value="{{ p.visible }}" hint-placeholder-val="{{ true }}">
+                          <div style="display:flex; flex-direction:column; gap:9px;">
+                            <sc-if value="{{ p.isBool }}">
+                              <div style="display:flex; align-items:flex-start; justify-content:space-between; gap:14px;">
+                                <div style="display:flex; flex-direction:column; gap:2px; min-width:0;">
+                                  <span style="font:600 13px var(--hf-font-sans); color:var(--hf-text-primary);">{{ p.label }}</span>
+                                  <span style="font:400 11.5px var(--hf-font-sans); color:var(--hf-text-tertiary); line-height:1.4;">{{ p.help }}</span>
+                                </div>
+                                <div style="flex-shrink:0; padding-top:1px;"><x-import component-from-global-scope="HiggsfieldDesignSystem_b4c079.Switch" checked="{{ p.value }}" onChange="{{ p.onChange }}" hint-size="40px,24px"></x-import></div>
+                              </div>
+                            </sc-if>
+                            <sc-if value="{{ p.notBool }}">
+                              <div style="display:flex; align-items:baseline; justify-content:space-between; gap:10px;">
+                                <span style="font:600 13px var(--hf-font-sans); color:var(--hf-text-secondary);">{{ p.label }}</span>
+                                <span style="font:500 12px var(--hf-font-mono); color:var(--hf-text-primary); background:var(--hf-fill-soft); padding:2px 8px; border-radius:7px;">{{ p.valueText }}</span>
+                              </div>
+                              <sc-if value="{{ p.isSlider }}"><div style="width:100%; padding:6px 0 2px;"><x-import component-from-global-scope="HiggsfieldDesignSystem_b4c079.Slider" label="" show-value="{{ false }}" value="{{ p.value }}" min="{{ p.min }}" max="{{ p.max }}" step="{{ p.step }}" onChange="{{ p.onChange }}" hint-size="100%,18px"></x-import></div></sc-if>
+                              <sc-if value="{{ p.isSeg }}"><x-import component-from-global-scope="HiggsfieldDesignSystem_b4c079.SegmentedControl" options="{{ p.choices }}" value="{{ p.value }}" onChange="{{ p.onChange }}" size="sm" hint-size="100%,36px"></x-import></sc-if>
+                              <sc-if value="{{ p.isSelect }}"><div style="width:100%;"><x-import component-from-global-scope="HiggsfieldDesignSystem_b4c079.Select" options="{{ p.choices }}" value="{{ p.value }}" onChange="{{ p.onChange }}" style="width:100%" hint-size="100%,40px"></x-import></div></sc-if>
+                              <sc-if value="{{ p.isStepper }}">
+                                <div style="display:flex; gap:8px; align-items:center;">
+                                  <div style="flex:1; display:flex; align-items:center; height:40px; background:var(--hf-surface-2); border:1px solid var(--hf-border); border-radius:12px; padding:0 12px;">
+                                    <input type="number" value="{{ p.value }}" onChange="{{ p.onInput }}" style="flex:1; min-width:0; background:none; border:none; outline:none; color:var(--hf-text-primary); font:400 14px var(--hf-font-mono);" />
+                                  </div>
+                                  <button onClick="{{ p.onRandomize }}" title="Randomize" style="width:40px; height:40px; flex-shrink:0; display:flex; align-items:center; justify-content:center; border-radius:12px; border:1px solid var(--hf-border); background:var(--hf-surface-2); color:var(--hf-text-secondary); cursor:pointer;" style-hover="color:var(--hf-text-primary); border-color:var(--hf-border-strong);">
+                                    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 2v6h-6M3 12a9 9 0 0 1 15-6.7L21 8M3 22v-6h6M21 12a9 9 0 0 1-15 6.7L3 16"/></svg>
+                                  </button>
+                                </div>
+                              </sc-if>
+                              <sc-if value="{{ p.showHelp }}"><span style="font:400 11.5px var(--hf-font-sans); color:var(--hf-text-tertiary); line-height:1.4;">{{ p.help }}</span></sc-if>
+                            </sc-if>
+                          </div>
+                        </sc-if>
+                      </sc-for>
+                    </div>
+                  </sc-if>
+                </div>
+              </sc-if>
+            </div>
+
+            <!-- GENERATE FOOTER -->
+            <div style="flex-shrink:0; border-top:1px solid var(--hf-border); background:var(--hf-bg-base); padding:14px 24px 16px; display:flex; flex-direction:column; gap:11px;">
+              <div style="display:flex; align-items:center; justify-content:space-between; font-size:11.5px; color:var(--hf-text-tertiary);">
+                <span style="display:flex; align-items:center; gap:6px;"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>{{ featureEst }}</span>
+                <span style="display:flex; align-items:center; gap:6px;"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="16" height="16" x="4" y="4" rx="2"/><rect width="6" height="6" x="9" y="9" rx="1"/></svg>{{ featureVram }}</span>
+              </div>
+              <x-import component-from-global-scope="HiggsfieldDesignSystem_b4c079.Button" variant="primary" size="lg" block="{{ true }}" loading="{{ runBusy }}" disabled="{{ generateDisabled }}" onClick="{{ onGenerate }}" hint-size="100%,48px">{{ generateLabel }}</x-import>
+            </div>
+          </section>
+
+          <!-- RESULTS -->
+          <section data-screen-label="results-region" style="min-width:0; min-height:0; overflow:auto; padding:24px 26px; background:var(--hf-bg);">
+
+            <!-- idle -->
+            <sc-if value="{{ runIdle }}" hint-placeholder-val="{{ true }}">
+              <div style="height:100%; min-height:420px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:18px; text-align:center;">
+                <span style="width:60px; height:60px; border-radius:18px; border:1px solid var(--hf-border); background:var(--hf-surface-1); display:flex; align-items:center; justify-content:center; color:var(--hf-text-tertiary);">
+                  <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.1-3.1a2 2 0 0 0-2.8 0L6 21"/></svg>
+                </span>
+                <div style="display:flex; flex-direction:column; gap:5px;">
+                  <strong style="font-size:15px; color:var(--hf-text-secondary);">Results appear here</strong>
+                  <span style="font-size:13px; color:var(--hf-text-tertiary);">Adjust parameters, then generate.</span>
+                </div>
+                <div style="display:flex; gap:7px; flex-wrap:wrap; justify-content:center;">
+                  <sc-for list="{{ outputKinds }}" as="o" hint-placeholder-count="3">
+                    <span style="display:inline-flex; align-items:center; height:26px; padding:0 11px; border-radius:99px; border:1px solid var(--hf-border); background:var(--hf-surface-1); font:500 11.5px var(--hf-font-sans); color:var(--hf-text-secondary);">{{ o }}</span>
+                  </sc-for>
+                </div>
+              </div>
+            </sc-if>
+
+            <!-- running / progress -->
+            <sc-if value="{{ runBusy }}" hint-placeholder-val="{{ false }}">
+              <div style="max-width:540px; margin:0 auto; display:flex; flex-direction:column; gap:24px; padding-top:14px; animation:rs-rise .3s var(--hf-ease-out);">
+                <div style="display:flex; align-items:center; gap:10px;">
+                  <span style="width:8px; height:8px; border-radius:99px; background:var(--hf-live); animation:rs-pulse 1.6s var(--hf-ease-out) infinite;"></span>
+                  <strong style="font-size:15px;">{{ runStateLabel }}</strong>
+                  <span style="margin-left:auto; font:500 12px var(--hf-font-mono); color:var(--hf-text-secondary);">{{ elapsedText }}</span>
+                </div>
+
+                <!-- phase stepper -->
+                <div style="display:flex; align-items:center; gap:0;">
+                  <sc-for list="{{ phaseList }}" as="ph" hint-placeholder-count="5">
+                    <div style="display:flex; align-items:center; flex:{{ ph.flex }};">
+                      <span style="width:22px; height:22px; flex-shrink:0; border-radius:99px; display:flex; align-items:center; justify-content:center; background:{{ ph.dotBg }}; color:{{ ph.dotColor }}; border:1px solid {{ ph.dotBorder }};">
+                        <sc-if value="{{ ph.done }}"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></sc-if>
+                        <sc-if value="{{ ph.notDone }}"><span style="width:6px; height:6px; border-radius:99px; background:currentColor;"></span></sc-if>
+                      </span>
+                      <sc-if value="{{ ph.hasLine }}"><span style="flex:1; height:2px; margin:0 4px; border-radius:2px; background:{{ ph.lineBg }};"></span></sc-if>
+                    </div>
+                  </sc-for>
+                </div>
+                <div style="font:600 13px var(--hf-font-sans); color:var(--hf-text-primary); margin-top:-12px;">{{ phaseLabel }}</div>
+
+                <!-- progress bar -->
+                <div style="display:flex; flex-direction:column; gap:9px;">
+                  <div style="display:flex; align-items:baseline; justify-content:space-between;">
+                    <span style="font:700 30px var(--hf-font-sans); letter-spacing:-.02em;">{{ percentText }}</span>
+                    <span style="font:500 12px var(--hf-font-mono); color:var(--hf-text-tertiary);">{{ progressDetail }}</span>
+                  </div>
+                  <div style="position:relative; height:8px; border-radius:99px; background:var(--hf-fill-strong); overflow:hidden;">
+                    <div style="position:absolute; left:0; top:0; bottom:0; border-radius:99px; width:{{ percentBar }}; background:var(--hf-white); transition:width .14s linear;"></div>
+                    <div style="position:absolute; top:0; bottom:0; left:0; width:40%; background:linear-gradient(90deg,transparent,rgba(255,255,255,.35),transparent); animation:rs-shimmer 1.3s linear infinite;"></div>
+                  </div>
+                </div>
+
+                <!-- stat grid -->
+                <div style="display:grid; grid-template-columns:repeat(3,1fr); gap:10px;">
+                  <sc-for list="{{ runStats }}" as="st" hint-placeholder-count="3">
+                    <div style="border:1px solid var(--hf-border); border-radius:12px; background:var(--hf-surface-1); padding:12px 13px; display:flex; flex-direction:column; gap:5px;">
+                      <span style="display:flex; align-items:center; gap:6px; font:500 11px var(--hf-font-sans); color:var(--hf-text-tertiary);">{{ st.label }}<sc-if value="{{ st.proposed }}"><span style="width:5px; height:5px; border-radius:99px; background:var(--hf-info); flex-shrink:0;" title="proposed data"></span></sc-if></span>
+                      <span style="font:600 16px var(--hf-font-mono); color:var(--hf-text-primary);">{{ st.value }}</span>
+                    </div>
+                  </sc-for>
+                </div>
+
+                <div style="display:flex; align-items:center; justify-content:space-between; gap:12px;">
+                  <span style="font:400 11.5px var(--hf-font-mono); color:var(--hf-text-tertiary);">node: {{ runNode }} · {{ featureId }}</span>
+                  <button onClick="{{ onCancel }}" style="height:34px; padding:0 16px; border-radius:10px; border:1px solid var(--hf-border-strong); background:transparent; color:var(--hf-text-primary); font:600 13px var(--hf-font-sans); cursor:pointer; display:flex; align-items:center; gap:7px;" style-hover="background:var(--hf-fill-soft);">Cancel<sc-if value="{{ showProvenance }}"><span style="width:5px; height:5px; border-radius:99px; background:var(--hf-info);"></span></sc-if></button>
+                </div>
+              </div>
+            </sc-if>
+
+            <!-- result -->
+            <sc-if value="{{ runResult }}" hint-placeholder-val="{{ false }}">
+              <div style="display:flex; flex-direction:column; gap:18px; animation:rs-rise .3s var(--hf-ease-out);">
+                <div style="display:flex; align-items:center; gap:10px;">
+                  <span style="display:inline-flex; align-items:center; gap:6px; height:24px; padding:0 10px; border-radius:99px; background:var(--hf-success-dim); color:var(--hf-success); font:600 11px var(--hf-font-sans);"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>Complete</span>
+                  <span style="font:500 12px var(--hf-font-mono); color:var(--hf-text-tertiary);">{{ metaDuration }}</span>
+                  <div style="margin-left:auto; display:flex; gap:8px;">
+                    <button onClick="{{ onRerun }}" style="height:34px; padding:0 14px; border-radius:10px; border:1px solid var(--hf-border); background:var(--hf-surface-1); color:var(--hf-text-primary); font:600 13px var(--hf-font-sans); cursor:pointer; display:flex; align-items:center; gap:7px;" style-hover="border-color:var(--hf-border-strong);"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M21 2v6h-6M3 12a9 9 0 0 1 15-6.7L21 8"/></svg>Re-run</button>
+                    <x-import component-from-global-scope="HiggsfieldDesignSystem_b4c079.Button" variant="secondary" size="md" onClick="{{ onRerun }}" hint-size="auto,40px">Download all</x-import>
+                  </div>
+                </div>
+
+                <div style="display:grid; grid-template-columns:{{ artGrid }}; gap:14px; align-items:start;">
+                  <sc-for list="{{ artifacts }}" as="a" hint-placeholder-count="0">
+                    <div style="border:1px solid var(--hf-border); border-radius:16px; overflow:hidden; background:var(--hf-surface-1); box-shadow:var(--hf-sheen-top);">
+                      <!-- image artifact -->
+                      <sc-if value="{{ a.isImage }}">
+                        <div style="position:relative; aspect-ratio:{{ a.ratio }}; background:var(--hf-surface-inset);">
+                          {{ a.imgEl }}
+                        </div>
+                      </sc-if>
+                      <!-- 3D preview -->
+                      <sc-if value="{{ a.isGlb }}">
+                        <div style="position:relative; aspect-ratio:{{ a.ratio }}; background:radial-gradient(120% 90% at 50% 18%, #EDEFF3 0%, #D9DDE4 75%); display:flex; align-items:center; justify-content:center; overflow:hidden;">
+                          <div style="position:absolute; bottom:-30%; left:50%; width:120%; height:80%; transform:translateX(-50%) rotateX(64deg); background:repeating-linear-gradient(0deg, rgba(15,20,28,.07) 0 1px, transparent 1px 34px), repeating-linear-gradient(90deg, rgba(15,20,28,.07) 0 1px, transparent 1px 34px);"></div>
+                          {{ a.glbImgEl }}
+                          <div style="position:absolute; top:12px; right:12px; display:flex; align-items:center; gap:6px; height:26px; padding:0 11px; border-radius:99px; background:var(--hf-glass-bg); backdrop-filter:blur(18px); -webkit-backdrop-filter:blur(18px); border:1px solid var(--hf-glass-border); font:600 11px var(--hf-font-sans); color:#fff;"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>Drag to orbit</div>
+                        </div>
+                      </sc-if>
+                      <!-- mesh download -->
+                      <sc-if value="{{ a.isMesh }}">
+                        <div style="aspect-ratio:{{ a.ratio }}; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:12px; background:repeating-linear-gradient(135deg, var(--hf-surface-inset) 0 10px, var(--hf-surface-3) 10px 20px);">
+                          <span style="width:48px; height:48px; border-radius:13px; background:var(--hf-surface-2); border:1px solid var(--hf-border); display:flex; align-items:center; justify-content:center; color:var(--hf-text-secondary);"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2 2 7l10 5 10-5z"/><path d="m2 17 10 5 10-5M2 12l10 5 10-5"/></svg></span>
+                          <span style="font:500 12px var(--hf-font-mono); color:var(--hf-text-tertiary);">not previewable inline</span>
+                        </div>
+                      </sc-if>
+                      <div style="display:flex; align-items:center; justify-content:space-between; gap:10px; padding:12px 14px; border-top:1px solid var(--hf-border-subtle);">
+                        <div style="display:flex; flex-direction:column; gap:2px; min-width:0;">
+                          <strong style="font-size:13px;">{{ a.label }}</strong>
+                          <span style="font:400 11px var(--hf-font-mono); color:var(--hf-text-tertiary); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">{{ a.sub }}</span>
+                        </div>
+                        <button title="Download" style="width:34px; height:34px; flex-shrink:0; display:flex; align-items:center; justify-content:center; border-radius:9px; border:1px solid var(--hf-border); background:var(--hf-surface-2); color:var(--hf-text-secondary); cursor:pointer;" style-hover="color:var(--hf-text-primary); border-color:var(--hf-border-strong);"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5M12 15V3"/></svg></button>
+                      </div>
+                    </div>
+                  </sc-for>
+                </div>
+
+                <!-- run metadata (proposed) -->
+                <div style="border:1px solid var(--hf-border); border-radius:14px; background:var(--hf-surface-1); padding:15px 17px;">
+                  <div style="display:flex; align-items:center; gap:8px; margin-bottom:13px;">
+                    <span style="font:600 11px var(--hf-font-sans); letter-spacing:.12em; text-transform:uppercase; color:var(--hf-text-tertiary);">Run metadata</span>
+                    <sc-if value="{{ showProvenance }}"><span style="font:700 8.5px var(--hf-font-sans); letter-spacing:.07em; text-transform:uppercase; color:var(--hf-info); background:var(--hf-info-dim); padding:2px 6px; border-radius:99px;">Proposed</span></sc-if>
+                  </div>
+                  <div style="display:grid; grid-template-columns:repeat(2,1fr); gap:13px 24px;">
+                    <sc-for list="{{ metaRows }}" as="r" hint-placeholder-count="4">
+                      <div style="display:flex; align-items:center; justify-content:space-between; gap:10px; border-bottom:1px solid var(--hf-border-subtle); padding-bottom:9px;">
+                        <span style="font:400 12px var(--hf-font-sans); color:var(--hf-text-tertiary);">{{ r.k }}</span>
+                        <span style="font:500 12px var(--hf-font-mono); color:var(--hf-text-secondary); text-align:right; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">{{ r.v }}</span>
+                      </div>
+                    </sc-for>
+                  </div>
+                </div>
+              </div>
+            </sc-if>
+
+            <!-- error -->
+            <sc-if value="{{ runError }}" hint-placeholder-val="{{ false }}">
+              <div style="max-width:480px; margin:40px auto 0; border:1px solid var(--hf-danger); border-radius:16px; background:var(--hf-danger-dim); padding:22px; display:flex; flex-direction:column; gap:14px; text-align:center; align-items:center;">
+                <span style="width:46px; height:46px; border-radius:13px; background:rgba(0,0,0,.25); color:var(--hf-danger); display:flex; align-items:center; justify-content:center;"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="m15 9-6 6M9 9l6 6"/></svg></span>
+                <div><strong style="font-size:15px;">Run failed</strong><p style="margin:5px 0 0; font:400 13px var(--hf-font-mono); color:var(--hf-text-secondary);">{{ runErrorMsg }}</p></div>
+                <x-import component-from-global-scope="HiggsfieldDesignSystem_b4c079.Button" variant="secondary" size="md" onClick="{{ onGenerate }}" hint-size="auto,40px">Retry</x-import>
+              </div>
+            </sc-if>
+          </section>
+        </div>
+      </sc-if>
+
+      <!-- (Recent generations moved to the right-side panel) -->
+    </div>
+  </div>
+
+  <!-- ======= RECENT GENERATIONS (right panel, toggleable) ======= -->
+  <sc-if value="{{ historyOpen }}" hint-placeholder-val="{{ true }}">
+    <aside data-screen-label="history-panel" style="width:256px; flex-shrink:0; display:flex; flex-direction:column; min-height:0; border-left:1px solid var(--hf-border); background:var(--hf-bg-base); animation:rs-rise .22s var(--hf-ease-out);">
+      <div style="flex-shrink:0; display:flex; align-items:center; gap:8px; padding:0 14px 0 18px; height:62px; border-bottom:1px solid var(--hf-border);">
+        <span style="font:600 11px var(--hf-font-sans); letter-spacing:.12em; text-transform:uppercase; color:var(--hf-text-tertiary);">Recent</span>
+        <sc-if value="{{ showProvenance }}"><span style="font:700 8.5px var(--hf-font-sans); letter-spacing:.07em; text-transform:uppercase; color:var(--hf-info); background:var(--hf-info-dim); padding:2px 6px; border-radius:99px;">Proposed</span></sc-if>
+        <span style="font:400 11px var(--hf-font-mono); color:var(--hf-text-tertiary);">{{ historyCount }}</span>
+        <button onClick="{{ onToggleHistory }}" title="Hide" style="margin-left:auto; width:30px; height:30px; flex-shrink:0; display:flex; align-items:center; justify-content:center; border-radius:9px; border:none; background:var(--hf-fill-soft); color:var(--hf-text-secondary); cursor:pointer;" style-hover="background:var(--hf-fill-medium); color:var(--hf-text-primary);">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+        </button>
+      </div>
+      <div style="flex:1; min-height:0; overflow:auto; padding:12px; display:flex; flex-direction:column; gap:8px;">
+        <sc-for list="{{ history }}" as="h" hint-placeholder-count="4">
+          <button onClick="{{ h.onRerun }}" title="Re-run" style="display:flex; align-items:center; gap:11px; width:100%; text-align:left; padding:8px; border-radius:12px; border:1px solid var(--hf-border); background:var(--hf-surface-1); cursor:pointer;" style-hover="border-color:var(--hf-border-strong); background:var(--hf-surface-2);">
+            <div style="position:relative; width:60px; height:48px; flex-shrink:0; border-radius:9px; overflow:hidden; border:1px solid var(--hf-border); background:var(--hf-surface-inset);">
+              {{ h.thumbEl }}
+              <div style="position:absolute; inset:0; background:var(--hf-grad-scrim); opacity:.45;"></div>
+              <span style="position:absolute; left:5px; bottom:4px; font:600 9px var(--hf-font-mono); color:#fff;">{{ h.duration }}</span>
+            </div>
+            <div style="flex:1; min-width:0;">
+              <div style="font:600 12.5px var(--hf-font-sans); color:var(--hf-text-primary); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">{{ h.name }}</div>
+              <div style="font:400 11px var(--hf-font-sans); color:var(--hf-text-tertiary); margin-top:1px;">{{ h.when }}</div>
+            </div>
+            <span style="flex-shrink:0; color:var(--hf-text-tertiary);"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M21 2v6h-6M3 12a9 9 0 0 1 15-6.7L21 8"/></svg></span>
+          </button>
+        </sc-for>
+      </div>
+    </aside>
+  </sc-if>
+
+  <!-- ======= SYSTEM SLIDE-OVER ======= -->
+  <sc-if value="{{ sysOpen }}" hint-placeholder-val="{{ false }}">
+    <div onClick="{{ onCloseSys }}" style="position:fixed; inset:0; z-index:300; background:var(--hf-scrim); backdrop-filter:blur(2px); -webkit-backdrop-filter:blur(2px); animation:rs-rise .2s var(--hf-ease-out);"></div>
+    <div data-screen-label="system-panel" style="position:fixed; top:0; right:0; bottom:0; z-index:310; width:420px; max-width:92vw; background:var(--hf-bg-base); border-left:1px solid var(--hf-border); box-shadow:var(--hf-shadow-xl); display:flex; flex-direction:column; animation:rs-rise .24s var(--hf-ease-out);">
+      <div style="display:flex; align-items:center; justify-content:space-between; padding:18px 22px; border-bottom:1px solid var(--hf-border);">
+        <div><h2 style="margin:0; font-size:16px; font-weight:700;">System &amp; health</h2><span style="font-size:12px; color:var(--hf-text-tertiary);">{{ sysDevice }}</span></div>
+        <button onClick="{{ onCloseSys }}" style="width:34px; height:34px; display:flex; align-items:center; justify-content:center; border-radius:10px; border:none; background:var(--hf-fill-soft); color:var(--hf-text-secondary); cursor:pointer;" style-hover="background:var(--hf-fill-medium); color:var(--hf-text-primary);"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
+      </div>
+      <div style="flex:1; overflow:auto; padding:20px 22px; display:flex; flex-direction:column; gap:20px;">
+
+        <!-- VRAM gauge -->
+        <div style="border:1px solid var(--hf-border); border-radius:16px; background:var(--hf-surface-1); padding:17px; box-shadow:var(--hf-sheen-top);">
+          <div style="display:flex; align-items:baseline; justify-content:space-between; margin-bottom:12px;">
+            <span style="font:600 13px var(--hf-font-sans); color:var(--hf-text-secondary);">VRAM</span>
+            <span style="font:700 18px var(--hf-font-mono); color:{{ vramColor }};">{{ vramReadout }}</span>
+          </div>
+          <div style="height:10px; border-radius:99px; background:var(--hf-fill-strong); overflow:hidden;">
+            <div style="height:100%; border-radius:99px; width:{{ vramPctStr }}; background:{{ vramColor }}; transition:width .25s var(--hf-ease-out);"></div>
+          </div>
+          <p style="margin:11px 0 0; font:400 11.5px var(--hf-font-sans); color:var(--hf-text-tertiary); line-height:1.5;">Relief and the image engine can't be resident at once — relief models unload before an image run.</p>
+        </div>
+
+        <!-- engine resident -->
+        <div style="display:flex; flex-direction:column; gap:9px;">
+          <span style="font:600 11px var(--hf-font-sans); letter-spacing:.12em; text-transform:uppercase; color:var(--hf-text-tertiary);">Resident engine</span>
+          <div style="display:flex; gap:7px;">
+            <sc-for list="{{ engineSeg }}" as="e" hint-placeholder-count="3">
+              <div style="flex:1; text-align:center; padding:11px 6px; border-radius:11px; border:1px solid {{ e.border }}; background:{{ e.bg }}; color:{{ e.color }}; font:600 12.5px var(--hf-font-sans);">{{ e.label }}</div>
+            </sc-for>
+          </div>
+        </div>
+
+        <!-- GPU stats (proposed) -->
+        <div style="display:flex; flex-direction:column; gap:9px;">
+          <span style="display:flex; align-items:center; gap:8px; font:600 11px var(--hf-font-sans); letter-spacing:.12em; text-transform:uppercase; color:var(--hf-text-tertiary);">GPU telemetry <sc-if value="{{ showProvenance }}"><span style="font:700 8.5px var(--hf-font-sans); letter-spacing:.07em; color:var(--hf-info); background:var(--hf-info-dim); padding:2px 6px; border-radius:99px;">Proposed</span></sc-if></span>
+          <div style="display:grid; grid-template-columns:repeat(3,1fr); gap:9px;">
+            <sc-for list="{{ gpuStats }}" as="g" hint-placeholder-count="3">
+              <div style="border:1px solid var(--hf-border); border-radius:12px; background:var(--hf-surface-1); padding:12px; display:flex; flex-direction:column; gap:4px;">
+                <span style="font:500 10.5px var(--hf-font-sans); color:var(--hf-text-tertiary);">{{ g.label }}</span>
+                <span style="font:700 16px var(--hf-font-mono); color:var(--hf-text-primary);">{{ g.value }}</span>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+
+        <!-- relief weights checklist -->
+        <div style="border:1px solid var(--hf-border); border-radius:14px; background:var(--hf-surface-1); padding:15px 16px;">
+          <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:11px;">
+            <span style="font:600 13px var(--hf-font-sans);">Relief depth weights</span>
+            <span style="font:600 11px var(--hf-font-sans); color:{{ reliefHealthColor }};">{{ reliefHealthText }}</span>
+          </div>
+          <div style="display:flex; flex-direction:column; gap:8px;">
+            <sc-for list="{{ weightModels }}" as="m" hint-placeholder-count="3">
+              <div style="display:flex; align-items:center; gap:9px; font:400 12.5px var(--hf-font-sans); color:var(--hf-text-secondary);"><span style="color:{{ m.color }};">{{ m.mark }}</span>{{ m.label }}</div>
+            </sc-for>
+          </div>
+        </div>
+
+        <!-- image engine checklist -->
+        <div style="border:1px solid var(--hf-border); border-radius:14px; background:var(--hf-surface-1); padding:15px 16px;">
+          <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:11px;">
+            <span style="font:600 13px var(--hf-font-sans);">Image engine</span>
+            <span style="font:600 11px var(--hf-font-sans); color:{{ comfyHealthColor }};">{{ comfyHealthText }}</span>
+          </div>
+          <div style="display:flex; flex-direction:column; gap:8px;">
+            <sc-for list="{{ comfyModels }}" as="cm" hint-placeholder-count="4">
+              <div style="display:flex; align-items:center; gap:9px; font:400 12px var(--hf-font-mono); color:var(--hf-text-secondary);"><span style="color:{{ cm.color }};">{{ cm.mark }}</span><span style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">{{ cm.label }}</span></div>
+            </sc-for>
+          </div>
+        </div>
+
+        <sc-if value="{{ showProvenance }}">
+          <div style="display:flex; align-items:center; gap:8px; font:400 11px var(--hf-font-sans); color:var(--hf-text-tertiary); padding-top:2px;">
+            <span style="width:7px; height:7px; border-radius:99px; background:var(--hf-info); flex-shrink:0;"></span>Proposed = data available at the source, not yet wired to an endpoint.
+          </div>
+        </sc-if>
+      </div>
+    </div>
+  </sc-if>
+
+  <!-- ======= TOASTS ======= -->
+  <div style="position:fixed; right:22px; bottom:22px; z-index:400; display:flex; flex-direction:column; gap:10px; align-items:flex-end;">
+    <sc-for list="{{ toasts }}" as="t" hint-placeholder-count="0">
+      <div style="min-width:240px; max-width:340px; display:flex; align-items:center; gap:11px; padding:13px 15px; border-radius:13px; border:1px solid var(--hf-border-strong); border-left:3px solid {{ t.color }}; background:var(--hf-surface-2); box-shadow:var(--hf-shadow-lg); animation:rs-rise .26s var(--hf-ease-out);">
+        <span style="width:8px; height:8px; border-radius:99px; background:{{ t.color }}; flex-shrink:0;"></span>
+        <span style="font:500 13px var(--hf-font-sans); color:var(--hf-text-primary); line-height:1.4;">{{ t.msg }}</span>
+      </div>
+    </sc-for>
+  </div>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1280,&quot;height&quot;:860},&quot;showProvenance&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;},&quot;startTab&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;default&quot;:&quot;relief&quot;,&quot;options&quot;:[&quot;relief&quot;,&quot;text2img&quot;,&quot;img2img&quot;,&quot;upscale&quot;],&quot;tsType&quot;:&quot;string&quot;},&quot;simSpeed&quot;:{&quot;editor&quot;:&quot;float&quot;,&quot;default&quot;:1,&quot;min&quot;:0.5,&quot;max&quot;:2,&quot;step&quot;:0.25,&quot;tsType&quot;:&quot;number&quot;}}">
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    const start = ['relief','text2img','img2img','upscale'].includes(props && props.startTab) ? props.startTab : 'relief';
+    const vals = {};
+    this.F.forEach(f => { vals[f.id] = this.defaultsFor(f.id); });
+    this.state = {
+      activeId: start,
+      values: vals,
+      images: { relief: 'assets/portrait.jpg', img2img: 'assets/scene.jpg', upscale: 'assets/neon.jpg', text2img: null },
+      advancedOpen: false,
+      run: { state: 'idle' },
+      sysOpen: false,
+      historyOpen: true,
+      weights: { installed: false, busy: false, log: [], models: { 'BiRefNet · matting': true, 'Depth-Anything-V2 (vitl)': false, 'Sapiens · human depth': false } },
+      comfy: { installed: false, running: false, busy: false, action: null, log: [], models: { 'transformer · Krea-2-Turbo Q4_K_M (~7.5 GB)': false, 'VAE · qwen_image (~0.25 GB)': false, 'text encoder · qwen (~3.9 GB)': false, 'upscale · 4x-UltraSharp (~0.07 GB)': false } },
+      sys: { device: 'NVIDIA RTX 3060 · 12 GB', vramTotal: 12, vramUsed: 0.7, engineResident: 'idle', util: 3, temp: 41, power: 22, modelLoaded: '—', diskFree: 184 },
+      history: [
+        { id: 'h1', feature: 'relief', name: 'Image → Relief', thumb: 'assets/heightmap.png', filter: 'none', duration: 8.4, when: '4 min ago' },
+        { id: 'h2', feature: 'text2img', name: 'Text → Image', thumb: 'assets/scene.jpg', filter: 'none', duration: 12.1, when: '11 min ago' },
+        { id: 'h3', feature: 'upscale', name: 'Upscale', thumb: 'assets/neon.jpg', filter: 'none', duration: 3.6, when: '22 min ago' },
+        { id: 'h4', feature: 'img2img', name: 'Image → Image', thumb: 'assets/storm.jpg', filter: 'none', duration: 9.8, when: '38 min ago' }
+      ],
+      toasts: []
+    };
+    this._cycle = ['assets/portrait.jpg','assets/portrait2.jpg','assets/scene.jpg','assets/storm.jpg'];
+    this._tid = 0;
+  }
+
+  componentWillUnmount() { clearInterval(this._tick); clearTimeout(this._submitT); clearInterval(this._wint); clearInterval(this._cint); }
+
+  get F() {
+    return [
+      { id:'relief', name:'Image → Relief', desc:'Tiled monocular-depth heightmap (16-bit PNG) + STL mesh', engine:'local', needsImage:true,
+        est:'~5 s – 4 min', vram:'~2–4 GB', outKinds:['Heightmap PNG','3D preview GLB','STL mesh'],
+        params:[
+          { name:'depth_model', control:'seg', group:'basic', label:'Depth model', help:'Monocular-depth model that estimates 3D shape from one photo.', choices:[{value:'depth-anything',label:'Depth-Anything'},{value:'depth-anything-3',label:'DA3'},{value:'sapiens',label:'Sapiens'}] },
+          { name:'tile_detail', control:'select', group:'basic', label:'Tile detail', help:'Finer tiling recovers facial detail. Off = 1 pass, Max = 144 tiles (slower).', choices:[{value:'off',label:'Off · 1 pass'},{value:'low',label:'Low · 9'},{value:'medium',label:'Medium · 36'},{value:'high',label:'High · 64'},{value:'ultra',label:'Ultra · 100'},{value:'max',label:'Max · 144'}] },
+          { name:'face_crop', control:'bool', group:'basic', label:'Face crop', help:'Auto-detect the face and concentrate detail there.' },
+          { name:'da3_variant', control:'select', group:'basic', label:'DA3 variant', help:'Model size — only for Depth-Anything-3.', dependsOn:{param:'depth_model',value:'depth-anything-3'}, choices:[{value:'DA3MONO-LARGE',label:'DA3MONO-LARGE'},{value:'DA3-LARGE',label:'DA3-LARGE'},{value:'DA3-GIANT',label:'DA3-GIANT'},{value:'DA3-BASE',label:'DA3-BASE'},{value:'DA3-SMALL',label:'DA3-SMALL'}] },
+          { name:'relief_depth_mm', control:'slider', group:'basic', label:'Relief depth', help:'Physical carve depth of the relief.', min:2, max:20, step:0.5, suffix:' mm' },
+          { name:'pixel_mm', control:'slider', group:'basic', label:'Pixel size', help:'Real-world size of one pixel → sets STL dimensions.', min:0.02, max:0.5, step:0.01, suffix:' mm/px' },
+          { name:'black_bg', control:'bool', group:'advanced', label:'Black background', help:'Background sits at zero height vs a mid-gray plate.' },
+          { name:'invert', control:'bool', group:'advanced', label:'Invert depth', help:'Flip near/far (raised ↔ recessed).' },
+          { name:'flatten_bg', control:'bool', group:'advanced', label:'Flatten background', help:'Push the background to a flat plane.' },
+          { name:'make_solid', control:'bool', group:'advanced', label:'Make solid', help:'Watertight solid (3D printing) vs surface (CNC).' }
+        ] },
+      { id:'text2img', name:'Text → Image', desc:'Generate an image from a prompt with Krea-2-Turbo (ComfyUI)', engine:'comfy', needsImage:false,
+        est:'~5–20 s', vram:'~9–10 GB', outKinds:['Image PNG'],
+        params:[
+          { name:'prompt', control:'text', group:'basic', label:'Prompt', placeholder:'Describe what to generate…' },
+          { name:'width', control:'slider', group:'basic', label:'Width', min:512, max:2048, step:64, suffix:' px' },
+          { name:'height', control:'slider', group:'basic', label:'Height', min:512, max:2048, step:64, suffix:' px' },
+          { name:'quant', control:'seg', group:'advanced', label:'Quantization', help:'Quality vs VRAM — higher is heavier.', choices:[{value:'Q3_K_M',label:'Q3'},{value:'Q4_K_M',label:'Q4'},{value:'Q5_K_M',label:'Q5'},{value:'Q6_K',label:'Q6'}] },
+          { name:'steps', control:'slider', group:'advanced', label:'Steps', help:'Turbo is tuned for 8 steps.', min:4, max:20, step:1, suffix:'' },
+          { name:'seed', control:'stepper', group:'advanced', label:'Seed', help:'0 = random each run.', suffix:'' }
+        ] },
+      { id:'img2img', name:'Image → Image', desc:'Transform an image with a prompt (Krea-2-Turbo img2img)', engine:'comfy', needsImage:true,
+        est:'~5–20 s', vram:'~9–10 GB', outKinds:['Image PNG'],
+        params:[
+          { name:'prompt', control:'text', group:'basic', label:'Prompt', placeholder:'Describe how to transform it…' },
+          { name:'denoise', control:'slider', group:'basic', label:'Denoise strength', help:'Lower stays close to the original; higher reinvents it.', min:0.1, max:1.0, step:0.05, suffix:'' },
+          { name:'quant', control:'seg', group:'advanced', label:'Quantization', help:'Quality vs VRAM.', choices:[{value:'Q3_K_M',label:'Q3'},{value:'Q4_K_M',label:'Q4'},{value:'Q5_K_M',label:'Q5'},{value:'Q6_K',label:'Q6'}] },
+          { name:'steps', control:'slider', group:'advanced', label:'Steps', min:4, max:20, step:1, suffix:'' },
+          { name:'seed', control:'stepper', group:'advanced', label:'Seed', help:'0 = random.', suffix:'' }
+        ] },
+      { id:'upscale', name:'Upscale', desc:'Upscale ~4× with an ESRGAN model (ComfyUI)', engine:'comfy', needsImage:true,
+        est:'~2–8 s', vram:'~1–2 GB', outKinds:['Image PNG · ~4×'],
+        params:[
+          { name:'model_name', control:'select', group:'basic', label:'Upscale model', help:'ESRGAN upscaler (all ~4×).', choices:[{value:'4x-UltraSharp.pth',label:'4x-UltraSharp'},{value:'RealESRGAN_x4plus.pth',label:'RealESRGAN x4plus'},{value:'4x_foolhardy_Remacri.pth',label:'4x Foolhardy Remacri'}] }
+        ] }
+    ];
+  }
+
+  defaultsFor(id) {
+    const f = this.F.find(x => x.id === id);
+    const o = {};
+    f.params.forEach(p => {
+      if (p.control === 'bool') o[p.name] = p.defaultBool !== undefined ? p.defaultBool : ({ face_crop:true, black_bg:true, invert:false, flatten_bg:true, make_solid:false }[p.name]);
+      else if (p.control === 'text') o[p.name] = '';
+      else if (p.name === 'seed') o[p.name] = 0;
+      else if (p.control === 'slider') o[p.name] = ({ relief_depth_mm:8, pixel_mm:0.1, width:1024, height:1024, steps:8, denoise:0.6 }[p.name]);
+      else o[p.name] = p.choices[0].value;
+    });
+    if (id === 'text2img') o.prompt = 'a lone figure on a windswept dune at golden hour, volumetric light, 35mm anamorphic, cinematic';
+    if (id === 'img2img') o.prompt = 'reimagine as a moody neon-noir cityscape at night, rain-soaked streets, cinematic';
+    return o;
+  }
+
+  feature() { return this.F.find(f => f.id === this.state.activeId); }
+  curVals() { return this.state.values[this.state.activeId]; }
+  tilesTotal(d) { return ({ off:1, low:9, medium:36, high:64, ultra:100, max:144 })[d] || 36; }
+  quantVram(q) { return ({ Q3_K_M:8.6, Q4_K_M:9.6, Q5_K_M:10.4, Q6_K:11.2 })[q] || 9.6; }
+  depthLabel(v) { return ({ 'depth-anything':'Depth-Anything-V2', 'depth-anything-3':'Depth-Anything-3', 'sapiens':'Sapiens depth' })[v] || v; }
+  simSpeed() { const s = (this.props && this.props.simSpeed) || 1; return 1 / s; }
+  allComfyModels() { return Object.values(this.state.comfy.models).every(Boolean); }
+  comfyReady() { const c = this.state.comfy; return c.installed && this.allComfyModels() && c.running; }
+  showProvenance() { return this.props && this.props.showProvenance === false ? false : true; }
+
+  setVal(name, v) {
+    const id = this.state.activeId;
+    this.setState(s => ({ values: { ...s.values, [id]: { ...s.values[id], [name]: v } } }));
+  }
+
+  addToast(tone, msg) {
+    const color = ({ success:'var(--hf-success)', info:'var(--hf-info)', warning:'var(--hf-warning)', danger:'var(--hf-danger)' })[tone] || 'var(--hf-white)';
+    const id = 't' + (++this._tid);
+    this.setState(s => ({ toasts: [...s.toasts, { id, color, msg }] }));
+    setTimeout(() => this.setState(s => ({ toasts: s.toasts.filter(t => t.id !== id) })), 4600);
+  }
+
+  onTab(id) {
+    if (id === this.state.activeId) return;
+    clearInterval(this._tick); clearTimeout(this._submitT);
+    this.setState(s => ({ activeId: id, advancedOpen: false, run: { state: 'idle' }, values: { ...s.values, [id]: this.defaultsFor(id) } }));
+  }
+
+  buildSegs(f, vals) {
+    const sp = this.simSpeed();
+    if (f.engine === 'comfy') {
+      const steps = vals.steps || 8;
+      return [
+        { key:'queued', label:'Queued', dur:500*sp },
+        { key:'loading_model', label:'Load model', dur:1500*sp },
+        { key:'sampling', label:'Sampling', dur:Math.max(1300, steps*230)*sp },
+        { key:'decoding', label:'Decoding', dur:750*sp },
+        { key:'saving', label:'Saving', dur:450*sp }
+      ];
+    }
+    const tiles = this.tilesTotal(vals.tile_detail);
+    return [
+      { key:'queued', label:'Queued', dur:400*sp },
+      { key:'loading', label:'Load depth model', dur:1500*sp },
+      { key:'tiling', label:'Tiling + depth', dur:Math.max(1000, tiles*55)*sp },
+      { key:'meshing', label:'Meshing', dur:1300*sp },
+      { key:'saving', label:'Saving', dur:500*sp }
+    ];
+  }
+
+  startRun() {
+    const f = this.feature(); const vals = { ...this.curVals() };
+    if (f.needsImage && !this.state.images[f.id]) return;
+    clearInterval(this._tick); clearTimeout(this._submitT);
+    const resident = f.engine === 'comfy' ? 'image' : 'relief';
+    if (f.engine === 'comfy' && this.state.sys.engineResident === 'relief') this.addToast('info', 'Unloaded relief models to free VRAM for the image engine.');
+    const segs = this.buildSegs(f, vals);
+    this._segs = segs; this._total = segs.reduce((a, s) => a + s.dur, 0); this._t0 = performance.now();
+    this._runFeature = f; this._runVals = vals;
+    this._peakVram = f.engine === 'comfy' ? (f.id === 'upscale' ? 1.8 : this.quantVram(vals.quant)) : (vals.depth_model === 'sapiens' ? 4.0 : 3.2);
+    this.setState(s => ({ sys: { ...s.sys, engineResident: resident }, run: { state:'submitting', engine:f.engine, feature:f.id, phases:segs.map(x => x.label), phaseIdx:0, percent:0, elapsed:0 } }));
+    this._submitT = setTimeout(() => {
+      this.setState(s => ({ run: { ...s.run, state:'running' } }));
+      this._tick = setInterval(() => this.tick(), 80);
+    }, 380);
+  }
+
+  tick() {
+    const el = performance.now() - this._t0; const total = this._total;
+    if (el >= total) { this.finishRun(); return; }
+    let acc = 0, idx = 0, seg = this._segs[0], local = 0;
+    for (let i = 0; i < this._segs.length; i++) { const s = this._segs[i]; if (el < acc + s.dur) { idx = i; seg = s; local = (el - acc) / s.dur; break; } acc += s.dur; }
+    const f = this._runFeature, vals = this._runVals;
+    const elapsedS = el / 1000;
+    const run = { ...this.state.run, state:'running', phaseIdx:idx, percent:Math.min(99, (el/total)*100), elapsed:elapsedS, eta:Math.max(0, (total-el)/1000) };
+    const hot = seg.key === 'sampling' || seg.key === 'tiling';
+    if (f.engine === 'comfy') {
+      const steps = vals.steps || 8; run.max = steps;
+      run.value = seg.key === 'sampling' ? Math.min(steps, Math.floor(local*steps)) : (idx > 2 ? steps : 0);
+      run.its = seg.key === 'sampling' ? (steps/(seg.dur/1000))*(0.9 + Math.random()*0.2) : 0;
+      run.node = seg.key === 'sampling' ? 'KSampler' : seg.key === 'decoding' ? 'VAEDecode' : seg.key === 'loading_model' ? 'CheckpointLoader' : '—';
+    } else {
+      const tt = this.tilesTotal(vals.tile_detail); run.tilesTotal = tt;
+      run.tilesDone = seg.key === 'tiling' ? Math.min(tt, Math.floor(local*tt)) : (idx > 2 ? tt : 0);
+      run.node = seg.key;
+    }
+    const vramUsed = idx >= 1 ? (idx === 1 ? this._peakVram*Math.min(1, 0.3 + local*0.7) : this._peakVram) : 0.7;
+    this.setState(s => ({ run, sys: { ...s.sys,
+      vramUsed: Number(vramUsed.toFixed(1)),
+      util: hot ? Math.round(94 + Math.random()*5) : Math.round(38 + Math.random()*22),
+      temp: Math.round(46 + Math.min(28, elapsedS*4)),
+      power: hot ? Math.round(150 + Math.random()*22) : Math.round(70 + Math.random()*30),
+      modelLoaded: f.engine === 'comfy' ? ('Krea-2-Turbo ' + (vals.quant || 'Q4_K_M')) : this.depthLabel(vals.depth_model)
+    } }));
+  }
+
+  finishRun() {
+    clearInterval(this._tick);
+    const f = this._runFeature, vals = this._runVals, dur = this._total/1000;
+    const seed = vals.seed !== undefined ? (vals.seed === 0 ? Math.floor(Math.random()*2147483647) : vals.seed) : null;
+    const arts = this.makeArtifacts(f, vals);
+    const dims = f.id === 'relief' ? '560 × 720' : f.id === 'upscale' ? '4096 × 4096' : ((vals.width||1024) + ' × ' + (vals.height||1024));
+    const meta = { duration:dur, seed, dims, size: f.id === 'relief' ? '1.4 MB' : '2.1 MB', model: f.engine === 'comfy' ? ('Krea-2-Turbo ' + (vals.quant||'Q4_K_M')) : this.depthLabel(vals.depth_model) };
+    const thumb = (arts.find(a => a.src) || {}).src;
+    const filter = f.id === 'relief' ? 'grayscale(1) contrast(1.1)' : 'none';
+    const hist = { id:'j'+Date.now(), feature:f.id, name:f.name, thumb, filter, duration:dur, when:'just now' };
+    this.setState(s => ({
+      run: { ...s.run, state:'result', percent:100, artifacts:arts, meta },
+      history: [hist, ...s.history].slice(0, 14),
+      sys: { ...s.sys, util:6, power:36, temp:Math.max(44, s.sys.temp-5) }
+    }));
+    this.addToast('success', f.name + ' complete · ' + dur.toFixed(1) + ' s');
+  }
+
+  makeArtifacts(f, vals) {
+    if (f.id === 'relief') return [
+      { kind:'image', name:'heightmap', label:'Heightmap', sub:'16-bit grayscale PNG · 560×720', src:'assets/heightmap.png', ratio:'560/720', filter:'none' },
+      { kind:'glb', name:'preview', label:'3D preview', sub:'GLB · interactive orbit', src:'assets/heightmap.png', ratio:'560/720' },
+      { kind:'mesh', name:'stl', label:'STL mesh', sub:'STL · ' + (vals.make_solid ? 'watertight solid' : 'surface') + ' · 8.2 MB', ratio:'560/720' }
+    ];
+    const map = { text2img:'assets/scene.jpg', img2img:'assets/storm.jpg', upscale:'assets/neon.jpg' };
+    const dims = f.id === 'upscale' ? '4096 × 4096' : ((vals.width||1024) + '×' + (vals.height||1024));
+    return [{ kind:'image', name:'image', label:'Image', sub:'PNG · ' + dims + ' · 2.1 MB', src:map[f.id], ratio: f.id==='upscale' ? '1/1' : ((vals.width||1024)+'/'+(vals.height||1024)), filter:'none' }];
+  }
+
+  // weights download — numeric progress + stats
+  downloadWeights() {
+    if (this.state.weights.busy) return;
+    this.setState(s => ({ weights: { ...s.weights, busy:true, progress:0, downloadedGB:0, speed:0, eta:null } }));
+    const totalGB = 1.34; const t0 = performance.now(); const durMs = 5400 * this.simSpeed();
+    clearInterval(this._wint);
+    this._wint = setInterval(() => {
+      const el = performance.now() - t0; const p = Math.min(1, el / durMs);
+      const downloaded = totalGB * p;
+      const speed = 44 + Math.sin(el / 280) * 6 + (Math.random() * 4 - 2);
+      const eta = Math.max(0, (durMs - el) / 1000);
+      this.setState(s => ({ weights: { ...s.weights, progress: p * 100, downloadedGB: downloaded, speed, eta } }));
+      if (p >= 1) {
+        clearInterval(this._wint);
+        this.setState(s => ({ weights: { ...s.weights, busy:false, installed:true, progress:100, eta:0, models: Object.fromEntries(Object.keys(s.weights.models).map(k => [k, true])) } }));
+        this.addToast('success', 'Depth weights installed — full quality enabled.');
+      }
+    }, 80);
+  }
+
+  comfyStep(action, lines, done) {
+    if (this.state.comfy.busy) return;
+    this.setState(s => ({ comfy: { ...s.comfy, busy:true, action, log: [...s.comfy.log, '— ' + action + ' —'] } }));
+    let i = 0; clearInterval(this._cint);
+    this._cint = setInterval(() => {
+      if (i >= lines.length) { clearInterval(this._cint); this.setState(s => { const c = { ...s.comfy, busy:false, action:null }; done(c); return { comfy:c }; }); return; }
+      this.setState(s => ({ comfy: { ...s.comfy, log: [...s.comfy.log, lines[i]] } })); i++;
+    }, 480);
+  }
+  comfyInstall() { this.comfyStep('install', ['$ git clone ComfyUI', 'Installing torch, xformers…', 'pip: 142 packages resolved', 'ComfyUI installed ✓'], c => { c.installed = true; }); }
+  comfyDownload() { if (!this.state.comfy.installed) return; this.comfyStep('download', ['Krea-2-Turbo Q4_K_M  3.1 / 7.5 GB (41%)', 'Krea-2-Turbo Q4_K_M  7.5 / 7.5 GB ✓', 'qwen_image VAE ✓', 'qwen text encoder  3.9 / 3.9 GB ✓', '4x-UltraSharp ✓', 'All models ready ✓'], c => { c.models = Object.fromEntries(Object.keys(c.models).map(k => [k, true])); this.addToast('success', 'Image models downloaded.'); }); }
+  comfyStart() { if (!(this.state.comfy.installed && this.allComfyModels())) return; this.comfyStep('start', ['$ python main.py --port 8188', 'Loading custom nodes…', 'Startup time: 4.2s', 'ComfyUI running on 127.0.0.1:8188 ✓'], c => { c.running = true; this.addToast('success', 'Image engine started · 127.0.0.1:8188'); }); }
+
+  augment(p) {
+    const vals = this.curVals(); const val = vals[p.name];
+    const o = { name:p.name, label:p.label, help:p.help || '', value:val, min:p.min, max:p.max, step:p.step, choices:p.choices, placeholder:p.placeholder || '' };
+    o.isBool = p.control === 'bool'; o.notBool = !o.isBool;
+    o.isSlider = p.control === 'slider'; o.isSeg = p.control === 'seg'; o.isSelect = p.control === 'select'; o.isStepper = p.control === 'stepper'; o.isText = p.control === 'text';
+    o.showHelp = o.notBool && !!o.help;
+    o.visible = p.dependsOn ? vals[p.dependsOn.param] === p.dependsOn.value : true;
+    if (o.isSlider || o.isStepper) { const v = Number(val); const txt = Number.isInteger(v) ? String(v) : String(parseFloat(v.toFixed(2))); o.valueText = txt + (p.suffix || ''); }
+    else if (o.isSeg || o.isSelect) { const c = (p.choices || []).find(x => x.value === val); o.valueText = c ? c.label : String(val); }
+    else o.valueText = '';
+    o.onChange = (nv) => this.setVal(p.name, nv);
+    o.onInput = (e) => this.setVal(p.name, p.control === 'text' ? e.target.value : Number(e.target.value));
+    o.onRandomize = () => this.setVal(p.name, Math.floor(Math.random()*2147483647));
+    return o;
+  }
+
+  navStyle(id) {
+    const a = this.state.activeId === id;
+    return 'display:flex;align-items:center;gap:11px;height:42px;padding:0 12px;border-radius:12px;border:none;cursor:pointer;width:100%;font:600 13.5px var(--hf-font-sans);transition:background .14s,color .14s;' +
+      (a ? 'background:var(--hf-fill-medium);color:var(--hf-text-primary);' : 'background:transparent;color:var(--hf-text-secondary);');
+  }
+
+  railStyle(id) {
+    const a = this.state.activeId === id;
+    return 'position:relative;width:46px;height:46px;display:flex;align-items:center;justify-content:center;border-radius:13px;border:none;cursor:pointer;transition:background .14s,color .14s;' +
+      (a ? 'background:var(--hf-fill-medium);color:var(--hf-text-primary);' : 'background:transparent;color:var(--hf-text-secondary);');
+  }
+
+  featureIcon(id, size) {
+    const h = React.createElement;
+    const sw = { width:size, height:size, viewBox:'0 0 24 24', fill:'none', stroke:'currentColor', strokeWidth:1.9, strokeLinecap:'round', strokeLinejoin:'round' };
+    const P = (d) => h('path', { d, key:d });
+    if (id === 'relief') return h('svg', sw, P('M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z'), P('m3.3 7 8.7 5 8.7-5'), P('M12 22V12'));
+    if (id === 'text2img') return h('svg', sw, P('M4 7V4h16v3'), P('M9 20h6'), P('M12 4v16'));
+    if (id === 'img2img') return h('svg', sw, h('rect', { width:18, height:18, x:3, y:3, rx:2, key:'r' }), h('circle', { cx:9, cy:9, r:2, key:'c' }), P('m21 15-3.1-3.1a2 2 0 0 0-2.8 0L6 21'));
+    return h('svg', sw, P('M15 3h6v6'), P('M9 21H3v-6'), P('M21 3l-7 7'), P('M3 21l7-7'));
+  }
+
+  renderVals() {
+    const f = this.feature(); const vals = this.curVals(); const run = this.state.run; const sys = this.state.sys;
+    const prov = this.showProvenance();
+    const basic = f.params.filter(p => p.group === 'basic').map(p => this.augment(p));
+    const advanced = f.params.filter(p => p.group === 'advanced').map(p => this.augment(p));
+    const vramPct = Math.min(100, (sys.vramUsed / sys.vramTotal) * 100);
+    const vramColor = vramPct >= 90 ? 'var(--hf-danger)' : vramPct >= 75 ? 'var(--hf-warning)' : 'var(--hf-accent)';
+    const residentDot = sys.engineResident === 'idle' ? 'var(--hf-text-tertiary)' : 'var(--hf-accent)';
+    const residentLabel = ({ relief:'Relief', image:'Image', idle:'Idle' })[sys.engineResident];
+
+    // weights model chips
+    const mk = (b) => b ? '✓' : '○';
+    const mkColor = (b) => b ? 'var(--hf-success)' : 'var(--hf-text-tertiary)';
+    const weightModels = Object.entries(this.state.weights.models).map(([label, b]) => ({ label, mark: mk(b), color: mkColor(b) }));
+    const comfyModels = Object.entries(this.state.comfy.models).map(([label, b]) => ({ label, mark: mk(b), color: mkColor(b) }));
+
+    const showBanner = this.state.activeId === 'relief' && !this.state.weights.installed;
+    const showComfyGate = f.engine === 'comfy' && !this.comfyReady();
+    const showWorkspace = !showComfyGate;
+
+    // wizard steps
+    const c = this.state.comfy; const allM = this.allComfyModels();
+    const stepDef = [
+      { key:'install', label:'Install ComfyUI', desc:'Clone the engine and Python dependencies.', done:c.installed, available:!c.installed, btnLabel:'Install', onAction:() => this.comfyInstall(), showModels:false },
+      { key:'download', label:'Download models', desc:'Fetch the 4 model files (~11.7 GB total).', done:allM, available:c.installed && !allM, btnLabel:'Download', onAction:() => this.comfyDownload(), showModels:true },
+      { key:'start', label:'Start engine', desc:'Launch ComfyUI on 127.0.0.1:8188.', done:c.running, available:c.installed && allM && !c.running, btnLabel:'Start', onAction:() => this.comfyStart(), showModels:false }
+    ];
+    const wizardSteps = stepDef.map((s, i) => {
+      const status = s.done ? 'done' : s.available ? 'available' : 'pending';
+      return {
+        label:s.label, desc:s.desc, numText: s.done ? '✓' : String(i+1), btnLabel:s.btnLabel, onAction:s.onAction, showModels:s.showModels,
+        loading: c.busy && c.action === s.key,
+        showBtn: s.available || (c.busy && c.action === s.key),
+        statusText: s.done ? 'Done' : s.available ? 'Ready' : 'Waiting',
+        statusColor: s.done ? 'var(--hf-success)' : s.available ? 'var(--hf-text-secondary)' : 'var(--hf-text-tertiary)',
+        titleColor: status === 'pending' ? 'var(--hf-text-tertiary)' : 'var(--hf-text-primary)',
+        numBg: s.done ? 'var(--hf-success-dim)' : s.available ? 'var(--hf-white)' : 'var(--hf-fill-medium)',
+        numColor: s.done ? 'var(--hf-success)' : s.available ? 'var(--hf-text-inverse)' : 'var(--hf-text-tertiary)',
+        borderColor: s.available ? 'var(--hf-border-strong)' : 'var(--hf-border)',
+        bgColor: s.available ? 'var(--hf-surface-2)' : 'var(--hf-surface-1)'
+      };
+    });
+
+    // phase stepper
+    const phaseList = (run.phases || []).map((label, i) => {
+      const done = i < (run.phaseIdx||0); const active = i === (run.phaseIdx||0);
+      const last = i === run.phases.length - 1;
+      return {
+        label, done, notDone:!done, hasLine: !last, flex: last ? '0 0 auto' : '1 1 auto',
+        dotBg: done ? 'var(--hf-accent)' : active ? 'var(--hf-white)' : 'var(--hf-surface-2)',
+        dotColor: done ? 'var(--hf-accent-fg)' : active ? 'var(--hf-text-inverse)' : 'var(--hf-text-tertiary)',
+        dotBorder: done || active ? 'transparent' : 'var(--hf-border)',
+        lineBg: done ? 'var(--hf-accent)' : 'var(--hf-fill-strong)'
+      };
+    });
+
+    // run stats
+    let runStats = [];
+    if (run.state === 'running' || run.state === 'submitting') {
+      if (run.engine === 'comfy') runStats = [
+        { label:'Steps', value:(run.value||0) + ' / ' + (run.max||8), proposed:false },
+        { label:'Speed', value:(run.its ? run.its.toFixed(1) : '—') + ' it/s', proposed:true },
+        { label:'ETA', value:(run.eta != null ? Math.ceil(run.eta) + 's' : '—'), proposed:true }
+      ];
+      else runStats = [
+        { label:'Tiles', value:(run.tilesDone||0) + ' / ' + (run.tilesTotal||1), proposed:true },
+        { label:'Elapsed', value:(run.elapsed||0).toFixed(1) + 's', proposed:false },
+        { label:'ETA', value:(run.eta != null ? Math.ceil(run.eta) + 's' : '—'), proposed:true }
+      ];
+    }
+
+    // artifacts — build img elements in JS so the src never streams as a literal {{ }} into the DOM
+    const h = React.createElement;
+    const artifacts = (run.artifacts || []).map(a => ({
+      ...a, isImage:a.kind==='image', isGlb:a.kind==='glb', isMesh:a.kind==='mesh',
+      imgEl: a.kind==='image' ? h('img', { src:a.src, alt:a.label, style:{ width:'100%', height:'100%', objectFit:'cover', display:'block', filter:a.filter||'none' } }) : null,
+      glbImgEl: a.kind==='glb' ? h('img', { src:a.src, alt:'3D', style:{ width:'54%', maxWidth:'200px', transform:'perspective(900px) rotateX(20deg) rotateZ(-2deg)', filter:'grayscale(1) contrast(1.05) drop-shadow(0 24px 30px rgba(15,20,28,.28))', borderRadius:'6px' } }) : null
+    }));
+    const artGrid = f.id === 'relief' ? 'repeat(2, minmax(0,1fr))' : 'minmax(0, 520px)';
+    const m = run.meta || {};
+    const metaRows = m.duration != null ? [
+      { k:'Duration', v: m.duration.toFixed(1) + ' s' },
+      { k:'Dimensions', v: m.dims },
+      { k:'File size', v: m.size },
+      { k:'Seed', v: m.seed != null ? String(m.seed) : '—' },
+      { k:'Model', v: m.model }
+    ] : [];
+
+    // engine resident segmented (system panel)
+    const engineSeg = [
+      { id:'relief', label:'Relief' }, { id:'image', label:'Image' }, { id:'idle', label:'Idle' }
+    ].map(e => { const on = sys.engineResident === e.id; return { label:e.label, bg: on ? 'var(--hf-fill-medium)':'transparent', border: on ? 'var(--hf-border-strong)':'var(--hf-border)', color: on ? 'var(--hf-text-primary)':'var(--hf-text-tertiary)' }; });
+
+    const gpuStats = [
+      { label:'Utilization', value: sys.util + '%' },
+      { label:'Temp', value: sys.temp + '°C' },
+      { label:'Power', value: sys.power + ' W' },
+      { label:'Loaded', value: sys.modelLoaded },
+      { label:'Disk free', value: sys.diskFree + ' GB' },
+      { label:'Resident', value: residentLabel }
+    ];
+
+    const reliefInstalled = this.state.weights.installed;
+    const allMReady = allM;
+
+    const mkImg = React.createElement;
+    const history = this.state.history.map(hh => ({ ...hh, duration: (typeof hh.duration === 'number' ? hh.duration.toFixed(1) + 's' : hh.duration), onRerun: () => this.onTab(hh.feature), thumbEl: mkImg('img', { src:hh.thumb, alt:hh.name, style:{ width:'100%', height:'100%', objectFit:'cover', display:'block', filter:hh.filter||'none' } }) }));
+    const f2 = this.feature(); const curImg = this.state.images[f2.id];
+    const inputImgEl = curImg ? React.createElement('img', { src:curImg, alt:'input', style:{ width:'100%', height:'100%', objectFit:'cover', display:'block' } }) : null;
+
+    return {
+      // nav
+      navRelief:this.navStyle('relief'), navText:this.navStyle('text2img'), navImg:this.navStyle('img2img'), navUp:this.navStyle('upscale'),
+      railRelief:this.railStyle('relief'), railText:this.railStyle('text2img'), railImg:this.railStyle('img2img'), railUp:this.railStyle('upscale'),
+      onTabRelief:() => this.onTab('relief'), onTabText:() => this.onTab('text2img'), onTabImg:() => this.onTab('img2img'), onTabUp:() => this.onTab('upscale'),
+      liteFlag: !reliefInstalled, featureIconEl:this.featureIcon(f.id, 20), showHeaderLite: f.id === 'relief' && !reliefInstalled,
+      // topbar
+      featureName:f.name, featureDesc:f.desc, featureId:f.id, featureEst:f.est, featureVram:f.vram,
+      reliefHealthDot: reliefInstalled ? 'var(--hf-accent)' : 'var(--hf-warning)',
+      comfyHealthDot: this.comfyReady() ? 'var(--hf-accent)' : c.installed ? 'var(--hf-warning)' : 'var(--hf-text-tertiary)',
+      // sidebar mini
+      vramReadout: sys.vramUsed.toFixed(1) + ' / ' + sys.vramTotal + ' GB', vramPctStr: vramPct.toFixed(0) + '%', vramColor, residentDot, residentLabel,
+      onOpenSys:() => this.setState({ sysOpen:true }), onCloseSys:() => this.setState({ sysOpen:false }), sysOpen:this.state.sysOpen,
+      // banner
+      showBanner, weightModels, weightsBusy:this.state.weights.busy, weightsIdle: !this.state.weights.busy, onDownloadWeights:() => this.downloadWeights(),
+      weightsPct: Math.round(this.state.weights.progress || 0) + '%', weightsBar: (this.state.weights.progress || 0) + '%',
+      weightsStats: (this.state.weights.downloadedGB || 0).toFixed(2) + ' / 1.34 GB',
+      weightsSpeed: Math.max(0, Math.round(this.state.weights.speed || 0)) + ' MB/s',
+      weightsEta: this.state.weights.eta != null ? ('ETA ' + Math.ceil(this.state.weights.eta) + 's') : 'ETA —',
+      // gate
+      showComfyGate, showWorkspace, wizardSteps, comfyModels, comfyLog:this.state.comfy.log, comfyHasLog:this.state.comfy.log.length > 0,
+      // input
+      needsImage:f.needsImage, hasImage: !!this.state.images[f.id], noImage: !this.state.images[f.id], inputImgEl, inputName: f.needsImage && this.state.images[f.id] ? this.state.images[f.id].split('/').pop() : '',
+      onUpload:() => { const cur = this.state.images[f.id]; const i = (this._cycle.indexOf(cur) + 1) % this._cycle.length; this.setState(s => ({ images: { ...s.images, [f.id]: this._cycle[i] } })); },
+      // params
+      paramsBasic:basic, paramsAdvanced:advanced, hasAdvanced: advanced.length > 0, advancedCount: advanced.length + ' settings',
+      advancedOpen:this.state.advancedOpen, onToggleAdvanced:() => this.setState(s => ({ advancedOpen: !s.advancedOpen })), advancedChevron: this.state.advancedOpen ? 'rotate(180deg)' : 'rotate(0deg)',
+      isRelief: f.id === 'relief', finalSize: (Math.round(560 * (vals.pixel_mm||0.1))) + ' × ' + (Math.round(720 * (vals.pixel_mm||0.1))) + ' mm',
+      outputKinds:f.outKinds,
+      // generate
+      canRun: !(run.state==='submitting'||run.state==='running') && (!f.needsImage || !!this.state.images[f.id]),
+      generateDisabled: (run.state==='submitting'||run.state==='running') || (f.needsImage && !this.state.images[f.id]),
+      runBusy: run.state==='submitting'||run.state==='running',
+      generateLabel: run.state==='submitting' ? 'Submitting…' : run.state==='running' ? 'Generating…' : 'Generate',
+      onGenerate:() => this.startRun(),
+      // run states
+      runIdle: run.state==='idle', runResult: run.state==='result', runError: run.state==='error',
+      runStateLabel: run.state==='submitting' ? 'Submitting' : (run.phases ? (run.phases[run.phaseIdx]||'Running') : 'Running'),
+      elapsedText: (run.elapsed||0).toFixed(1) + 's',
+      phaseList, phaseLabel: run.phases ? run.phases[run.phaseIdx] : '',
+      percentText: Math.round(run.percent||0) + '%', percentBar: (run.percent||0) + '%',
+      progressDetail: run.engine==='comfy' ? ((run.value||0)+'/'+(run.max||8)+' steps') : ((run.tilesDone||0)+'/'+(run.tilesTotal||1)+' tiles'),
+      runStats, runNode: run.node || '—',
+      onCancel:() => { clearInterval(this._tick); clearTimeout(this._submitT); this.setState(s => ({ run:{state:'idle'}, sys:{...s.sys, util:3, power:22, vramUsed:0.7} })); this.addToast('info','Run cancelled.'); },
+      // result
+      artifacts, artGrid, metaRows, metaDuration: m.duration != null ? ('took ' + m.duration.toFixed(1) + ' s') : '',
+      onRerun:() => this.startRun(),
+      runErrorMsg: run.error || 'CUDA out of memory — try a lower quant or smaller resolution.',
+      // history
+      history, historyCount: this.state.history.length + ' jobs',
+      historyOpen: this.state.historyOpen, onToggleHistory: () => this.setState(s => ({ historyOpen: !s.historyOpen })),
+      historyBtnStyle: 'width:34px;height:34px;display:flex;align-items:center;justify-content:center;border-radius:10px;cursor:pointer;transition:background .14s,color .14s,border-color .14s;' + (this.state.historyOpen ? 'border:1px solid var(--hf-border-strong);background:var(--hf-fill-medium);color:var(--hf-text-primary);' : 'border:1px solid var(--hf-border);background:var(--hf-surface-1);color:var(--hf-text-secondary);'),
+      // system panel
+      sysDevice:sys.device, engineSeg, gpuStats,
+      reliefHealthText: reliefInstalled ? 'Installed' : 'Lite mode', reliefHealthColor: reliefInstalled ? 'var(--hf-success)' : 'var(--hf-warning)',
+      comfyHealthText: this.comfyReady() ? 'Running' : allMReady ? 'Stopped' : c.installed ? 'No models' : 'Not installed', comfyHealthColor: this.comfyReady() ? 'var(--hf-success)' : 'var(--hf-warning)',
+      // provenance
+      showProvenance:prov,
+      // toasts
+      toasts:this.state.toasts
+    };
+  }
+}
+</script>
+</body>
+</html>

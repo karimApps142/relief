@@ -1,0 +1,84 @@
+/* ============================================================
+   HIGGSFIELD — COLOR TOKENS
+   Dark-native, cinematic, near-monochrome. Imagery carries the
+   color; the UI stays out of the way. White is the primary action.
+   ============================================================ */
+
+:root {
+  /* ---- Raw neutral ramp (cool near-black → white) ---- */
+  --hf-neutral-0:   #000000;
+  --hf-neutral-950: #0B0C0E;  /* app canvas */
+  --hf-neutral-900: #0F1113;  /* brand base (meta theme-color) */
+  --hf-neutral-850: #141619;  /* card surface */
+  --hf-neutral-800: #1A1D21;  /* elevated surface / inputs */
+  --hf-neutral-750: #22262B;  /* hover surface */
+  --hf-neutral-700: #2C3137;  /* strong divider / pressed */
+  --hf-neutral-600: #3C424A;
+  --hf-neutral-500: #5A616B;
+  --hf-neutral-400: #7A828D;
+  --hf-neutral-300: #9CA3AD;
+  --hf-neutral-200: #C2C7CE;
+  --hf-neutral-100: #E2E5E9;
+  --hf-neutral-50:  #F3F4F6;
+  --hf-white:       #FFFFFF;
+
+  /* ---- Surfaces (semantic) ---- */
+  --hf-bg:            var(--hf-neutral-950); /* the canvas everything sits on */
+  --hf-bg-base:       var(--hf-neutral-900);
+  --hf-surface-1:     var(--hf-neutral-850); /* default card */
+  --hf-surface-2:     var(--hf-neutral-800); /* inputs, popovers, raised */
+  --hf-surface-3:     var(--hf-neutral-750); /* hover / selected */
+  --hf-surface-inset: #0A0B0D;               /* recessed wells, code blocks */
+  --hf-scrim:         rgba(8, 9, 11, 0.72);  /* modal / sheet backdrop */
+
+  /* ---- Borders & dividers (white alpha so they read on any surface) ---- */
+  --hf-border-subtle: rgba(255, 255, 255, 0.06);
+  --hf-border:        rgba(255, 255, 255, 0.10);
+  --hf-border-strong: rgba(255, 255, 255, 0.18);
+  --hf-border-focus:  rgba(255, 255, 255, 0.85);
+
+  /* ---- Text (white alpha = consistent across surfaces) ---- */
+  --hf-text-primary:   #FFFFFF;
+  --hf-text-secondary: rgba(255, 255, 255, 0.64);
+  --hf-text-tertiary:  rgba(255, 255, 255, 0.42);
+  --hf-text-disabled:  rgba(255, 255, 255, 0.26);
+  --hf-text-inverse:   #0B0C0E;               /* on white / light fills */
+
+  /* ---- Primary action = WHITE (Higgsfield's signature CTA) ---- */
+  --hf-action:          #FFFFFF;
+  --hf-action-hover:    #E4E6EA;
+  --hf-action-active:   #C9CCD2;
+  --hf-action-fg:       #0B0C0E;
+  --hf-action-disabled: rgba(255, 255, 255, 0.16);
+
+  /* ---- Accent: cinematic mint (used sparingly — focus glints, live, success) ---- */
+  --hf-accent:        #4FE0A6;
+  --hf-accent-hover:  #6BE9B7;
+  --hf-accent-dim:    rgba(79, 224, 166, 0.16);
+  --hf-accent-fg:     #06231A;
+
+  /* ---- Semantic ---- */
+  --hf-success:     #4FE0A6;
+  --hf-success-dim: rgba(79, 224, 166, 0.16);
+  --hf-warning:     #F5B544;
+  --hf-warning-dim: rgba(245, 181, 68, 0.16);
+  --hf-danger:      #FF5C5C;
+  --hf-danger-dim:  rgba(255, 92, 92, 0.16);
+  --hf-info:        #5AA0FF;
+  --hf-info-dim:    rgba(90, 160, 255, 0.16);
+
+  /* ---- Live / generating (creative-tool state) ---- */
+  --hf-live:        #FF4D6D;  /* recording / rendering pulse */
+  --hf-pro:         #F5B544;  /* PRO / premium tier marker */
+
+  /* ---- Fills / chips on dark ---- */
+  --hf-fill-soft:   rgba(255, 255, 255, 0.06);
+  --hf-fill-medium: rgba(255, 255, 255, 0.10);
+  --hf-fill-strong: rgba(255, 255, 255, 0.16);
+
+  /* ---- Gradients (restrained — sheen + media scrims, not decoration) ---- */
+  --hf-grad-sheen:  linear-gradient(180deg, rgba(255,255,255,0.06) 0%, rgba(255,255,255,0) 60%); /* @kind color */
+  --hf-grad-scrim:  linear-gradient(180deg, rgba(11,12,14,0) 0%, rgba(11,12,14,0.85) 100%); /* @kind color */
+  --hf-grad-scrim-top: linear-gradient(0deg, rgba(11,12,14,0) 0%, rgba(11,12,14,0.7) 100%); /* @kind color */
+  --hf-grad-premium: linear-gradient(135deg, #FFFFFF 0%, #B9C0FF 50%, #8FE9C6 100%); /* @kind color */
+}

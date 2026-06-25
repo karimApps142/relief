@@ -1,0 +1,12 @@
+/* ============================================================
+   HIGGSFIELD DESIGN SYSTEM — GLOBAL ENTRY
+   Consumers link this one file. It only @imports the token +
+   font layers (no rules of its own) plus a small base reset.
+   ============================================================ */
+
+@import url('./tokens/fonts.css');
+@import url('./tokens/colors.css');
+@import url('./tokens/typography.css');
+@import url('./tokens/spacing.css');
+@import url('./tokens/effects.css');
+@import url('./tokens/base.css');

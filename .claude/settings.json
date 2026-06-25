@@ -8,7 +8,27 @@
       "Bash(ssh -v -o BatchMode=yes -o ConnectTimeout=10 -o StrictHostKeyChecking=accept-new ad@100.86.189.84 exit)",
       "Bash(git commit -m 'fix\\(gpu\\): pin torch/torchvision to +cu121 so pip can'\\\\''t grab the CPU wheel *)",
       "Bash(git push *)",
-      "Bash(git commit -m 'fix\\(gpu\\): add kornia + timm \\(BiRefNet remote-code deps\\) *)"
+      "Bash(git commit -m 'fix\\(gpu\\): add kornia + timm \\(BiRefNet remote-code deps\\) *)",
+      "Bash(git commit -m 'fix\\(gpu\\): default normals to marigold \\(StableNormal broken on Windows\\) *)",
+      "Bash(python3 -m py_compile relief_core.py pipeline.py app_gradio.py)",
+      "Bash(python3 -m py_compile app_gradio.py)",
+      "Bash(git commit -m 'feat\\(ui\\): add in-app tuning guide panel for portrait quality *)",
+      "Bash(.venv/bin/python -c \"import cv2, numpy, scipy; print\\('cv2', cv2.__version__\\); print\\('numpy', numpy.__version__\\); print\\('scipy', scipy.__version__\\); print\\('ximgproc', hasattr\\(cv2, 'ximgproc'\\)\\)\")",
+      "Bash(.venv/bin/python -c \"import skimage; print\\('skimage', skimage.__version__\\)\")",
+      "WebFetch(domain:www.cs.huji.ac.il)",
+      "WebFetch(domain:gfx.cs.princeton.edu)",
+      "WebFetch(domain:www.sculptok.com)",
+      "WebFetch(domain:langbein.org)",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:huggingface.co)",
+      "WebFetch(domain:arxiv.org)",
+      "WebFetch(domain:api.github.com)",
+      "WebFetch(domain:yaksoy.github.io)",
+      "Bash(python3 -m py_compile models.py backends.py pipeline.py features/relief.py app_gradio.py)",
+      "Bash(./.venv/bin/python test_features.py)",
+      "Bash(echo \"test_features exit=$?\")",
+      "Bash(./.venv/bin/python -c ' *)"
     ]
   }
 }
