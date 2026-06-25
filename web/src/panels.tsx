@@ -13,7 +13,7 @@ export function LiteBanner({ s }: { s: Studio }) {
   if (s.activeId !== 'relief' || !s.models || s.models.installed) return null
   const m = s.models
   return (
-    <div style={{ margin: '16px 26px 0', border: '1px solid var(--hf-border)', borderLeft: '3px solid var(--hf-warning)', borderRadius: 12, background: 'var(--hf-surface-1)', boxShadow: 'var(--hf-sheen-top)', overflow: 'hidden' }}>
+    <div style={{ margin: '0 0 16px', border: '1px solid var(--hf-border)', borderLeft: '3px solid var(--hf-warning)', borderRadius: 12, background: 'var(--hf-surface-1)', boxShadow: 'var(--hf-sheen-top)', overflow: 'hidden' }}>
       {m.busy ? (
         <div style={{ padding: '12px 16px', display: 'flex', flexDirection: 'column', gap: 9 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>

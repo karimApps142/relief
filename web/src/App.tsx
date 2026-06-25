@@ -76,13 +76,13 @@ export default function App() {
               Can’t reach the API ({s.bootErr}). Is the server running on :8000?
             </div>
           )}
-          {active && <LiteBanner s={s} />}
           {active && (showComfyGate ? (
             <ComfyWizard s={s} />
           ) : (
-            <div style={{ flex: 1, minHeight: 0, display: 'grid', gridTemplateColumns: '430px 1fr' }}>
+            <div style={{ flex: 1, minHeight: 0, display: 'grid', gridTemplateColumns: '420px 1fr' }}>
               <Controls s={s} />
-              <section style={{ minWidth: 0, minHeight: 0, overflow: 'auto', padding: '24px 26px', background: 'var(--hf-bg)' }}>
+              <section style={{ minWidth: 0, minHeight: 0, overflow: 'auto', padding: '20px 24px', background: 'var(--hf-bg)' }}>
+                <LiteBanner s={s} />
                 <Results s={s} />
               </section>
             </div>

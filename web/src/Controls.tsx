@@ -30,7 +30,7 @@ function ParamField({ p, value, onChange }: { p: ParamSpec; value: any; onChange
     )
   }
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 9 }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
       <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 10 }}>
         <span style={{ font: '600 13px var(--hf-font-sans)', color: 'var(--hf-text-secondary)' }}>{p.label}</span>
         {valueText(p, value) && (
@@ -38,7 +38,7 @@ function ParamField({ p, value, onChange }: { p: ParamSpec; value: any; onChange
         )}
       </div>
       {p.control === 'slider' && (
-        <div style={{ padding: '6px 0 2px' }}>
+        <div style={{ padding: '2px 0 0' }}>
           <Slider value={Number(value)} min={p.min ?? 0} max={p.max ?? 1} step={p.step ?? 0.01} onChange={onChange} />
         </div>
       )}
@@ -92,9 +92,9 @@ export default function Controls({ s }: { s: Studio }) {
   return (
     <section style={{ borderRight: '1px solid var(--hf-border)', display: 'flex', flexDirection: 'column', minHeight: 0, background: 'var(--hf-bg-base)' }}>
       {/* panel header */}
-      <div style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: 12, padding: '17px 22px', borderBottom: '1px solid var(--hf-border)' }}>
-        <span style={{ width: 38, height: 38, flexShrink: 0, borderRadius: 11, background: 'var(--hf-fill-medium)', color: 'var(--hf-text-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <Icon name={featureIcon(f.icon)} size={20} />
+      <div style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: 11, padding: '13px 20px', borderBottom: '1px solid var(--hf-border)' }}>
+        <span style={{ width: 34, height: 34, flexShrink: 0, borderRadius: 10, background: 'var(--hf-fill-medium)', color: 'var(--hf-text-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <Icon name={featureIcon(f.icon)} size={19} />
         </span>
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -105,13 +105,13 @@ export default function Controls({ s }: { s: Studio }) {
         </div>
       </div>
 
-      <div style={{ flex: 1, minHeight: 0, overflow: 'auto', padding: '22px 24px 16px', display: 'flex', flexDirection: 'column', gap: 22 }}>
+      <div style={{ flex: 1, minHeight: 0, overflow: 'auto', padding: '16px 22px 14px', display: 'flex', flexDirection: 'column', gap: 15 }}>
         {/* image input */}
         {f.needs_image && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             <span style={eyebrow}>Input image</span>
             {s.preview ? (
-              <div style={{ position: 'relative', borderRadius: 16, overflow: 'hidden', border: '1px solid var(--hf-border)', background: 'var(--hf-surface-inset)', aspectRatio: '16/10' }}>
+              <div style={{ position: 'relative', borderRadius: 14, overflow: 'hidden', border: '1px solid var(--hf-border)', background: 'var(--hf-surface-inset)', aspectRatio: '16/9' }}>
                 <img src={s.preview} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
                 <div style={{ position: 'absolute', inset: 0, background: 'var(--hf-grad-scrim)', opacity: 0.5 }} />
                 <div style={{ position: 'absolute', left: 11, bottom: 11, display: 'flex', alignItems: 'center', gap: 6, height: 24, padding: '0 9px', borderRadius: 99, background: 'var(--hf-glass-bg)', backdropFilter: 'blur(18px)', border: '1px solid var(--hf-glass-border)', font: '500 11px var(--hf-font-mono)', color: '#fff' }}>{s.file?.name}</div>
@@ -120,8 +120,8 @@ export default function Controls({ s }: { s: Studio }) {
                 </label>
               </div>
             ) : (
-              <label style={{ border: '1.5px dashed var(--hf-border-strong)', background: 'var(--hf-surface-1)', borderRadius: 16, aspectRatio: '16/10', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 9, cursor: 'pointer', color: 'var(--hf-text-tertiary)' }}>
-                <Icon name="upload" size={26} sw={1.7} />
+              <label style={{ border: '1.5px dashed var(--hf-border-strong)', background: 'var(--hf-surface-1)', borderRadius: 14, aspectRatio: '16/6.5', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 6, cursor: 'pointer', color: 'var(--hf-text-tertiary)' }}>
+                <Icon name="upload" size={22} sw={1.7} />
                 <span style={{ fontSize: 13, fontWeight: 500 }}>Drop an image or click to upload</span>
                 <span style={{ fontSize: 11 }}>PNG · JPG</span>
                 <input type="file" accept="image/*" style={{ display: 'none' }} onChange={(e) => e.target.files?.[0] && s.onUpload(e.target.files[0])} />
@@ -131,13 +131,13 @@ export default function Controls({ s }: { s: Studio }) {
         )}
 
         {/* basic params */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 19 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
           {basic.map((p) => <ParamField key={p.name} p={p} value={s.values[p.name]} onChange={(v) => s.setVal(p.name, v)} />)}
         </div>
 
         {/* final STL size (relief) */}
         {f.id === 'relief' && (
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, padding: '13px 15px', border: '1px solid var(--hf-border)', borderRadius: 13, background: 'var(--hf-surface-1)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, padding: '10px 14px', border: '1px solid var(--hf-border)', borderRadius: 12, background: 'var(--hf-surface-1)' }}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
               <span style={{ display: 'flex', alignItems: 'center', gap: 7, font: '600 12px var(--hf-font-sans)', color: 'var(--hf-text-secondary)' }}>Final STL size</span>
               <span style={{ font: '400 11px var(--hf-font-sans)', color: 'var(--hf-text-tertiary)' }}>pixel size × input resolution</span>
@@ -148,7 +148,7 @@ export default function Controls({ s }: { s: Studio }) {
 
         {/* advanced */}
         {advanced.length > 0 && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 13 }}>
             <button onClick={() => s.setAdvancedOpen(!s.advancedOpen)}
               style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'none', border: 'none', padding: '6px 0', cursor: 'pointer', color: 'var(--hf-text-secondary)', font: '600 11px var(--hf-font-sans)', letterSpacing: '.12em', textTransform: 'uppercase' }}>
               <span style={{ flex: 1, textAlign: 'left' }}>Advanced</span>
@@ -156,7 +156,7 @@ export default function Controls({ s }: { s: Studio }) {
               <span style={{ transform: s.advancedOpen ? 'rotate(180deg)' : 'rotate(0)', transition: 'transform .18s', display: 'flex' }}><Icon name="chevronDown" size={14} sw={1.6} /></span>
             </button>
             {s.advancedOpen && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 19 }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
                 {advanced.map((p) => <ParamField key={p.name} p={p} value={s.values[p.name]} onChange={(v) => s.setVal(p.name, v)} />)}
               </div>
             )}
@@ -165,7 +165,7 @@ export default function Controls({ s }: { s: Studio }) {
       </div>
 
       {/* generate footer */}
-      <div style={{ flexShrink: 0, borderTop: '1px solid var(--hf-border)', background: 'var(--hf-bg-base)', padding: '14px 24px 16px', display: 'flex', flexDirection: 'column', gap: 11 }}>
+      <div style={{ flexShrink: 0, borderTop: '1px solid var(--hf-border)', background: 'var(--hf-bg-base)', padding: '11px 22px 13px', display: 'flex', flexDirection: 'column', gap: 9 }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: 11.5, color: 'var(--hf-text-tertiary)' }}>
           <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}><Icon name="clock" size={13} sw={2} />{f.est_runtime}</span>
           <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}><Icon name="system" size={13} sw={2} />{f.vram}</span>
