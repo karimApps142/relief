@@ -112,7 +112,7 @@ export default function Controls({ s }: { s: Studio }) {
             <span style={eyebrow}>Input image</span>
             {s.preview ? (
               <div style={{ position: 'relative', borderRadius: 14, overflow: 'hidden', border: '1px solid var(--hf-border)', background: 'var(--hf-surface-inset)', aspectRatio: '16/9' }}>
-                <img src={s.preview} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+                <img src={s.preview} style={{ width: '100%', height: '100%', objectFit: 'contain', display: 'block' }} />
                 <div style={{ position: 'absolute', inset: 0, background: 'var(--hf-grad-scrim)', opacity: 0.5 }} />
                 <div style={{ position: 'absolute', left: 11, bottom: 11, display: 'flex', alignItems: 'center', gap: 6, height: 24, padding: '0 9px', borderRadius: 99, background: 'var(--hf-glass-bg)', backdropFilter: 'blur(18px)', border: '1px solid var(--hf-glass-border)', font: '500 11px var(--hf-font-mono)', color: '#fff' }}>{s.file?.name}</div>
                 <label style={{ position: 'absolute', right: 11, bottom: 11, height: 28, padding: '0 12px', display: 'flex', alignItems: 'center', borderRadius: 99, background: 'var(--hf-glass-bg)', backdropFilter: 'blur(18px)', border: '1px solid var(--hf-glass-border)', color: '#fff', font: '600 12px var(--hf-font-sans)', cursor: 'pointer' }}>

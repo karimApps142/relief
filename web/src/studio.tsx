@@ -24,7 +24,7 @@ export function useStudio() {
   const [files, setFiles] = useState<Record<string, File | null>>({})
   const [previews, setPreviews] = useState<Record<string, string>>({})
   const [advancedOpen, setAdvancedOpen] = useState(false)
-  const [historyOpen, setHistoryOpen] = useState(true)
+  const [historyOpen, setHistoryOpen] = useState(false)
   const [sysOpen, setSysOpen] = useState(false)
 
   const [runState, setRunState] = useState<RunState>('idle')
