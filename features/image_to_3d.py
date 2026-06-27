@@ -8,17 +8,19 @@ for print/CAD), not a relief heightmap.
 WHY workflow-driven: the wrapper's textured pipeline is a large, frequently-updated graph
 (shape → UV unwrap → multiview render → paint → bake → texture inpaint → export) that pulls in
 several custom nodes and a compiled `custom_rasterizer` extension. Hardcoding it would rot. So we
-drive an API-format workflow JSON exported once from ComfyUI (after validating it there — which
-also confirms the custom_rasterizer build), substituting only the input image + seed. Provision
-the nodes/model from the in-app ComfyUI setup panel; comfy_manager clones the wrapper + essentials
-and fetches the shape DiT (paint/delight models auto-download on first run).
+drive an API-format workflow JSON and substitute only the input image + seed.
 
-Setup the workflow once on the box:
+The workflow is LEARNED AUTOMATICALLY: run the wrapper's example once in ComfyUI (which you do
+anyway to validate the custom_rasterizer build) and ComfyUI stores its exact API graph in
+/history — this feature picks the most recent Hy3D run up and caches it to data/hy3d_workflow_api.json,
+so no manual "Save (API Format)" is needed. You can still drop a hand-made JSON there or point
+HY3D_WORKFLOW_API at one to override.
+
+Setup once on the box:
   1. ComfyUI setup panel → Install (clones the wrapper + essentials) → Download (the ~4.9 GB DiT).
   2. Build custom_rasterizer (see the install log) — required for textures.
-  3. In ComfyUI, load custom_nodes/ComfyUI-Hunyuan3DWrapper/example_workflows/hy3d_example_01.json,
-     run it once to confirm a textured GLB comes out, then Save (API Format) to
-     <repo>/data/hy3d_workflow_api.json  (or set HY3D_WORKFLOW_API to its path).
+  3. In ComfyUI, load custom_nodes/ComfyUI-Hunyuan3DWrapper/example_workflows/hy3d_example_01.json
+     and run it once. Then this feature works (it learns that graph from history).
 """
 import os
 import json
@@ -30,19 +32,17 @@ from .base import Feature, ParamSpec
 from ._comfy import ComfyUIClient
 
 _ROOT = Path(__file__).resolve().parent.parent
+_CACHE = _ROOT / "data" / "hy3d_workflow_api.json"          # learned/overridable API workflow
 # API-format workflow the headless run drives. Override with HY3D_WORKFLOW_API.
-_WORKFLOW_CANDIDATES = [
-    os.environ.get("HY3D_WORKFLOW_API"),
-    str(_ROOT / "data" / "hy3d_workflow_api.json"),
-]
+_WORKFLOW_CANDIDATES = [os.environ.get("HY3D_WORKFLOW_API"), str(_CACHE)]
 _SETUP_HINT = (
-    "No Hunyuan3D workflow found. One-time setup on the box:\n"
+    "No Hunyuan3D workflow yet. One-time setup on the box:\n"
     "  1. ComfyUI setup panel → Install (clones the Hunyuan3D wrapper + essentials) → Download (the ~4.9 GB DiT).\n"
     "  2. Build custom_rasterizer for textures (see the install log).\n"
-    "  3. In ComfyUI, load custom_nodes/ComfyUI-Hunyuan3DWrapper/example_workflows/hy3d_example_01.json,\n"
-    "     run it once, then Save (API Format) to:\n"
-    f"     {_ROOT / 'data' / 'hy3d_workflow_api.json'}\n"
-    "     (or set the HY3D_WORKFLOW_API env var to wherever you saved it)."
+    "  3. In ComfyUI (127.0.0.1:8188), load\n"
+    "     custom_nodes/ComfyUI-Hunyuan3DWrapper/example_workflows/hy3d_example_01.json and RUN it once.\n"
+    "Then click Generate again — this feature auto-learns that workflow from ComfyUI's history.\n"
+    "(No manual export needed. To override, drop an API-format graph at data/hy3d_workflow_api.json.)"
 )
 
 
@@ -51,6 +51,39 @@ def _load_workflow():
         if p and Path(p).is_file():
             return json.loads(Path(p).read_text(encoding="utf-8")), p
     return None, None
+
+
+def _learn_workflow_from_history(client):
+    """Auto-discover the API-format workflow from a prior ComfyUI run. When the user runs the
+    wrapper's example once in ComfyUI, its exact API graph is stored in /history; pick the most
+    recent run that contains a Hy3D node, cache it to data/hy3d_workflow_api.json, and return it.
+    (ComfyUI keeps the prompt graph even if the run errored, so a missing-rasterizer run still
+    teaches the workflow.)"""
+    try:
+        hist = client.get_history(max_items=200)
+    except Exception:
+        return None
+    best_num, best_graph = -1.0, None
+    for entry in (hist or {}).values():
+        prompt = entry.get("prompt") if isinstance(entry, dict) else None
+        if not isinstance(prompt, list) or len(prompt) < 3 or not isinstance(prompt[2], dict):
+            continue
+        num, graph = prompt[0], prompt[2]
+        if any(isinstance(nd, dict) and str(nd.get("class_type", "")).startswith("Hy3D")
+               for nd in graph.values()):
+            try:
+                num = float(num)
+            except Exception:
+                num = 0.0
+            if num >= best_num:
+                best_num, best_graph = num, graph
+    if best_graph is not None:
+        try:
+            _CACHE.parent.mkdir(parents=True, exist_ok=True)
+            _CACHE.write_text(json.dumps(best_graph), encoding="utf-8")
+        except Exception:
+            pass
+    return best_graph
 
 
 def _nodes_of(graph, class_type):
@@ -81,12 +114,15 @@ class ImageTo3DFeature(Feature):
 
     def run(self, inputs, params, out_dir):
         out = Path(out_dir)
-        graph, wf_path = _load_workflow()
+        client = ComfyUIClient()
+
+        # 0. find the API workflow: an override/cached file, else learn it from ComfyUI history.
+        graph, _src = _load_workflow()
+        if graph is None:
+            graph = _learn_workflow_from_history(client)
         if graph is None:
             raise RuntimeError(_SETUP_HINT)
         graph = json.loads(json.dumps(graph))             # deep copy so we don't mutate the template
-
-        client = ComfyUIClient()
 
         # 1. upload the photo, point every LoadImage / Hy3DUploadMesh-style image input at it.
         src = Image.open(inputs["image"]).convert("RGB")

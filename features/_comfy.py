@@ -92,6 +92,14 @@ class ComfyUIClient:
         return ComfyUIError(f"ComfyUI not reachable at {self.base} — is it running "
                             f"(ComfyUI/main.py --listen --port {self.port})?")
 
+    def get_history(self, max_items=100):
+        """Recent run history: {prompt_id: {prompt:[num,pid,graph,...], outputs, status}}.
+        The API-format graph of each past run lives at entry['prompt'][2]."""
+        try:
+            return self._get_json("/history", {"max_items": max_items})
+        except urllib.error.URLError:
+            raise self._unreachable()
+
     def upload_image(self, path):
         """Upload an input image to ComfyUI (multipart); return the LoadImage name."""
         # sanitise the filename — it goes raw into a Content-Disposition header.
