@@ -23,11 +23,14 @@ function ArtifactCard({ name, url }: { name: string; url: string }) {
         </div>
       )}
       {kind === 'glb' && (
-        <div style={{ aspectRatio: '4/5', background: 'radial-gradient(120% 90% at 50% 18%, #EDEFF3 0%, #D9DDE4 75%)' }}>
+        // DARK backdrop — the relief is a near-white matte surface, invisible on a light bg.
+        <div style={{ aspectRatio: '4/5', background: 'radial-gradient(130% 100% at 50% 8%, #262a33 0%, #0a0c10 72%)' }}>
           {/* @ts-ignore — model-viewer web component */}
-          <model-viewer src={url} camera-controls auto-rotate camera-orbit="-20deg 72deg 100%"
-            exposure="1.15" shadow-intensity="1" tone-mapping="neutral" interaction-prompt="none"
-            style={{ width: '100%', height: '100%' }} />
+          <model-viewer src={url} camera-controls auto-rotate auto-rotate-delay="0"
+            rotation-per-second="22deg" camera-orbit="-18deg 68deg 100%" field-of-view="30deg"
+            exposure="1.3" shadow-intensity="0.6" shadow-softness="1.2"
+            tone-mapping="neutral" interaction-prompt="none"
+            style={{ width: '100%', height: '100%', backgroundColor: 'transparent' }} />
         </div>
       )}
       {kind === 'mesh' && (
