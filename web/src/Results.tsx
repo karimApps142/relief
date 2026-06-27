@@ -11,7 +11,7 @@ function kindOf(url: string): 'glb' | 'image' | 'mesh' {
   if (/\.(png|jpg|jpeg|webp)$/.test(u)) return 'image'
   return 'mesh'
 }
-const ARTLABEL: Record<string, string> = { heightmap: 'Heightmap', preview3d: '3D preview', stl: 'STL mesh', image: 'Image' }
+const ARTLABEL: Record<string, string> = { heightmap: 'Heightmap', preview3d: '3D preview', stl: 'STL mesh', image: 'Image', depth_16bit: 'Depth (16-bit)', depth_preview: 'Depth preview', normal: 'Normal map' }
 
 function ArtifactCard({ name, url }: { name: string; url: string }) {
   const kind = kindOf(url)
@@ -161,7 +161,7 @@ export default function Results({ s }: { s: Studio }) {
     { k: 'Seed', v: meta.seed != null ? String(meta.seed) : '—' },
     { k: 'Model', v: meta.model || '—' },
   ]
-  const grid = f.id === 'relief' ? 'repeat(2, minmax(0,1fr))' : 'minmax(0, 520px)'
+  const grid = (f.id === 'relief' || f.id === 'depthmap') ? 'repeat(2, minmax(0,1fr))' : 'minmax(0, 520px)'
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 18, animation: 'rs-rise .3s var(--hf-ease-out)' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>

@@ -28,7 +28,17 @@
       "Bash(python3 -m py_compile models.py backends.py pipeline.py features/relief.py app_gradio.py)",
       "Bash(./.venv/bin/python test_features.py)",
       "Bash(echo \"test_features exit=$?\")",
-      "Bash(./.venv/bin/python -c ' *)"
+      "Bash(./.venv/bin/python -c ' *)",
+      "Bash(./.venv/bin/python -c \"import importlib.util as u; print\\({m: bool\\(u.find_spec\\(m\\)\\) for m in ['uvicorn','fastapi','numpy','cv2','PIL','trimesh','scipy']}\\)\")",
+      "Bash(./.venv/bin/python -c \"import server; print\\('OK; routes:', len\\([r for r in server.app.routes if getattr\\(r,'path',''\\).startswith\\('/api'\\)]\\)\\)\")",
+      "Bash(./.venv/bin/python -c \"import system_info, json; print\\(json.dumps\\(system_info.snapshot\\(\\) if hasattr\\(system_info,'snapshot'\\) else {k:getattr\\(system_info,k\\) for k in dir\\(system_info\\) if not k.startswith\\('_'\\)}, default=str\\)[:400]\\)\")",
+      "Bash(./.venv/bin/python -)",
+      "Bash(.venv/bin/python -m uvicorn server:app --host 0.0.0.0 --port 8000)",
+      "Bash(echo \"pid=$!\")",
+      "Bash(curl -sf http://127.0.0.1:8000/api/health)",
+      "Bash(curl -s http://127.0.0.1:8000/api/health)",
+      "Bash(curl -s -o /dev/null -w \"HTTP %{http_code}, %{size_download} bytes, type=%{content_type}\\\\n\" http://127.0.0.1:8000/)",
+      "Bash(python3 -m py_compile relief_core.py)"
     ]
   }
 }
