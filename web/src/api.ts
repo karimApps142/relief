@@ -101,6 +101,7 @@ export type ComfyStatus = {
   url: string
   models: Record<string, boolean>
   relight_models?: Record<string, boolean>
+  hunyuan3d_models?: Record<string, boolean>
   nodes?: Record<string, boolean>
   busy: boolean
   action: string | null
