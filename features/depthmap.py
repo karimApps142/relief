@@ -43,8 +43,8 @@ class DepthMapFeature(Feature):
         ParamSpec("normal_gain", "number", 0.7, "Detail strength", 0.0, 1.5, 0.05, control="slider",
                   depends_on={"param": "normals", "value": True},
                   help="How strongly the normal-derived detail stands out in the depth."),
-        ParamSpec("relief_depth_mm", "number", 8.0, "3D depth", 2, 20, 0.5, control="slider", suffix=" mm",
-                  group="advanced", help="Z height of the interactive 3D preview."),
+        ParamSpec("relief_depth_mm", "number", 5.0, "3D depth", 2, 20, 0.5, control="slider", suffix=" mm",
+                  group="advanced", help="Z height of the interactive 3D preview (lower = shallower, lithophane-like)."),
         ParamSpec("invert", "bool", False, "Invert depth", group="advanced",
                   help="Flip near/far. Default: brighter = nearer/higher."),
     ]
@@ -103,9 +103,10 @@ class DepthMapFeature(Feature):
             Image.fromarray((np.clip(n, 0.0, 1.0) * 255).astype(np.uint8)).save(out / "normal.png")
             arts["normal"] = str(out / "normal.png")
 
-        # 6. interactive 3D preview (GLB) — auto-rendered by the UI's <model-viewer>
+        # 6. interactive 3D preview (GLB) — auto-rendered by the UI's <model-viewer>.
+        #    max_px=448 (vs the relief's 320) keeps more of the fused detail in the preview.
         preview = out / "preview.glb"
-        rc.heightmap_to_preview(height16, z_scale_mm=float(params.get("relief_depth_mm", 8.0)),
-                                pixel_mm=0.1).export(str(preview))
+        rc.heightmap_to_preview(height16, z_scale_mm=float(params.get("relief_depth_mm", 5.0)),
+                                pixel_mm=0.1, max_px=448).export(str(preview))
         arts["preview3d"] = str(preview)
         return arts

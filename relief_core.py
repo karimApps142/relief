@@ -519,8 +519,8 @@ def heightmap_to_preview(height16, z_scale_mm=8.0, pixel_mm=0.1, max_px=320):
     # surface instead of washing out as flat white.
     m.visual = trimesh.visual.TextureVisuals(
         material=trimesh.visual.material.PBRMaterial(
-            name="relief", baseColorFactor=[200, 202, 210, 255],
-            metallicFactor=0.0, roughnessFactor=0.85))
+            name="relief", baseColorFactor=[182, 186, 194, 255],
+            metallicFactor=0.0, roughnessFactor=0.9))
     return m
 
 

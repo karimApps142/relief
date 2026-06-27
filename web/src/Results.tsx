@@ -23,12 +23,13 @@ function ArtifactCard({ name, url }: { name: string; url: string }) {
         </div>
       )}
       {kind === 'glb' && (
-        // DARK backdrop — the relief is a near-white matte surface, invisible on a light bg.
-        <div style={{ aspectRatio: '4/5', background: 'radial-gradient(130% 100% at 50% 8%, #262a33 0%, #0a0c10 72%)' }}>
+        // Soft studio backdrop + matte plaster lighting, so the relief reads as a lit cast
+        // (like a lithophane preview) instead of a flat, blown-out white blob.
+        <div style={{ aspectRatio: '4/5', background: 'linear-gradient(165deg, #eef4fb 0%, #c6d6e8 58%, #a9bdd6 100%)' }}>
           {/* @ts-ignore — model-viewer web component */}
           <model-viewer src={url} camera-controls auto-rotate auto-rotate-delay="0"
-            rotation-per-second="22deg" camera-orbit="-18deg 68deg 100%" field-of-view="30deg"
-            exposure="1.3" shadow-intensity="0.6" shadow-softness="1.2"
+            rotation-per-second="16deg" camera-orbit="-16deg 78deg 108%" field-of-view="27deg"
+            exposure="0.95" shadow-intensity="1.0" shadow-softness="0.85"
             tone-mapping="neutral" interaction-prompt="none"
             style={{ width: '100%', height: '100%', backgroundColor: 'transparent' }} />
         </div>
