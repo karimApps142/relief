@@ -480,6 +480,47 @@ def mesh_to_heightmap(mesh, view="front", resolution=1024):
     return depth[::-1].copy(), mask[::-1].astype(np.float32).copy()   # flip → upright image
 
 
+def clean_generated_mesh(mesh, target_faces=200000, fill=True):
+    """Prepare an AI-GENERATED mesh (Hunyuan3D / TRELLIS / …) for the orthographic relief
+    render. Single-image reconstructions arrive with detached specks, the odd inverted face,
+    small holes, and far more triangles than a height field needs. CPU-only (trimesh+numpy):
+      1. keep the largest connected body (drop floating fragments / inner shells),
+      2. make winding + normals consistent (an inverted face punches a hole/spike in the z-buffer),
+      3. fill the small holes a single view leaves,
+      4. decimate to the pixel budget — sub-pixel triangles add nothing and the rasteriser is O(tris).
+    Returns a trimesh.Trimesh (the input unchanged if it's empty/unsplittable)."""
+    import trimesh
+    if mesh is None or not hasattr(mesh, "faces") or len(mesh.faces) == 0:
+        return mesh
+    try:
+        parts = mesh.split(only_watertight=False)
+        if len(parts) > 1:
+            mesh = max(parts, key=lambda m: len(m.faces))
+    except Exception:
+        pass
+    for fn in ("fix_inversion", "fix_winding", "fix_normals"):
+        try:
+            getattr(trimesh.repair, fn)(mesh)
+        except Exception:
+            pass
+    if fill:
+        try:
+            trimesh.repair.fill_holes(mesh)
+        except Exception:
+            pass
+    if target_faces and len(mesh.faces) > target_faces:
+        try:                                              # trimesh API varies by version
+            mesh = mesh.simplify_quadric_decimation(face_count=int(target_faces))
+        except TypeError:
+            try:
+                mesh = mesh.simplify_quadric_decimation(int(target_faces))
+            except Exception:
+                pass
+        except Exception:
+            pass
+    return mesh
+
+
 # ----- Stage 6: heightmap -> STL -----
 def heightmap_to_surface(height16, z_scale_mm=8.0, pixel_mm=0.1):
     """Open top-surface mesh — fine for CNC (CAM closes the model)."""

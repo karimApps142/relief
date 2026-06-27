@@ -57,6 +57,17 @@ RELIGHT_MODELS = {
     "relight · SD1.5 base (~2 GB)":
         ("Comfy-Org/stable-diffusion-v1-5-archive", "v1-5-pruned-emaonly-fp16.safetensors", "checkpoints"),
 }
+# IMAGE→3D = Hunyuan3D-2.0 shape model, loaded by ComfyUI's NATIVE nodes (ImageOnlyCheckpointLoader
+# from models/checkpoints/) — no custom node, no custom_rasterizer compile. Not in the engine gate,
+# so it never blocks the other features; used only by the Image → Relief (3D) feature.
+# This is the canonical native filename ComfyUI's Hunyuan3D template expects (matches features/
+# image_to_3d._CKPT); the kijai repo serves it under that exact name. The official source is
+# tencent/Hunyuan3D-2 (hunyuan3d-dit-v2-0/model.fp16.safetensors), but its basename collides, so
+# we use the pre-named repackaged mirror. Native node graph per docs.comfy.org/tutorials/3d/hunyuan3D-2 .
+HUNYUAN3D_MODELS = {
+    "image→3D · Hunyuan3D-2.0 DiT fp16 (~4.9 GB)":
+        ("Kijai/Hunyuan3D-2_safetensors", "hunyuan3d-dit-v2-0-fp16.safetensors", "checkpoints"),
+}
 
 LORA_DIR = COMFY_DIR / "models" / "loras"                 # user-supplied custom LoRAs land here
 
@@ -117,6 +128,7 @@ def status():
         "url": COMFY_URL,
         "models": models_status(),
         "relight_models": {label: _path_ok(_dest(sub, p)) for label, (_, p, sub) in RELIGHT_MODELS.items()},
+        "hunyuan3d_models": {label: _path_ok(_dest(sub, p)) for label, (_, p, sub) in HUNYUAN3D_MODELS.items()},
         "nodes": _nodes_status(),
         "busy": _task["running"],
         "action": _task["action"],
@@ -215,7 +227,7 @@ def download_async(labels=None):
 
 
 def _download(labels):
-    all_models = {**MODELS, **RELIGHT_MODELS}              # gate uses MODELS; download grabs both
+    all_models = {**MODELS, **RELIGHT_MODELS, **HUNYUAN3D_MODELS}   # gate uses MODELS; download grabs all
     items = all_models if not labels else {k: all_models[k] for k in labels if k in all_models}
     failures = []
     for label, (repo, path_in_repo, sub) in items.items():

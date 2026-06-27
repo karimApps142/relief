@@ -38,7 +38,8 @@
       "Bash(curl -sf http://127.0.0.1:8000/api/health)",
       "Bash(curl -s http://127.0.0.1:8000/api/health)",
       "Bash(curl -s -o /dev/null -w \"HTTP %{http_code}, %{size_download} bytes, type=%{content_type}\\\\n\" http://127.0.0.1:8000/)",
-      "Bash(python3 -m py_compile relief_core.py)"
+      "Bash(python3 -m py_compile relief_core.py)",
+      "Bash(timeout 20 ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 ad@100.86.189.84 'nvidia-smi --query-gpu=name,memory.total,driver_version --format=csv 2>nul || nvidia-smi')"
     ]
   }
 }

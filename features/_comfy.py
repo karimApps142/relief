@@ -200,6 +200,27 @@ class ComfyUIClient:
             raise self._unreachable()
         raise ComfyUIError("ComfyUI finished but produced no image")
 
+    def _fetch_output_file(self, pid, exts):
+        """Fetch the first saved output file whose name ends in one of `exts`
+        (e.g. a SaveGLB mesh). Scans every output node key-agnostically, since
+        non-image savers list their files under their own ui key ('3d', etc.)."""
+        exts = tuple(e.lower() for e in exts)
+        try:
+            h = self._get_json(f"/history/{pid}")
+            for node in h.get(pid, {}).get("outputs", {}).values():
+                for items in node.values():
+                    if not isinstance(items, list):
+                        continue
+                    for it in items:
+                        if isinstance(it, dict) and isinstance(it.get("filename"), str) \
+                                and it["filename"].lower().endswith(exts):
+                            return self._get_bytes("/view", {
+                                "filename": it["filename"], "subfolder": it.get("subfolder", ""),
+                                "type": it.get("type", "output")})
+        except urllib.error.URLError:
+            raise self._unreachable()
+        raise ComfyUIError(f"ComfyUI finished but produced no {'/'.join(exts)} file")
+
     # --------------------------------------------------------------------- public
     def generate(self, graph, label="", max_wait=600):
         """Queue the graph and return the first output image's PNG bytes, streaming
@@ -218,5 +239,26 @@ class ComfyUIClient:
             else:
                 self._poll_until_done(pid, deadline)
             return self._fetch_output(pid)
+        finally:
+            _clear_progress()
+
+    def generate_file(self, graph, exts=(".glb",), label="", max_wait=900):
+        """Like generate(), but returns the bytes of the first saved FILE output
+        matching `exts` (e.g. a SaveGLB mesh) instead of an image. Image→3D and other
+        mesh-producing graphs save to disk rather than emitting an `images` output."""
+        _reset_progress(label)
+        deadline = time.monotonic() + max_wait
+        try:
+            pid = self._submit(graph)                     # queue EXACTLY once
+            if _HAS_WS:
+                try:
+                    asyncio.run(self._watch_ws(pid, deadline))
+                except ComfyUIError:
+                    raise
+                except Exception:
+                    self._poll_until_done(pid, deadline)   # ws missing/closed/quiet → poll
+            else:
+                self._poll_until_done(pid, deadline)
+            return self._fetch_output_file(pid, exts)
         finally:
             _clear_progress()
