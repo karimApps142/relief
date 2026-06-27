@@ -11,6 +11,7 @@ from .portrait_relief import PortraitReliefFeature
 from .cutout import CutoutFeature
 from .depthmap import DepthMapFeature
 from .face_restore import FaceRestoreFeature
+from .mesh_relief import MeshReliefFeature
 from .text2img import Text2ImgFeature
 from .img2img import Img2ImgFeature
 from .upscale import UpscaleFeature
@@ -28,6 +29,7 @@ register(PortraitReliefFeature())    # Pro pipeline: delight (ComfyUI) → upsca
 register(CutoutFeature())            # local background removal (BiRefNet)
 register(DepthMapFeature())          # local depth + normal map export
 register(FaceRestoreFeature())       # local face restoration (GFPGAN via spandrel+facexlib)
+register(MeshReliefFeature())        # local 3D mesh → orthographic heightmap relief
 register(Text2ImgFeature())          # Krea-2-Turbo GGUF via ComfyUI (:8188)
 register(Img2ImgFeature())           # Krea-2-Turbo img2img via ComfyUI
 register(UpscaleFeature())           # ESRGAN upscale via ComfyUI

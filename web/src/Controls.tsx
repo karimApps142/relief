@@ -130,6 +130,29 @@ export default function Controls({ s }: { s: Studio }) {
           </div>
         )}
 
+        {/* 3D-model input (Mesh → Relief) */}
+        {f.needs_mesh && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <span style={eyebrow}>3D model</span>
+            {s.file ? (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 14px', border: '1px solid var(--hf-border)', borderRadius: 14, background: 'var(--hf-surface-2)' }}>
+                <span style={{ width: 34, height: 34, flexShrink: 0, borderRadius: 9, background: 'var(--hf-fill-medium)', color: 'var(--hf-text-secondary)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Icon name="box" size={18} /></span>
+                <span style={{ flex: 1, minWidth: 0, font: '500 12px var(--hf-font-mono)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.file.name}</span>
+                <label style={{ flexShrink: 0, height: 30, padding: '0 12px', display: 'flex', alignItems: 'center', borderRadius: 9, border: '1px solid var(--hf-border)', background: 'var(--hf-surface-1)', font: '600 12px var(--hf-font-sans)', cursor: 'pointer' }}>
+                  Replace<input type="file" accept=".obj,.stl,.glb,.gltf,.ply,.off,.3mf" style={{ display: 'none' }} onChange={(e) => e.target.files?.[0] && s.onUpload(e.target.files[0])} />
+                </label>
+              </div>
+            ) : (
+              <label style={{ border: '1.5px dashed var(--hf-border-strong)', background: 'var(--hf-surface-1)', borderRadius: 14, aspectRatio: '16/6.5', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 6, cursor: 'pointer', color: 'var(--hf-text-tertiary)' }}>
+                <Icon name="box" size={22} sw={1.7} />
+                <span style={{ fontSize: 13, fontWeight: 500 }}>Drop a 3D model or click to upload</span>
+                <span style={{ fontSize: 11 }}>OBJ · STL · GLB · PLY</span>
+                <input type="file" accept=".obj,.stl,.glb,.gltf,.ply,.off,.3mf" style={{ display: 'none' }} onChange={(e) => e.target.files?.[0] && s.onUpload(e.target.files[0])} />
+              </label>
+            )}
+          </div>
+        )}
+
         {/* basic params */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
           {basic.map((p) => <ParamField key={p.name} p={p} value={s.values[p.name]} onChange={(v) => s.setVal(p.name, v)} />)}
@@ -171,10 +194,10 @@ export default function Controls({ s }: { s: Studio }) {
           <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}><Icon name="system" size={13} sw={2} />{f.vram}</span>
         </div>
         <Button variant="primary" size="lg" block loading={s.running}
-          disabled={s.running || (f.needs_image && !s.file)} onClick={s.generate}>
+          disabled={s.running || ((f.needs_image || f.needs_mesh) && !s.file)} onClick={s.generate}>
           {s.runState === 'submitting' ? 'Submitting…' : s.runState === 'running' ? 'Generating…' : 'Generate'}
         </Button>
-        {f.needs_image && !s.file && <span style={{ fontSize: 11, color: 'var(--hf-text-tertiary)', textAlign: 'center' }}>Upload an image first.</span>}
+        {(f.needs_image || f.needs_mesh) && !s.file && <span style={{ fontSize: 11, color: 'var(--hf-text-tertiary)', textAlign: 'center' }}>Upload a {f.needs_mesh ? '3D model' : 'image'} first.</span>}
       </div>
     </section>
   )

@@ -422,6 +422,64 @@ def tiled_relief_heightmap(depth, mask=None, invert=False, base=0.50, fig_span=0
     return out.astype(np.float32)
 
 
+# ----- MESH -> heightmap (orthographic Z render; the pro 'project a 3D model' path) -----
+def mesh_to_heightmap(mesh, view="front", resolution=1024):
+    """Orthographic depth render of a 3D mesh → a front-surface height field + mask.
+
+    Rotates `view` to face the camera (+Z), then z-buffers the NEAREST surface per pixel
+    with a small numpy triangle rasteriser (headless — no OpenGL). This is how ZBrush
+    'Bas Relief' / Carveco / Aspire turn a 3D model into a carve-able heightmap, and it
+    captures true z-order (ears, nose, profiles) that monocular depth cannot.
+    Returns (depth HxW float32 [near=high], mask HxW float32 in {0,1})."""
+    import trimesh
+    rot = {
+        "front": None,
+        "back":   trimesh.transformations.rotation_matrix(np.pi, [0, 1, 0]),
+        "left":   trimesh.transformations.rotation_matrix(-np.pi / 2, [0, 1, 0]),
+        "right":  trimesh.transformations.rotation_matrix(np.pi / 2, [0, 1, 0]),
+        "top":    trimesh.transformations.rotation_matrix(-np.pi / 2, [1, 0, 0]),
+        "bottom": trimesh.transformations.rotation_matrix(np.pi / 2, [1, 0, 0]),
+    }.get(view)
+    m = mesh.copy()
+    if rot is not None:
+        m.apply_transform(rot)
+    v = np.asarray(m.vertices, np.float64)
+    f = np.asarray(m.faces, np.int64)
+    mn = v.min(0)
+    ex = np.maximum(v.max(0) - mn, 1e-9)
+    scale = (resolution - 1) / max(ex[0], ex[1])
+    W = max(2, int(round(ex[0] * scale)) + 1)
+    H = max(2, int(round(ex[1] * scale)) + 1)
+    px = (v[:, 0] - mn[0]) * scale
+    py = (v[:, 1] - mn[1]) * scale
+    pz = v[:, 2]
+    zbuf = np.full((H, W), -np.inf)
+    tris = np.stack([px[f], py[f], pz[f]], -1)            # (T, 3, 3): rows = [x, y, z]
+    for (x0, y0, z0), (x1, y1, z1), (x2, y2, z2) in tris:
+        lox = max(int(np.floor(min(x0, x1, x2))), 0); hix = min(int(np.ceil(max(x0, x1, x2))), W - 1)
+        loy = max(int(np.floor(min(y0, y1, y2))), 0); hiy = min(int(np.ceil(max(y0, y1, y2))), H - 1)
+        if hix < lox or hiy < loy:
+            continue
+        den = (y1 - y2) * (x0 - x2) + (x2 - x1) * (y0 - y2)
+        if abs(den) < 1e-12:
+            continue
+        gy, gx = np.mgrid[loy:hiy + 1, lox:hix + 1]
+        a = ((y1 - y2) * (gx - x2) + (x2 - x1) * (gy - y2)) / den
+        b = ((y2 - y0) * (gx - x2) + (x0 - x2) * (gy - y2)) / den
+        c = 1.0 - a - b
+        ins = (a >= 0) & (b >= 0) & (c >= 0)
+        if not ins.any():
+            continue
+        z = a * z0 + b * z1 + c * z2
+        sub = zbuf[loy:hiy + 1, lox:hix + 1]              # view into zbuf
+        upd = ins & (z > sub)
+        sub[upd] = z[upd]
+    mask = np.isfinite(zbuf)
+    fill = float(zbuf[mask].min()) if mask.any() else 0.0
+    depth = np.where(mask, zbuf, fill).astype(np.float32)
+    return depth[::-1].copy(), mask[::-1].astype(np.float32).copy()   # flip → upright image
+
+
 # ----- Stage 6: heightmap -> STL -----
 def heightmap_to_surface(height16, z_scale_mm=8.0, pixel_mm=0.1):
     """Open top-surface mesh — fine for CNC (CAM closes the model)."""

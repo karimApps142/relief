@@ -73,6 +73,7 @@ class Feature:
         return {
             "id": self.id, "name": self.name, "description": self.description,
             "inputs": self.inputs, "needs_image": "image" in self.inputs,
+            "needs_mesh": "mesh" in self.inputs,
             "needs_comfy": self.needs_comfy, "engine": self.engine,
             "est_runtime": self.est_runtime, "vram": self.vram,
             "output_kinds": self.output_kinds, "icon": self.icon,
