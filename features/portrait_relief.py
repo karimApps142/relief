@@ -38,7 +38,7 @@ class PortraitReliefFeature(Feature):
     needs_comfy = True
     inputs = ["image"]
     engine = "comfy"
-    icon = "box"
+    icon = "portrait"
     est_runtime = "~1–5 min"
     vram = "~6–10 GB"
     output_kinds = ["Heightmap PNG", "3D preview GLB", "STL mesh"]

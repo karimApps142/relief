@@ -5,14 +5,14 @@ export type Choice = { value: string; label: string }
 export type ParamSpec = {
   name: string
   type: 'number' | 'bool' | 'select' | 'text'
-  control: 'slider' | 'stepper' | 'seg' | 'select' | 'switch' | 'textarea'
+  control: 'slider' | 'stepper' | 'seg' | 'select' | 'switch' | 'textarea' | 'lora'
   default: any
   label: string
   min?: number | null
   max?: number | null
   step?: number | null
   choices?: Array<Choice | string> | null
-  group: 'basic' | 'advanced'
+  group: 'basic' | 'advanced' | 'hidden'
   help?: string
   suffix?: string
   placeholder?: string
@@ -130,6 +130,20 @@ export const comfyInstall = () => post('/api/comfy/install')
 export const comfyDownload = () => post('/api/comfy/download')
 export const comfyStart = () => post('/api/comfy/start')
 export const comfyRestart = () => post('/api/comfy/restart')
+export const comfyInterrupt = () => post('/api/comfy/interrupt')
+
+// Custom LoRAs: list the drop-in files, and upload a new .safetensors (drag-drop).
+export const getLoras = (): Promise<string[]> =>
+  get('/api/loras').then((d) => d.loras || []).catch(() => [])
+
+export async function uploadLora(file: File): Promise<{ saved: string; loras: string[] }> {
+  const fd = new FormData()
+  fd.append('file', file)
+  const r = await fetch('/api/loras', { method: 'POST', body: fd })
+  const data = await r.json().catch(() => ({}))
+  if (!r.ok || data.error || data.detail) throw new Error(data.error || data.detail || `upload failed (${r.status})`)
+  return data
+}
 
 export async function runFeature(
   id: string,
@@ -153,6 +167,17 @@ export function choiceList(choices?: Array<Choice | string> | null): Choice[] {
 export function choiceLabel(choices: Array<Choice | string> | null | undefined, value: any): string {
   const c = choiceList(choices).find((x) => x.value === value)
   return c ? c.label : String(value)
+}
+
+// human-friendly duration: 3.4s · 42s · 1m 13s · 1h 05m
+export function fmtDur(sec: number): string {
+  sec = Math.max(0, sec || 0)
+  if (sec < 10) return `${sec.toFixed(1)}s`
+  if (sec < 60) return `${Math.round(sec)}s`
+  const m = Math.floor(sec / 60)
+  if (m < 60) return `${m}m ${String(Math.round(sec % 60)).padStart(2, '0')}s`
+  const h = Math.floor(m / 60)
+  return `${h}h ${String(m % 60).padStart(2, '0')}m`
 }
 
 export function relativeTime(epochSec: number): string {

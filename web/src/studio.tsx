@@ -5,7 +5,8 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import {
   FeatureSchema, RunRecord, Progress, SystemInfo, ModelsStatus, ComfyStatus,
   getFeatures, getProgress, getSystem, getJobs, getModelsStatus, modelsDownload,
-  getComfyStatus, comfyInstall, comfyDownload, comfyStart, comfyRestart, runFeature,
+  getComfyStatus, comfyInstall, comfyDownload, comfyStart, comfyRestart, comfyInterrupt,
+  runFeature, fmtDur,
 } from './api'
 
 export type RunState = 'idle' | 'submitting' | 'running' | 'result' | 'error'
@@ -113,7 +114,7 @@ export function useStudio() {
       const rec = await runFeature(f.id, files[f.id] || null, values[f.id] || {}, ac.signal)
       if (runId.current !== myId) return        // cancelled/superseded → drop this result
       setRecord(rec); setRunState('result')
-      addToast('success', `${f.name} complete · ${rec.meta.duration_s.toFixed(1)} s`)
+      addToast('success', `${f.name} complete · ${fmtDur(rec.meta.duration_s)}`)
       refreshJobs(); refreshSystem()
     } catch (e: any) {
       if (runId.current !== myId) return         // cancelled → ignore (cancel already reset)
@@ -124,8 +125,9 @@ export function useStudio() {
   const cancel = useCallback(() => {
     runId.current++                              // invalidate the in-flight run
     abortRef.current?.abort()
+    comfyInterrupt().catch(() => {})             // stop the GPU work if it's a ComfyUI job
     setRunState('idle'); setError(''); setProgress(null)
-    addToast('info', 'Run cancelled (the backend may still finish).')
+    addToast('info', 'Run cancelled.')
   }, [addToast])
 
   // ---- actions ----

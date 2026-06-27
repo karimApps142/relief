@@ -16,7 +16,7 @@ class CutoutFeature(Feature):
     description = "Remove the background (BiRefNet) — transparent, black, or white backdrop + the mask."
     inputs = ["image"]
     engine = "local"
-    icon = "image"
+    icon = "scissors"
     est_runtime = "~2–10 s"
     vram = "~1 GB"
     output_kinds = ["Cutout PNG", "Mask PNG"]

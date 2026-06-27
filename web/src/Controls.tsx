@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import type { Studio } from './studio'
 import type { ParamSpec } from './api'
-import { choiceList, choiceLabel } from './api'
+import { choiceList, choiceLabel, getLoras, uploadLora } from './api'
 import { Button, Switch, Slider, Segmented, Select } from './ds'
 import { Icon, featureIcon } from './icons'
 
@@ -63,6 +63,73 @@ function ParamField({ p, value, onChange }: { p: ParamSpec; value: any; onChange
       {p.help && (
         <span style={{ font: '400 11.5px var(--hf-font-sans)', color: 'var(--hf-text-tertiary)', lineHeight: 1.4 }}>{p.help}</span>
       )}
+    </div>
+  )
+}
+
+const loraLabel = (name: string) => name.replace(/\.safetensors$/i, '')
+
+// Self-contained LoRA control: a dropdown of drop-in LoRAs, a drag-drop/click uploader
+// (POST /api/loras), and a strength slider shown once a LoRA is picked. Reads/writes the
+// feature's `lora` + `lora_strength` params directly, so no per-feature wiring is needed.
+function LoraField({ s }: { s: Studio }) {
+  const [loras, setLoras] = useState<string[]>([])
+  const [busy, setBusy] = useState(false)
+  const [drag, setDrag] = useState(false)
+  const [err, setErr] = useState('')
+  const value: string = s.values.lora ?? 'none'
+  const strength = Number(s.values.lora_strength ?? 0.8)
+
+  useEffect(() => { getLoras().then(setLoras) }, [])
+
+  const options = [{ value: 'none', label: 'None (base model)' },
+    ...loras.map((l) => ({ value: l, label: loraLabel(l) }))]
+
+  const handleFile = async (file?: File | null) => {
+    if (!file) return
+    if (!/\.safetensors$/i.test(file.name)) { setErr('LoRA must be a .safetensors file'); return }
+    setErr(''); setBusy(true)
+    try {
+      const { saved, loras: list } = await uploadLora(file)
+      setLoras(list); s.setVal('lora', saved)
+      s.addToast('success', `LoRA added · ${loraLabel(saved)}`)
+    } catch (e: any) {
+      setErr(e.message || 'upload failed'); s.addToast('danger', 'LoRA upload failed')
+    } finally { setBusy(false) }
+  }
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 9 }}>
+      <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 10 }}>
+        <span style={{ font: '600 13px var(--hf-font-sans)', color: 'var(--hf-text-secondary)' }}>LoRA</span>
+        {value !== 'none' && (
+          <span style={{ font: '500 12px var(--hf-font-mono)', color: 'var(--hf-text-primary)', background: 'var(--hf-fill-soft)', padding: '2px 8px', borderRadius: 7 }}>{strength.toFixed(2)}×</span>
+        )}
+      </div>
+      <Select options={options} value={value} onChange={(v) => s.setVal('lora', v)} />
+
+      {/* drag-drop / click to add a .safetensors LoRA — no manual file copying */}
+      <label
+        onDragOver={(e) => { e.preventDefault(); setDrag(true) }}
+        onDragLeave={() => setDrag(false)}
+        onDrop={(e) => { e.preventDefault(); setDrag(false); handleFile(e.dataTransfer.files?.[0]) }}
+        style={{ border: `1.5px dashed ${drag ? 'var(--hf-action)' : 'var(--hf-border-strong)'}`, background: drag ? 'var(--hf-fill-soft)' : 'var(--hf-surface-1)', borderRadius: 12, padding: '11px 14px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, cursor: busy ? 'wait' : 'pointer', color: 'var(--hf-text-tertiary)' }}>
+        <Icon name={busy ? 'clock' : 'upload'} size={16} sw={1.7} />
+        <span style={{ fontSize: 12.5, fontWeight: 500 }}>{busy ? 'Uploading…' : 'Drop a .safetensors LoRA or click to add'}</span>
+        <input type="file" accept=".safetensors" style={{ display: 'none' }} disabled={busy}
+          onChange={(e) => handleFile(e.target.files?.[0])} />
+      </label>
+      {err && <span style={{ fontSize: 11.5, color: 'var(--hf-danger)' }}>{err}</span>}
+
+      {/* strength — only meaningful once a LoRA is chosen */}
+      {value !== 'none' && (
+        <div style={{ padding: '2px 0 0' }}>
+          <Slider value={strength} min={0} max={1.5} step={0.05} onChange={(v) => s.setVal('lora_strength', v)} />
+        </div>
+      )}
+      <span style={{ font: '400 11.5px var(--hf-font-sans)', color: 'var(--hf-text-tertiary)', lineHeight: 1.4 }}>
+        Custom Krea-2 LoRA, applied to the diffusion model. Added files live in ComfyUI/models/loras.
+      </span>
     </div>
   )
 }
@@ -155,7 +222,9 @@ export default function Controls({ s }: { s: Studio }) {
 
         {/* basic params */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-          {basic.map((p) => <ParamField key={p.name} p={p} value={s.values[p.name]} onChange={(v) => s.setVal(p.name, v)} />)}
+          {basic.map((p) => p.control === 'lora'
+            ? <LoraField key={p.name} s={s} />
+            : <ParamField key={p.name} p={p} value={s.values[p.name]} onChange={(v) => s.setVal(p.name, v)} />)}
         </div>
 
         {/* final STL size (relief) */}
@@ -180,7 +249,9 @@ export default function Controls({ s }: { s: Studio }) {
             </button>
             {s.advancedOpen && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-                {advanced.map((p) => <ParamField key={p.name} p={p} value={s.values[p.name]} onChange={(v) => s.setVal(p.name, v)} />)}
+                {advanced.map((p) => p.control === 'lora'
+                  ? <LoraField key={p.name} s={s} />
+                  : <ParamField key={p.name} p={p} value={s.values[p.name]} onChange={(v) => s.setVal(p.name, v)} />)}
               </div>
             )}
           </div>
@@ -193,11 +264,17 @@ export default function Controls({ s }: { s: Studio }) {
           <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}><Icon name="clock" size={13} sw={2} />{f.est_runtime}</span>
           <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}><Icon name="system" size={13} sw={2} />{f.vram}</span>
         </div>
-        <Button variant="primary" size="lg" block loading={s.running}
-          disabled={s.running || ((f.needs_image || f.needs_mesh) && !s.file)} onClick={s.generate}>
-          {s.runState === 'submitting' ? 'Submitting…' : s.runState === 'running' ? 'Generating…' : 'Generate'}
-        </Button>
-        {(f.needs_image || f.needs_mesh) && !s.file && <span style={{ fontSize: 11, color: 'var(--hf-text-tertiary)', textAlign: 'center' }}>Upload a {f.needs_mesh ? '3D model' : 'image'} first.</span>}
+        {s.running ? (
+          <Button variant="secondary" size="lg" block onClick={s.cancel}>
+            <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <Icon name="x" size={15} sw={2.4} />Cancel{s.runState === 'submitting' ? ' (submitting…)' : ''}
+            </span>
+          </Button>
+        ) : (
+          <Button variant="primary" size="lg" block
+            disabled={(f.needs_image || f.needs_mesh) && !s.file} onClick={s.generate}>Generate</Button>
+        )}
+        {!s.running && (f.needs_image || f.needs_mesh) && !s.file && <span style={{ fontSize: 11, color: 'var(--hf-text-tertiary)', textAlign: 'center' }}>Upload a {f.needs_mesh ? '3D model' : 'image'} first.</span>}
       </div>
     </section>
   )

@@ -19,7 +19,7 @@ class FaceRestoreFeature(Feature):
     description = "Restore/enhance faces (GFPGAN) — crisper eyes, skin, hair. Great before relief."
     inputs = ["image"]
     engine = "local"
-    icon = "image"
+    icon = "face"
     est_runtime = "~3–15 s"
     vram = "~2 GB"
     output_kinds = ["Restored image"]

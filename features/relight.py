@@ -57,7 +57,7 @@ class RelightFeature(Feature):
     needs_comfy = True
     inputs = ["image"]
     engine = "comfy"
-    icon = "image"
+    icon = "sun"
     est_runtime = "~10–30 s"
     vram = "~4–6 GB"
     output_kinds = ["Relit image"]

@@ -18,7 +18,7 @@ class DepthMapFeature(Feature):
     description = "Export the raw depth map (16-bit, carve-ready) + a surface-normal map."
     inputs = ["image"]
     engine = "local"
-    icon = "box"
+    icon = "layers"
     est_runtime = "~5 s – 2 min"
     vram = "~2–4 GB"
     output_kinds = ["Depth 16-bit PNG", "Preview", "Normal PNG"]

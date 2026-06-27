@@ -86,11 +86,40 @@ def comfy_restart():
     return {"started": comfy_manager.restart_async(), **comfy_manager.status()}
 
 
+@app.post("/api/comfy/interrupt")
+def comfy_interrupt():
+    """Cancel the in-flight ComfyUI generation (stops the GPU work)."""
+    return comfy_manager.interrupt()
+
+
 @app.get("/api/comfy/progress")
 def comfy_progress():
     """Live generation progress (sampler steps) for the in-flight ComfyUI job."""
     from features._comfy import get_progress
     return get_progress()
+
+
+# ---- Custom LoRAs: list / drag-drop upload / remove (drop-in, no restart) ----
+@app.get("/api/loras")
+def loras_list():
+    """Custom LoRA files available to text2img/img2img (ComfyUI/models/loras/*.safetensors)."""
+    return {"loras": comfy_manager.list_loras()}
+
+
+@app.post("/api/loras")
+async def loras_upload(file: UploadFile = File(...)):
+    """Save an uploaded .safetensors LoRA so the next Generate can use it (no restart)."""
+    try:
+        saved = comfy_manager.save_lora(file.filename, await file.read())
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    return {"saved": saved, "loras": comfy_manager.list_loras()}
+
+
+@app.delete("/api/loras/{name}")
+def loras_delete(name: str):
+    comfy_manager.delete_lora(name)
+    return {"loras": comfy_manager.list_loras()}
 
 
 @app.get("/api/progress")

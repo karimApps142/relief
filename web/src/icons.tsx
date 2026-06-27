@@ -21,6 +21,11 @@ const STROKE: Record<string, string[]> = {
   sparkle: ['m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3z'],
   image: ['M5 21h14a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2z', 'M9 11a2 2 0 1 0 0-4 2 2 0 0 0 0 4z', 'm21 15-3.1-3.1a2 2 0 0 0-2.8 0L6 21'],
   mesh: ['M12 2 2 7l10 5 10-5z', 'm2 17 10 5 10-5M2 12l10 5 10-5'],
+  portrait: ['M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2', 'M12 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8z'],
+  scissors: ['M6 9a3 3 0 1 0 0-6 3 3 0 0 0 0 6z', 'M6 21a3 3 0 1 0 0-6 3 3 0 0 0 0 6z', 'M20 4 8.12 15.88', 'M14.47 14.48 20 20', 'M8.12 8.12 12 12'],
+  layers: ['m12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.84z', 'm22 17.65-9.17 4.16a2 2 0 0 1-1.66 0L2 17.65', 'm22 12.65-9.17 4.16a2 2 0 0 1-1.66 0L2 12.65'],
+  face: ['M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20z', 'M8 14s1.5 2 4 2 4-2 4-2', 'M9 9h.01', 'M15 9h.01'],
+  sun: ['M12 17a5 5 0 1 0 0-10 5 5 0 0 0 0 10z', 'M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42'],
 }
 const FILL: Record<string, string[]> = {
   logo: ['M12 2 9.5 9.5 2 12l7.5 2.5L12 22l2.5-7.5L22 12l-7.5-2.5z'],
@@ -44,5 +49,6 @@ export function Icon({ name, size = 20, sw = 1.9 }: { name: string; size?: numbe
   )
 }
 
-// feature.icon ('box'|'text'|'image'|'upscale') → icon name
-export const featureIcon = (icon: string) => FEATURE[icon] || 'cube'
+// feature.icon → STROKE icon name (legacy aliases via FEATURE; otherwise the icon name
+// is used directly, e.g. 'portrait' | 'scissors' | 'layers' | 'face' | 'sun' | 'mesh').
+export const featureIcon = (icon: string) => FEATURE[icon] || (icon in STROKE ? icon : 'cube')

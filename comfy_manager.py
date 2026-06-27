@@ -58,6 +58,8 @@ RELIGHT_MODELS = {
         ("Comfy-Org/stable-diffusion-v1-5-archive", "v1-5-pruned-emaonly-fp16.safetensors", "checkpoints"),
 }
 
+LORA_DIR = COMFY_DIR / "models" / "loras"                 # user-supplied custom LoRAs land here
+
 _proc = None                                              # the launched ComfyUI process
 _lock = threading.Lock()
 _task = {"action": None, "running": False, "log": [], "error": None, "done": False}
@@ -266,6 +268,47 @@ def _http_download(url, target, label):
     os.replace(tmp, target)                               # atomic; no partial/broken target
 
 
+# ------------------------------------------------------------------------------ loras
+# Custom LoRAs are *drop-in*: the user adds a .safetensors via the UI (POST /api/loras)
+# or by copying it into ComfyUI/models/loras/. ComfyUI re-scans that folder when a graph
+# is submitted, so a freshly-added file is usable on the next Generate — no restart.
+def list_loras():
+    """Sorted names of usable LoRA files in models/loras/ (empty if the dir is absent)."""
+    try:
+        return sorted(p.name for p in LORA_DIR.glob("*.safetensors") if _path_ok(p))
+    except OSError:
+        return []
+
+
+def _safe_lora_name(filename):
+    """Basename only (no path traversal), must be a .safetensors. Raises ValueError."""
+    name = os.path.basename(filename or "").replace("\\", "").replace("\r", "").replace("\n", "").strip()
+    name = name.replace("/", "_")
+    if not name.lower().endswith(".safetensors"):
+        raise ValueError("LoRA must be a .safetensors file")
+    return name
+
+
+def save_lora(filename, data):
+    """Write an uploaded LoRA into models/loras/ (atomic via .part). Returns the saved name."""
+    name = _safe_lora_name(filename)
+    LORA_DIR.mkdir(parents=True, exist_ok=True)
+    target = LORA_DIR / name
+    tmp = target.with_name(target.name + ".part")
+    tmp.write_bytes(data)
+    os.replace(tmp, target)
+    _log(f"✓ LoRA added -> {target}")
+    return name
+
+
+def delete_lora(name):
+    """Remove a LoRA file by name (basename-guarded). Best-effort."""
+    try:
+        (LORA_DIR / os.path.basename(name)).unlink()
+    except OSError:
+        pass
+
+
 # ----------------------------------------------------------------------------- launch
 def _pump(proc):
     """Stream ComfyUI's stdout/stderr into our task log (and comfy.log) so boot errors
@@ -352,6 +395,17 @@ def restart_async():
             _log(f"ERROR: {e}"); _end(str(e))
     threading.Thread(target=_r, daemon=True).start()
     return True
+
+
+def interrupt():
+    """Interrupt the in-flight ComfyUI execution (POST /interrupt) so Cancel actually
+    stops the GPU work. Best-effort; harmless if nothing is running."""
+    try:
+        req = urllib.request.Request(f"http://{COMFY_URL}/interrupt", data=b"", method="POST")
+        urllib.request.urlopen(req, timeout=3)
+        return {"ok": True}
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
 
 
 def ensure_running():

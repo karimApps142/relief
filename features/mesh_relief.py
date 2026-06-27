@@ -18,7 +18,7 @@ class MeshReliefFeature(Feature):
     description = "Project a 3D model (OBJ/STL/GLB/PLY) to a carve-ready relief heightmap + STL."
     inputs = ["mesh"]
     engine = "local"
-    icon = "box"
+    icon = "mesh"
     est_runtime = "~5–60 s"
     vram = "CPU only"
     output_kinds = ["Heightmap PNG", "3D preview GLB", "STL mesh"]

@@ -1,6 +1,7 @@
 import type { Studio } from './studio'
 import { Button } from './ds'
 import { Icon } from './icons'
+import { fmtDur } from './api'
 
 const eyebrow: React.CSSProperties = { font: '600 11px var(--hf-font-sans)', letterSpacing: '.12em', textTransform: 'uppercase', color: 'var(--hf-text-tertiary)' }
 
@@ -77,14 +78,14 @@ export default function Results({ s }: { s: Studio }) {
     const percent = isComfy ? Math.round((((p?.value || 0) / (p?.max || 8)) * 100)) : (p?.percent ?? 0)
     const phaseLabel = phases[idx] || p?.node || (s.runState === 'submitting' ? 'Submitting' : 'Preparing…')
     const stats = isComfy
-      ? [{ k: 'Steps', v: `${p?.value || 0} / ${p?.max || 8}` }, { k: 'Node', v: p?.node || '—' }, { k: 'Elapsed', v: `${s.elapsed.toFixed(1)}s` }]
-      : [{ k: 'Phase', v: phaseLabel }, { k: 'Tiles', v: String(p?.tiles_total ?? '—') }, { k: 'Elapsed', v: `${s.elapsed.toFixed(1)}s` }]
+      ? [{ k: 'Steps', v: `${p?.value || 0} / ${p?.max || 8}` }, { k: 'Node', v: p?.node || '—' }, { k: 'Elapsed', v: fmtDur(s.elapsed) }]
+      : [{ k: 'Phase', v: phaseLabel }, { k: 'Tiles', v: String(p?.tiles_total ?? '—') }, { k: 'Elapsed', v: fmtDur(s.elapsed) }]
     return (
       <div style={{ maxWidth: 540, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 24, paddingTop: 14, animation: 'rs-rise .3s var(--hf-ease-out)' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <span style={{ width: 8, height: 8, borderRadius: 99, background: 'var(--hf-live)', animation: 'rs-pulse 1.6s var(--hf-ease-out) infinite' }} />
           <strong style={{ fontSize: 15 }}>{phaseLabel}</strong>
-          <span style={{ marginLeft: 'auto', font: '500 12px var(--hf-font-mono)', color: 'var(--hf-text-secondary)' }}>{s.elapsed.toFixed(1)}s</span>
+          <span style={{ marginLeft: 'auto', font: '500 12px var(--hf-font-mono)', color: 'var(--hf-text-secondary)' }}>{fmtDur(s.elapsed)}</span>
         </div>
 
         {phases.length > 0 && (
@@ -128,7 +129,7 @@ export default function Results({ s }: { s: Studio }) {
 
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
           <span style={{ font: '400 11.5px var(--hf-font-mono)', color: 'var(--hf-text-tertiary)' }}>{f.id} · {p?.engine || f.engine}</span>
-          <button onClick={s.cancel} style={{ height: 34, padding: '0 16px', borderRadius: 10, border: '1px solid var(--hf-border-strong)', background: 'transparent', color: 'var(--hf-text-primary)', font: '600 13px var(--hf-font-sans)', cursor: 'pointer' }}>Cancel</button>
+          <button onClick={s.cancel} style={{ height: 34, padding: '0 14px', borderRadius: 10, border: '1px solid var(--hf-danger)', background: 'var(--hf-danger-dim)', color: 'var(--hf-danger)', font: '600 13px var(--hf-font-sans)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 7 }}><Icon name="x" size={14} sw={2.4} />Cancel</button>
         </div>
       </div>
     )
@@ -151,7 +152,7 @@ export default function Results({ s }: { s: Studio }) {
   const arts = Object.entries(rec.artifacts)
   const meta = rec.meta
   const metaRows = [
-    { k: 'Duration', v: `${meta.duration_s.toFixed(1)} s` },
+    { k: 'Duration', v: fmtDur(meta.duration_s) },
     { k: 'Dimensions', v: meta.dimensions || '—' },
     { k: 'File size', v: meta.file_size || '—' },
     { k: 'Seed', v: meta.seed != null ? String(meta.seed) : '—' },
@@ -162,7 +163,7 @@ export default function Results({ s }: { s: Studio }) {
     <div style={{ display: 'flex', flexDirection: 'column', gap: 18, animation: 'rs-rise .3s var(--hf-ease-out)' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
         <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, height: 24, padding: '0 10px', borderRadius: 99, background: 'var(--hf-success-dim)', color: 'var(--hf-success)', font: '600 11px var(--hf-font-sans)' }}><Icon name="check" size={12} sw={3} />Complete</span>
-        <span style={{ font: '500 12px var(--hf-font-mono)', color: 'var(--hf-text-tertiary)' }}>took {meta.duration_s.toFixed(1)} s</span>
+        <span style={{ font: '500 12px var(--hf-font-mono)', color: 'var(--hf-text-tertiary)' }}>took {fmtDur(meta.duration_s)}</span>
         <div style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>
           <button onClick={s.generate} style={{ height: 34, padding: '0 14px', borderRadius: 10, border: '1px solid var(--hf-border)', background: 'var(--hf-surface-1)', color: 'var(--hf-text-primary)', font: '600 13px var(--hf-font-sans)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 7 }}><Icon name="rerun" size={15} />Re-run</button>
         </div>
