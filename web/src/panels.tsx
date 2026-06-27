@@ -47,25 +47,25 @@ export function ComfyWizard({ s }: { s: Studio }) {
     <div style={{ flex: 1, minHeight: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--hf-text-tertiary)', fontSize: 13 }}>Checking the image engine…</div>
   )
   // feature-aware requirements: relight/portrait need the IC-Light node + relight models;
-  // image3d (Hunyuan3D) uses ComfyUI's NATIVE nodes — no custom node — just its checkpoint;
-  // the rest (text2img/img2img/upscale) need the GGUF node + the Krea core.
+  // image3d (Image → 3D) needs the Hunyuan3D wrapper node + its shape DiT; the rest
+  // (text2img/img2img/upscale) need the GGUF node + the Krea core.
   const isRelight = f.id === 'relight' || f.id === 'portrait'
   const isImage3d = f.id === 'image3d'
   const models = isRelight ? Object.entries(c.relight_models || {})
     : isImage3d ? Object.entries(c.hunyuan3d_models || {})
     : Object.entries(c.models)
   const allM = models.length > 0 && models.every(([, b]) => b)
-  const nodeKey = isRelight ? 'iclight' : isImage3d ? null : 'gguf'
-  const nodeOk = nodeKey ? !!(c.nodes || {})[nodeKey] : true   // image3d: native nodes, none required
+  const nodeKey = isRelight ? 'iclight' : isImage3d ? 'hy3dwrap' : 'gguf'
+  const nodeOk = !!(c.nodes || {})[nodeKey]
   const installedOk = c.installed && nodeOk
   const addNode = c.installed && !nodeOk         // engine there, just missing this tool's node
   const steps = [
-    { key: 'install', label: isRelight ? 'Install ComfyUI + IC-Light' : 'Install ComfyUI',
+    { key: 'install', label: isRelight ? 'Install ComfyUI + IC-Light' : isImage3d ? 'Install ComfyUI + Hunyuan3D' : 'Install ComfyUI',
       desc: addNode ? 'Add the required node and reload the engine.' : 'Clone the engine and Python dependencies.',
       done: installedOk, available: !installedOk, btn: addNode ? 'Add node' : 'Install', showModels: false },
     { key: 'download', label: 'Download models',
       desc: isRelight ? 'Fetch the relight models (~3.7 GB).'
-        : isImage3d ? 'Fetch the Hunyuan3D model (~4.9 GB).'
+        : isImage3d ? 'Fetch the Hunyuan3D shape model (~4.9 GB). Paint models auto-download on first run.'
         : 'Fetch the 4 model files (~11.7 GB total).',
       done: allM, available: c.installed && !allM, btn: 'Download', showModels: true },
     c.running

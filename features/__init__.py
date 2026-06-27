@@ -12,7 +12,7 @@ from .cutout import CutoutFeature
 from .depthmap import DepthMapFeature
 from .face_restore import FaceRestoreFeature
 from .mesh_relief import MeshReliefFeature
-from .image_to_3d import ImageTo3DReliefFeature
+from .image_to_3d import ImageTo3DFeature
 from .text2img import Text2ImgFeature
 from .img2img import Img2ImgFeature
 from .upscale import UpscaleFeature
@@ -31,7 +31,7 @@ register(CutoutFeature())            # local background removal (BiRefNet)
 register(DepthMapFeature())          # local depth + normal map export
 register(FaceRestoreFeature())       # local face restoration (GFPGAN via spandrel+facexlib)
 register(MeshReliefFeature())        # local 3D mesh → orthographic heightmap relief
-register(ImageTo3DReliefFeature())   # image → Hunyuan3D mesh (ComfyUI) → relief (local)
+register(ImageTo3DFeature())         # image → textured 3D model (Hunyuan3D wrapper via ComfyUI)
 register(Text2ImgFeature())          # Krea-2-Turbo GGUF via ComfyUI (:8188)
 register(Img2ImgFeature())           # Krea-2-Turbo img2img via ComfyUI
 register(UpscaleFeature())           # ESRGAN upscale via ComfyUI

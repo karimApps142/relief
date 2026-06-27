@@ -35,6 +35,10 @@ _HOST, _PORT = (COMFY_URL.split(":") + ["8188"])[:2]
 COMFY_GIT = "https://github.com/comfyanonymous/ComfyUI"
 GGUF_GIT = "https://github.com/city96/ComfyUI-GGUF"
 ICLIGHT_GIT = "https://github.com/kijai/ComfyUI-IC-Light"
+# Image → 3D (textured): the kijai Hunyuan3D wrapper (shape + paint) + cubiq essentials
+# (the wrapper's example workflow uses ImageResize+ / background-removal nodes from it).
+HY3DWRAP_GIT = "https://github.com/kijai/ComfyUI-Hunyuan3DWrapper"
+ESSENTIALS_GIT = "https://github.com/cubiq/ComfyUI_essentials"
 
 # label -> (hf_repo, path_within_repo, dest_subdir_under_ComfyUI/models)
 # path_within_repo may contain a subfolder; only the basename lands in dest.
@@ -57,16 +61,14 @@ RELIGHT_MODELS = {
     "relight · SD1.5 base (~2 GB)":
         ("Comfy-Org/stable-diffusion-v1-5-archive", "v1-5-pruned-emaonly-fp16.safetensors", "checkpoints"),
 }
-# IMAGE→3D = Hunyuan3D-2.0 shape model, loaded by ComfyUI's NATIVE nodes (ImageOnlyCheckpointLoader
-# from models/checkpoints/) — no custom node, no custom_rasterizer compile. Not in the engine gate,
-# so it never blocks the other features; used only by the Image → Relief (3D) feature.
-# This is the canonical native filename ComfyUI's Hunyuan3D template expects (matches features/
-# image_to_3d._CKPT); the kijai repo serves it under that exact name. The official source is
-# tencent/Hunyuan3D-2 (hunyuan3d-dit-v2-0/model.fp16.safetensors), but its basename collides, so
-# we use the pre-named repackaged mirror. Native node graph per docs.comfy.org/tutorials/3d/hunyuan3D-2 .
+# IMAGE→3D = Hunyuan3D-2.0 shape DiT for the kijai Hunyuan3DWrapper's Hy3DModelLoader, which
+# lists models/diffusion_models/ (recursively). The wrapper's example workflow references it as
+# 'hy3dgen\hunyuan3d-dit-v2-0-fp16.safetensors', so we place it in diffusion_models/hy3dgen/.
+# The paint + delight models are diffusers-based and AUTO-DOWNLOAD on first run via the wrapper's
+# DownloadAndLoad nodes — only this shape DiT needs explicit provisioning. Not in the engine gate.
 HUNYUAN3D_MODELS = {
     "image→3D · Hunyuan3D-2.0 DiT fp16 (~4.9 GB)":
-        ("Kijai/Hunyuan3D-2_safetensors", "hunyuan3d-dit-v2-0-fp16.safetensors", "checkpoints"),
+        ("Kijai/Hunyuan3D-2_safetensors", "hunyuan3d-dit-v2-0-fp16.safetensors", "diffusion_models/hy3dgen"),
 }
 
 LORA_DIR = COMFY_DIR / "models" / "loras"                 # user-supplied custom LoRAs land here
@@ -116,7 +118,9 @@ def models_status():
 def _nodes_status():
     cn = COMFY_DIR / "custom_nodes"
     return {"gguf": (cn / "ComfyUI-GGUF").exists(),
-            "iclight": (cn / "ComfyUI-IC-Light").exists()}
+            "iclight": (cn / "ComfyUI-IC-Light").exists(),
+            "hy3dwrap": (cn / "ComfyUI-Hunyuan3DWrapper").exists(),
+            "essentials": (cn / "ComfyUI_essentials").exists()}
 
 
 def status():
@@ -189,6 +193,25 @@ def _install():
             _run(["git", "clone", "--depth", "1", ICLIGHT_GIT, str(iclight)])
             if (iclight / "requirements.txt").exists():
                 _run([py, "-m", "pip", "install", "-r", str(iclight / "requirements.txt")])
+        # Image → 3D (textured): kijai Hunyuan3D wrapper + cubiq essentials (image-prep nodes
+        # its example workflow uses). The wrapper's requirements add trimesh/xatlas/pymeshlab/etc.
+        hy3d = COMFY_DIR / "custom_nodes" / "ComfyUI-Hunyuan3DWrapper"
+        if not hy3d.exists():
+            _log("cloning ComfyUI-Hunyuan3DWrapper (image→3D, textured)")
+            _run(["git", "clone", "--depth", "1", HY3DWRAP_GIT, str(hy3d)])
+            if (hy3d / "requirements.txt").exists():
+                _run([py, "-m", "pip", "install", "-r", str(hy3d / "requirements.txt")])
+            cr = hy3d / "hy3dgen" / "texgen" / "custom_rasterizer"
+            _log("NOTE: TEXTURE generation needs the custom_rasterizer CUDA extension. No prebuilt "
+                 "wheel matches torch2.5.1+cu121, so build it once on the box:")
+            _log(f"  {py} -m pip install -e \"{cr}\"   (or: cd \"{cr}\" && {py} setup.py install)")
+            _log("  — needs VS Build Tools + the matching CUDA toolkit on PATH. Shape works without it.")
+        essentials = COMFY_DIR / "custom_nodes" / "ComfyUI_essentials"
+        if not essentials.exists():
+            _log("cloning ComfyUI_essentials (image-prep nodes for the Hy3D workflow)")
+            _run(["git", "clone", "--depth", "1", ESSENTIALS_GIT, str(essentials)])
+            if (essentials / "requirements.txt").exists():
+                _run([py, "-m", "pip", "install", "-r", str(essentials / "requirements.txt")])
         _log("installing ComfyUI requirements (this can take a few minutes)…")
         _run([py, "-m", "pip", "install", "-r", str(COMFY_DIR / "requirements.txt")])
         _run([py, "-m", "pip", "install", "-r", str(gguf / "requirements.txt")])

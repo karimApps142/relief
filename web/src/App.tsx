@@ -8,8 +8,8 @@ export default function App() {
   const s = useStudio()
   const { active, comfy, models, system } = s
 
-  // Feature-aware engine readiness: relight needs its own node + models; image3d needs only
-  // the Hunyuan3D checkpoint (native nodes — no custom node); the rest need Krea.
+  // Feature-aware engine readiness: relight needs the IC-Light node + relight models; image3d
+  // needs the Hunyuan3D wrapper node + its shape checkpoint; the rest need Krea.
   const comfyReady = (() => {
     if (!comfy || !comfy.installed || !comfy.running) return false
     if (active?.id === 'relight' || active?.id === 'portrait') {
@@ -18,7 +18,7 @@ export default function App() {
     }
     if (active?.id === 'image3d') {
       const m = Object.values(comfy.hunyuan3d_models || {})
-      return m.length > 0 && m.every(Boolean)
+      return !!comfy.nodes?.hy3dwrap && m.length > 0 && m.every(Boolean)
     }
     return Object.values(comfy.models).every(Boolean)
   })()
