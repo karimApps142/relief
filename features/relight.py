@@ -8,6 +8,7 @@ the relief depth pass, since baked shadows otherwise get carved as false geometr
 Needs the IC-Light node (kijai/ComfyUI-IC-Light) + iclight_sd15_fc.safetensors + an SD1.5
 checkpoint — provisioned by comfy_manager's install/download.
 """
+import os
 import random
 from pathlib import Path
 from PIL import Image
@@ -16,7 +17,10 @@ from .base import Feature, ParamSpec
 from ._comfy import ComfyUIClient
 
 _SD15 = "v1-5-pruned-emaonly-fp16.safetensors"
-_ICLIGHT = "IC-Light/iclight_sd15_fc.safetensors"   # relative to models/unet/
+# ComfyUI lists subfolder models with the HOST separator (backslash on Windows), and the
+# LoadAndApplyICLightUnet dropdown validates against that exact string — so build it with
+# os.path.join (server runs on the same OS as ComfyUI) instead of a hard-coded '/'.
+_ICLIGHT = os.path.join("IC-Light", "iclight_sd15_fc.safetensors")   # relative to models/unet/
 
 # lighting preset → prompt (IC-Light FC is prompt-driven). 'even' = delight for relief.
 _PRESETS = {
