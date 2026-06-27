@@ -100,6 +100,14 @@ class ComfyUIClient:
         except urllib.error.URLError:
             raise self._unreachable()
 
+    def get_object_info(self):
+        """Every node's input schema (required/optional inputs, types, widget flags) — the
+        same data ComfyUI's frontend uses to convert a UI workflow into an API prompt."""
+        try:
+            return self._get_json("/object_info")
+        except urllib.error.URLError:
+            raise self._unreachable()
+
     def upload_image(self, path):
         """Upload an input image to ComfyUI (multipart); return the LoadImage name."""
         # sanitise the filename — it goes raw into a Content-Disposition header.

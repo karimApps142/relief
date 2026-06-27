@@ -39,6 +39,9 @@ ICLIGHT_GIT = "https://github.com/kijai/ComfyUI-IC-Light"
 # (the wrapper's example workflow uses ImageResize+ / background-removal nodes from it).
 HY3DWRAP_GIT = "https://github.com/kijai/ComfyUI-Hunyuan3DWrapper"
 ESSENTIALS_GIT = "https://github.com/cubiq/ComfyUI_essentials"
+# Clarity-style creative upscale: ssitu's Ultimate SD Upscale node (tiled SD img2img).
+# Has a git submodule (Coyote-A/ultimate-upscale) — clone with --recurse-submodules.
+USDU_GIT = "https://github.com/ssitu/ComfyUI_UltimateSDUpscale"
 
 # label -> (hf_repo, path_within_repo, dest_subdir_under_ComfyUI/models)
 # path_within_repo may contain a subfolder; only the basename lands in dest.
@@ -69,6 +72,18 @@ RELIGHT_MODELS = {
 HUNYUAN3D_MODELS = {
     "image→3D · Hunyuan3D-2.0 DiT fp16 (~4.9 GB)":
         ("Kijai/Hunyuan3D-2_safetensors", "hunyuan3d-dit-v2-0-fp16.safetensors", "diffusion_models/hy3dgen"),
+}
+# CLARITY = the creative-upscale bundle (SD1.5 Tile ControlNet + photoreal checkpoint +
+# detail LoRA) for the Clarity feature. Downloaded alongside the core but NOT part of the
+# engine gate, so it never blocks text2img/img2img. The 4x-UltraSharp upscaler it also uses
+# already ships in MODELS, and the SD1.5 base (v1-5-pruned-emaonly) comes from RELIGHT_MODELS.
+CLARITY_MODELS = {
+    "clarity · Tile ControlNet SD1.5 (~1.4 GB)":
+        ("lllyasviel/ControlNet-v1-1", "control_v11f1e_sd15_tile.pth", "controlnet"),
+    "clarity · Juggernaut Reborn checkpoint (~2 GB)":
+        ("dantea1118/juggernaut_reborn", "juggernaut_reborn.safetensors", "checkpoints"),
+    "clarity · more_details LoRA (~0.1 GB)":
+        ("philz1337x/loras", "more_details.safetensors", "loras"),
 }
 
 LORA_DIR = COMFY_DIR / "models" / "loras"                 # user-supplied custom LoRAs land here
@@ -120,7 +135,8 @@ def _nodes_status():
     return {"gguf": (cn / "ComfyUI-GGUF").exists(),
             "iclight": (cn / "ComfyUI-IC-Light").exists(),
             "hy3dwrap": (cn / "ComfyUI-Hunyuan3DWrapper").exists(),
-            "essentials": (cn / "ComfyUI_essentials").exists()}
+            "essentials": (cn / "ComfyUI_essentials").exists(),
+            "usdu": (cn / "ComfyUI_UltimateSDUpscale").exists()}
 
 
 def status():
@@ -133,6 +149,7 @@ def status():
         "models": models_status(),
         "relight_models": {label: _path_ok(_dest(sub, p)) for label, (_, p, sub) in RELIGHT_MODELS.items()},
         "hunyuan3d_models": {label: _path_ok(_dest(sub, p)) for label, (_, p, sub) in HUNYUAN3D_MODELS.items()},
+        "clarity_models": {label: _path_ok(_dest(sub, p)) for label, (_, p, sub) in CLARITY_MODELS.items()},
         "nodes": _nodes_status(),
         "busy": _task["running"],
         "action": _task["action"],
@@ -212,6 +229,12 @@ def _install():
             _run(["git", "clone", "--depth", "1", ESSENTIALS_GIT, str(essentials)])
             if (essentials / "requirements.txt").exists():
                 _run([py, "-m", "pip", "install", "-r", str(essentials / "requirements.txt")])
+        # Clarity creative-upscale: Ultimate SD Upscale. --recurse-submodules pulls the
+        # Coyote-A upscale script it depends on (else it self-downloads a zip at import).
+        usdu = COMFY_DIR / "custom_nodes" / "ComfyUI_UltimateSDUpscale"
+        if not usdu.exists():
+            _log("cloning ComfyUI_UltimateSDUpscale (clarity creative upscale)")
+            _run(["git", "clone", "--depth", "1", "--recurse-submodules", USDU_GIT, str(usdu)])
         _log("installing ComfyUI requirements (this can take a few minutes)…")
         _run([py, "-m", "pip", "install", "-r", str(COMFY_DIR / "requirements.txt")])
         _run([py, "-m", "pip", "install", "-r", str(gguf / "requirements.txt")])
@@ -250,7 +273,7 @@ def download_async(labels=None):
 
 
 def _download(labels):
-    all_models = {**MODELS, **RELIGHT_MODELS, **HUNYUAN3D_MODELS}   # gate uses MODELS; download grabs all
+    all_models = {**MODELS, **RELIGHT_MODELS, **HUNYUAN3D_MODELS, **CLARITY_MODELS}  # gate uses MODELS; download grabs all
     items = all_models if not labels else {k: all_models[k] for k in labels if k in all_models}
     failures = []
     for label, (repo, path_in_repo, sub) in items.items():

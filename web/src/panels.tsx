@@ -51,21 +51,24 @@ export function ComfyWizard({ s }: { s: Studio }) {
   // (text2img/img2img/upscale) need the GGUF node + the Krea core.
   const isRelight = f.id === 'relight' || f.id === 'portrait'
   const isImage3d = f.id === 'image3d'
+  const isClarity = f.id === 'clarity'
   const models = isRelight ? Object.entries(c.relight_models || {})
     : isImage3d ? Object.entries(c.hunyuan3d_models || {})
+    : isClarity ? Object.entries(c.clarity_models || {})
     : Object.entries(c.models)
   const allM = models.length > 0 && models.every(([, b]) => b)
-  const nodeKey = isRelight ? 'iclight' : isImage3d ? 'hy3dwrap' : 'gguf'
+  const nodeKey = isRelight ? 'iclight' : isImage3d ? 'hy3dwrap' : isClarity ? 'usdu' : 'gguf'
   const nodeOk = !!(c.nodes || {})[nodeKey]
   const installedOk = c.installed && nodeOk
   const addNode = c.installed && !nodeOk         // engine there, just missing this tool's node
   const steps = [
-    { key: 'install', label: isRelight ? 'Install ComfyUI + IC-Light' : isImage3d ? 'Install ComfyUI + Hunyuan3D' : 'Install ComfyUI',
+    { key: 'install', label: isRelight ? 'Install ComfyUI + IC-Light' : isImage3d ? 'Install ComfyUI + Hunyuan3D' : isClarity ? 'Install ComfyUI + Ultimate SD Upscale' : 'Install ComfyUI',
       desc: addNode ? 'Add the required node and reload the engine.' : 'Clone the engine and Python dependencies.',
       done: installedOk, available: !installedOk, btn: addNode ? 'Add node' : 'Install', showModels: false },
     { key: 'download', label: 'Download models',
       desc: isRelight ? 'Fetch the relight models (~3.7 GB).'
         : isImage3d ? 'Fetch the Hunyuan3D shape model (~4.9 GB). Paint models auto-download on first run.'
+        : isClarity ? 'Fetch the clarity models — Tile ControlNet + photoreal checkpoint + detail LoRA (~3.5 GB).'
         : 'Fetch the 4 model files (~11.7 GB total).',
       done: allM, available: c.installed && !allM, btn: 'Download', showModels: true },
     c.running
@@ -166,7 +169,7 @@ export function SystemPanel({ s }: { s: Studio }) {
     { k: 'Resident', v: ({ relief: 'Relief', image: 'Image', idle: 'Idle' } as any)[resident] },
   ] : []
   const weights = s.models?.models ? Object.entries(s.models.models) : []
-  const cmodels = s.comfy ? [...Object.entries(s.comfy.models), ...Object.entries(s.comfy.hunyuan3d_models || {})] : []
+  const cmodels = s.comfy ? [...Object.entries(s.comfy.models), ...Object.entries(s.comfy.hunyuan3d_models || {}), ...Object.entries(s.comfy.clarity_models || {})] : []
   return (
     <>
       <div onClick={() => s.setSysOpen(false)} style={{ position: 'fixed', inset: 0, zIndex: 300, background: 'var(--hf-scrim)', backdropFilter: 'blur(2px)', animation: 'rs-rise .2s var(--hf-ease-out)' }} />

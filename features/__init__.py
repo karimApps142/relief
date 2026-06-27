@@ -16,6 +16,7 @@ from .image_to_3d import ImageTo3DFeature
 from .text2img import Text2ImgFeature
 from .img2img import Img2ImgFeature
 from .upscale import UpscaleFeature
+from .clarity import ClarityFeature
 from .relight import RelightFeature
 
 REGISTRY = {}
@@ -35,4 +36,5 @@ register(ImageTo3DFeature())         # image → textured 3D model (Hunyuan3D wr
 register(Text2ImgFeature())          # Krea-2-Turbo GGUF via ComfyUI (:8188)
 register(Img2ImgFeature())           # Krea-2-Turbo img2img via ComfyUI
 register(UpscaleFeature())           # ESRGAN upscale via ComfyUI
+register(ClarityFeature())           # Clarity-style creative upscale (SD1.5 + Tile ControlNet + USDU)
 register(RelightFeature())           # IC-Light relight/delight via ComfyUI

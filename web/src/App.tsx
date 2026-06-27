@@ -9,7 +9,8 @@ export default function App() {
   const { active, comfy, models, system } = s
 
   // Feature-aware engine readiness: relight needs the IC-Light node + relight models; image3d
-  // needs the Hunyuan3D wrapper node + its shape checkpoint; the rest need Krea.
+  // needs the Hunyuan3D wrapper node + its shape checkpoint; clarity needs the Ultimate SD
+  // Upscale node + the clarity models (Tile ControlNet + checkpoint + LoRA); the rest need Krea.
   const comfyReady = (() => {
     if (!comfy || !comfy.installed || !comfy.running) return false
     if (active?.id === 'relight' || active?.id === 'portrait') {
@@ -19,6 +20,10 @@ export default function App() {
     if (active?.id === 'image3d') {
       const m = Object.values(comfy.hunyuan3d_models || {})
       return !!comfy.nodes?.hy3dwrap && m.length > 0 && m.every(Boolean)
+    }
+    if (active?.id === 'clarity') {
+      const m = Object.values(comfy.clarity_models || {})
+      return !!comfy.nodes?.usdu && m.length > 0 && m.every(Boolean)
     }
     return Object.values(comfy.models).every(Boolean)
   })()

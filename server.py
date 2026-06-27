@@ -179,8 +179,11 @@ def _human_size(nbytes):
 
 def _model_label(feat, coerced):
     if feat.engine == "comfy":
-        return coerced.get("model_name", "") if feat.id == "upscale" \
-            else "Krea-2-Turbo " + coerced.get("quant", "Q4_K_M")
+        if feat.id == "upscale":
+            return coerced.get("model_name", "")
+        if feat.id == "clarity":
+            return "Clarity · " + coerced.get("checkpoint", "").replace(".safetensors", "")
+        return "Krea-2-Turbo " + coerced.get("quant", "Q4_K_M")
     return _DEPTH_LABEL.get(coerced.get("depth_model"), coerced.get("depth_model", ""))
 
 
