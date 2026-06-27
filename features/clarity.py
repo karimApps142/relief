@@ -40,9 +40,11 @@ _NEG = "blurry, lowres, low quality, worst quality, jpeg artifacts, oversharpene
 
 
 def _build_graph(image_name, checkpoint, pos, neg, creativity, resemblance, hdr,
-                 scale, steps, seed, tile, detail_lora, detail_strength=0.5):
+                 scale, steps, seed, tile, detail_lora, final_upscale, detail_strength=0.5):
     """Hand-authored API graph: checkpoint (+ optional detail LoRA) → CLIP encode →
-    Tile-ControlNet apply → Ultimate SD Upscale (4x-UltraSharp + tiled SD1.5) → save."""
+    Tile-ControlNet apply → Ultimate SD Upscale (4x-UltraSharp + tiled SD1.5) → save.
+    With final_upscale, a closing ImageUpscaleWithModel (4x-UltraSharp) crispens the
+    finished image (×4 on top of `scale`), reusing the already-loaded upscale model."""
     graph = {
         "1": {"class_type": "CheckpointLoaderSimple", "inputs": {"ckpt_name": checkpoint}},
         "2": {"class_type": "LoadImage", "inputs": {"image": image_name}},
@@ -72,8 +74,13 @@ def _build_graph(image_name, checkpoint, pos, neg, creativity, resemblance, hdr,
         "seam_fix_mode": "None", "seam_fix_denoise": 1.0, "seam_fix_width": 64,
         "seam_fix_mask_blur": 8, "seam_fix_padding": 16, "force_uniform_tiles": True,
         "tiled_decode": False, "batch_size": 1}}
+    save_ref = ["8", 0]
+    if final_upscale:                                       # closing 4x-UltraSharp crispen pass
+        graph["11"] = {"class_type": "ImageUpscaleWithModel", "inputs": {
+            "upscale_model": ["3", 0], "image": ["8", 0]}}
+        save_ref = ["11", 0]
     graph["9"] = {"class_type": "SaveImage", "inputs": {
-        "filename_prefix": "clarity/c", "images": ["8", 0]}}
+        "filename_prefix": "clarity/c", "images": save_ref}}
     return graph
 
 
@@ -94,7 +101,10 @@ class ClarityFeature(Feature):
                   placeholder="Describe the subject to steer the detail…",
                   help="Blank works fine — a hint like 'portrait of a woman' sharpens results."),
         ParamSpec("scale", "number", 2, "Scale", 1, 4, 0.5, control="slider", suffix="×",
-                  help="Output size multiplier."),
+                  help="Output size multiplier (the diffusion stage)."),
+        ParamSpec("final_upscale", "bool", True, "Final 4×-UltraSharp", control="switch",
+                  help="Run 4×-UltraSharp on the finished image for extra crispness. "
+                       "Multiplies the final size by 4 (so Scale 2× → 8× total). Off to keep Scale."),
         ParamSpec("creativity", "number", 0.35, "Creativity", 0.1, 1.0, 0.05, control="slider",
                   help="Denoise — higher invents more new detail; lower stays faithful. "
                        "Sweet spot 0.3–0.5; push to 0.6–0.9 for a heavier remaster."),
@@ -130,7 +140,7 @@ class ClarityFeature(Feature):
         graph = _build_graph(
             name, params["checkpoint"], pos, _NEG, params["creativity"], params["resemblance"],
             params["hdr"], params["scale"], params["steps"], seed, params["tile"],
-            params.get("detail_lora", "more_details.safetensors"))
+            params.get("detail_lora", "more_details.safetensors"), params.get("final_upscale", True))
         out = Path(out_dir) / "clarity.png"
         out.write_bytes(client.generate(graph, label="clarity", max_wait=900))
         return {"image": str(out)}
