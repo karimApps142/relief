@@ -53,6 +53,21 @@ _LORA_STRENGTH = {
 }
 
 
+def _estimate_runs(width, height, passes, tile, seam_fix):
+    """Mirror UltimateSDUpscale's tiling to count sampler RUNS (each tile is one KSampler at
+    `steps`). Used to predict total sampler steps so the progress bar fills once, cumulatively,
+    instead of resetting per tile. Approximate — the cumulative % is capped at 99 until done."""
+    import math
+    w, h, runs, tiles = float(width), float(height), 0, 1
+    for m in passes:
+        w *= m; h *= m
+        tiles = max(1, math.ceil(w / tile)) * max(1, math.ceil(h / tile))
+        runs += tiles
+    if seam_fix:
+        runs += tiles                  # final-pass half-tile seam sweep ≈ one more tile pass
+    return runs
+
+
 def _calc_passes(scale):
     """Decompose the requested scale into successive ≤2× diffusion passes (the clarity
     recipe): 4×→[2,2], 3×→[2,1.5], 2×→[2], 1.5×→[1.5]. Each pass re-diffuses + re-details,
@@ -136,6 +151,29 @@ class ClarityFeature(Feature):
     vram = "~4–8 GB"
     output_kinds = ["Image PNG · detailed"]
     inputs = ["image"]
+    guide = [
+        {"h": "What it does",
+         "b": "A creative upscale that ADDS detail — skin pores, hair strands, fabric weave, "
+              "foliage. It re-diffuses your image tile-by-tile through SD1.5 under a Tile "
+              "ControlNet that locks the original structure, so it gets bigger AND more "
+              "detailed (the plain Upscale tab just enlarges — it invents nothing)."},
+        {"h": "How to add more fine detail",
+         "b": "In order of impact: (1) Creativity ↑ to 0.45–0.6 — the main lever, but above "
+              "~0.65 it starts changing the face. (2) Detail LoRA → Detail Tweaker (strongest). "
+              "(3) HDR ↑ to 7–8 (stop at ~8 or it looks 'fried'). (4) Steps ↑ to 26–30. "
+              "(5) Tile → 768 or 512 packs denser detail — turn Seam fix ON. (6) Add a Prompt "
+              "describing the subject. (7) Resemblance ↓ to ~0.45 frees it to add more (watch drift)."},
+        {"h": "Recipes",
+         "b": "Max facial detail → start from the Creative preset: Creativity 0.55, Detail "
+              "Tweaker, HDR 7.5, Steps 28, Tile 768, Seam fix on, a descriptive prompt.  "
+              "Faithful sharpen (no identity change) → Subtle/Balanced: Creativity 0.3, "
+              "Resemblance 0.75, more_details LoRA, HDR 6."},
+        {"h": "Watch out / for Relief",
+         "b": "Too much Creativity invents details that aren't real; too high HDR looks "
+              "oversharpened; tiny tiles without Seam fix show grid seams. If you'll feed the "
+              "result into Relief, keep it moderate (Creativity ~0.4, Detail Tweaker) — enough "
+              "carve-able detail without hallucinating features the relief shouldn't have."},
+    ]
     params = [
         ParamSpec("preset", "select", "balanced", "Preset",
                   help="Quick-start — fills the Creativity / Resemblance / HDR sliders below. "
@@ -227,6 +265,12 @@ class ClarityFeature(Feature):
         graph = _build_graph(name, params["checkpoint"], pos, _NEG, creativity, resemblance, hdr,
                              passes, params["steps"], seed, params["tile"], detail_lora,
                              detail_strength, final_up, bool(params.get("seam_fix", True)), clamp_to)
+        # predict total sampler steps (tiles × passes × steps) so progress fills once, not per-tile
+        runs = _estimate_runs(src.width, src.height, passes, int(params["tile"]),
+                              bool(params.get("seam_fix", True)))
+        total_steps = runs * int(params["steps"])
+
         out = out_dir / "clarity.png"
-        out.write_bytes(client.generate(graph, label="clarity", max_wait=1200))
+        out.write_bytes(client.generate(graph, label="clarity", max_wait=1200,
+                                        total_steps=total_steps))
         return {"image": str(out)}

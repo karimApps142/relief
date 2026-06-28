@@ -187,17 +187,23 @@ export default function Results({ s }: { s: Studio }) {
     const phases = p?.phases || []
     const idx = p?.phase_idx ?? 0
     const isComfy = p?.engine === 'comfy'
-    const percent = isComfy ? Math.round((((p?.value || 0) / (p?.max || 8)) * 100)) : (p?.percent ?? 0)
+    // Prefer the backend's cumulative percent (smooth single fill across all tiles/passes);
+    // fall back to the current run's value/max only if an older backend omits it.
+    const percent = p?.percent ?? (isComfy ? Math.round((((p?.value || 0) / (p?.max || 8)) * 100)) : 0)
+    // ETA from real progress: time_left ≈ elapsed × (100−pct)/pct. Hold off until there's a
+    // little signal (pct>3, >4 s) so the first estimate isn't wild.
+    const eta = percent > 3 && percent < 100 && s.elapsed > 4
+      ? Math.round((s.elapsed * (100 - percent)) / percent) : 0
     const phaseLabel = phases[idx] || p?.node || (s.runState === 'submitting' ? 'Submitting' : 'Preparing…')
     const stats = isComfy
-      ? [{ k: 'Steps', v: `${p?.value || 0} / ${p?.max || 8}` }, { k: 'Node', v: p?.node || '—' }, { k: 'Elapsed', v: fmtDur(s.elapsed) }]
+      ? [{ k: 'Time left', v: eta ? `~${fmtDur(eta)}` : 'estimating…' }, { k: 'Node', v: p?.node || '—' }, { k: 'Elapsed', v: fmtDur(s.elapsed) }]
       : [{ k: 'Phase', v: phaseLabel }, { k: 'Tiles', v: String(p?.tiles_total ?? '—') }, { k: 'Elapsed', v: fmtDur(s.elapsed) }]
     return (
       <div style={{ maxWidth: 540, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 24, paddingTop: 14, animation: 'rs-rise .3s var(--hf-ease-out)' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <span style={{ width: 8, height: 8, borderRadius: 99, background: 'var(--hf-live)', animation: 'rs-pulse 1.6s var(--hf-ease-out) infinite' }} />
           <strong style={{ fontSize: 15 }}>{phaseLabel}</strong>
-          <span style={{ marginLeft: 'auto', font: '500 12px var(--hf-font-mono)', color: 'var(--hf-text-secondary)' }}>{fmtDur(s.elapsed)}</span>
+          <span style={{ marginLeft: 'auto', font: '500 12px var(--hf-font-mono)', color: 'var(--hf-text-secondary)' }}>{fmtDur(s.elapsed)}{eta ? <span style={{ color: 'var(--hf-text-tertiary)' }}>{`  ·  ~${fmtDur(eta)} left`}</span> : ''}</span>
         </div>
 
         {phases.length > 0 && (
@@ -222,7 +228,7 @@ export default function Results({ s }: { s: Studio }) {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 9 }}>
           <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between' }}>
             <span style={{ font: '700 30px var(--hf-font-sans)', letterSpacing: '-.02em' }}>{percent}%</span>
-            <span style={{ font: '500 12px var(--hf-font-mono)', color: 'var(--hf-text-tertiary)' }}>{isComfy ? `${p?.value || 0}/${p?.max || 8} steps` : phaseLabel}</span>
+            <span style={{ font: '500 12px var(--hf-font-mono)', color: 'var(--hf-text-tertiary)' }}>{eta ? `~${fmtDur(eta)} left` : (isComfy ? 'working…' : phaseLabel)}</span>
           </div>
           <div style={{ position: 'relative', height: 8, borderRadius: 99, background: 'var(--hf-fill-strong)', overflow: 'hidden' }}>
             <div style={{ position: 'absolute', left: 0, top: 0, bottom: 0, borderRadius: 99, width: `${percent}%`, background: 'var(--hf-white)', transition: 'width .2s linear' }} />

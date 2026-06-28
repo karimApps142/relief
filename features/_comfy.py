@@ -41,7 +41,8 @@ class ComfyUIError(RuntimeError):
 
 # --- process-global generation progress (single-user box: one gen at a time) ------
 _progress_lock = threading.Lock()
-_progress = {"active": False, "value": 0, "max": 0, "node": None, "label": ""}
+_progress = {"active": False, "value": 0, "max": 0, "node": None, "label": "",
+             "total": 0, "done": 0, "percent": 0}
 
 
 def get_progress():
@@ -49,19 +50,33 @@ def get_progress():
         return dict(_progress)
 
 
-def _reset_progress(label=""):
+def _reset_progress(label="", total=0):
     with _progress_lock:
-        _progress.update(active=True, value=0, max=0, node=None, label=label)
+        _progress.update(active=True, value=0, max=0, node=None, label=label,
+                         total=int(total or 0), done=0, percent=0)
 
 
 def _clear_progress():
     with _progress_lock:
-        _progress.update(active=False, value=0, max=0, node=None)
+        _progress.update(active=False, value=0, max=0, node=None, done=0, percent=0)
 
 
-def _set_progress(**kw):
+def _set_progress(value=0, max=0, node=None):
+    """One ComfyUI 'progress' message (= one sampler run's current step). When `total`
+    expected steps was given (multi-tile jobs like Clarity's UltimateSDUpscale), accumulate
+    across runs into ONE smooth bar: a value RESET (next tile) banks the previous run's
+    steps. percent is then cumulative (done/total), not per-tile — so the bar fills once."""
     with _progress_lock:
-        _progress.update(**kw)
+        if max and value < _progress["value"]:        # a new sampler run started → bank prev
+            _progress["done"] += _progress["max"]
+        _progress["value"] = value
+        if max:
+            _progress["max"] = max
+        if node is not None:
+            _progress["node"] = node
+        total, cur = _progress["total"], _progress["done"] + value
+        _progress["percent"] = (min(99, round(100 * cur / total)) if total
+                                else (round(100 * value / _progress["max"]) if _progress["max"] else 0))
 
 
 class ComfyUIClient:
@@ -267,16 +282,18 @@ class ComfyUIClient:
             "type": pick.get("type", "output")})
 
     # --------------------------------------------------------------------- public
-    def generate(self, graph, label="", max_wait=600):
+    def generate(self, graph, label="", max_wait=600, total_steps=0):
         """Queue the graph and return the first output image's PNG bytes, streaming
-        live progress. Submits once; ws for progress; HTTP-poll fallback for the rest."""
-        _reset_progress(label)
+        live progress. Submits once; ws for progress; HTTP-poll fallback for the rest.
+        `total_steps` (expected sampler steps across all tiles/passes) makes the progress
+        bar cumulative — one smooth fill — instead of resetting per tile (see _set_progress)."""
+        _reset_progress(label, total=total_steps)
         deadline = time.monotonic() + max_wait
         try:
             pid = self._submit(graph)                     # queue EXACTLY once
             if _HAS_WS:
                 try:
-                    asyncio.run(self._watch_ws(pid, deadline))
+                    self._run_ws(pid, deadline)            # SelectorEventLoop (Win-safe)
                 except ComfyUIError:
                     raise                                  # real execution error / deadline
                 except Exception:
@@ -287,12 +304,13 @@ class ComfyUIClient:
         finally:
             _clear_progress()
 
-    def generate_file(self, graph, exts=(".glb",), prefer=None, label="", max_wait=900):
+    def generate_file(self, graph, exts=(".glb",), prefer=None, label="", max_wait=900,
+                      total_steps=0):
         """Like generate(), but returns the bytes of a saved FILE output matching `exts`
         (e.g. an exported GLB mesh) instead of an image. `prefer` picks among several
         matches by filename substring (e.g. 'textured'). Image→3D and other mesh-producing
         graphs save to disk rather than emitting an `images` output."""
-        _reset_progress(label)
+        _reset_progress(label, total=total_steps)
         deadline = time.monotonic() + max_wait
         try:
             pid = self._submit(graph)                     # queue EXACTLY once

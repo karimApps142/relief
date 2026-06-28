@@ -1,11 +1,72 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { Studio } from './studio'
-import type { ParamSpec } from './api'
-import { choiceList, choiceLabel, getLoras, uploadLora } from './api'
+import type { ParamSpec, RunRecord } from './api'
+import { choiceList, choiceLabel, getLoras, uploadLora, fmtDur } from './api'
 import { Button, Switch, Slider, Segmented, Select } from './ds'
 import { Icon, featureIcon } from './icons'
 
 const eyebrow: React.CSSProperties = { font: '600 11px var(--hf-font-sans)', letterSpacing: '.12em', textTransform: 'uppercase', color: 'var(--hf-text-tertiary)' }
+
+// ---- Clarity live time estimate (mirrors features/clarity._estimate_runs) -------------------
+// Predicts wall-clock from the settings so it updates as you drag a slider, and self-calibrates
+// from your real runs: cost = (tiles × passes × steps) × tile² ≈ total pixel-steps the GPU does;
+// `c` (seconds per pixel-step) is learned per machine and stored in localStorage.
+const clarityPasses = (scale: number): number[] => {
+  let s = scale; const out: number[] = []
+  while (s > 2.0 + 1e-6) { out.push(2); s /= 2 }
+  out.push(Math.round(s * 1e4) / 1e4)
+  return out
+}
+const clarityRuns = (W: number, H: number, scale: number, tile: number, seamFix: boolean): number => {
+  let runs = 0, tiles = 1, w = W, h = H
+  for (const m of clarityPasses(scale)) {
+    w *= m; h *= m
+    tiles = Math.max(1, Math.ceil(w / tile)) * Math.max(1, Math.ceil(h / tile))
+    runs += tiles
+  }
+  return seamFix ? runs + tiles : runs
+}
+const srcAfterLimit = (W: number, H: number, limit: number) => {
+  const m = Math.max(W, H)
+  return m > limit ? { w: (W * limit) / m, h: (H * limit) / m } : { w: W, h: H }
+}
+const CLARITY_C_KEY = 'relief.clarity.secPerPixelStep'
+const CLARITY_C_DEFAULT = 4e-7         // ~RTX 3060 starting guess; recalibrated after the first run
+const clarityOverhead = (finalUp: boolean) => 6 + (finalUp ? 8 : 0)   // model load + final UltraSharp
+const clarityC = () => Number(localStorage.getItem(CLARITY_C_KEY)) || CLARITY_C_DEFAULT
+
+function clarityEstimateSec(values: Record<string, any>, dims: { w: number; h: number } | null): number | null {
+  if (!dims) return null
+  const tile = Number(values.tile ?? 1024), steps = Number(values.steps ?? 18)
+  const src = srcAfterLimit(dims.w, dims.h, Number(values.source_limit ?? 1536))
+  const runs = clarityRuns(src.w, src.h, Number(values.scale ?? 2), tile, values.seam_fix !== false)
+  const cost = runs * steps * tile * tile
+  return cost * clarityC() + clarityOverhead(values.final_upscale !== false)
+}
+
+// Learn `c` from a finished Clarity run. Reconstructs the source size the run actually used from
+// its OUTPUT dimensions (robust even if the loaded image changed since), so the next estimate fits.
+function calibrateClarity(rec: RunRecord, fallbackDims: { w: number; h: number } | null) {
+  const p = rec?.meta?.params; const actual = Number(rec?.meta?.duration_s)
+  if (!p || !(actual > 3)) return
+  const scale = Number(p.scale ?? 2), tile = Number(p.tile ?? 1024), steps = Number(p.steps ?? 18)
+  const finalUp = p.final_upscale !== false
+  let srcW: number, srcH: number
+  const dm = String(rec.meta.dimensions || '').match(/(\d+)\D+(\d+)/)
+  if (dm) {                                   // output = src × scale × (finalUp?4:1) → back it out
+    let oW = +dm[1], oH = +dm[2]
+    if (finalUp) { oW /= 4; oH /= 4 }
+    srcW = oW / scale; srcH = oH / scale
+  } else if (fallbackDims) {
+    const s = srcAfterLimit(fallbackDims.w, fallbackDims.h, Number(p.source_limit ?? 1536))
+    srcW = s.w; srcH = s.h
+  } else return
+  const cost = clarityRuns(srcW, srcH, scale, tile, p.seam_fix !== false) * steps * tile * tile
+  if (cost <= 0) return
+  const newC = Math.max(1e-8, (actual - clarityOverhead(finalUp)) / cost)
+  const prev = Number(localStorage.getItem(CLARITY_C_KEY)) || CLARITY_C_DEFAULT
+  localStorage.setItem(CLARITY_C_KEY, String(prev * 0.5 + newC * 0.5))   // EMA → converges in a few runs
+}
 
 // Clarity presets are a UI quick-start: picking one fills the (always-visible) sliders, and
 // nudging a slider flips the Preset to 'Custom'. Mirrors features/clarity.py's documented values.
@@ -147,6 +208,8 @@ function LoraField({ s }: { s: Studio }) {
 export default function Controls({ s }: { s: Studio }) {
   const f = s.active
   const [dims, setDims] = useState<{ w: number; h: number } | null>(null)
+  const [guideOpen, setGuideOpen] = useState(false)
+  const calibratedJob = useRef<string | null>(null)
 
   useEffect(() => {
     setDims(null)
@@ -157,6 +220,14 @@ export default function Controls({ s }: { s: Studio }) {
     img.src = url
     return () => URL.revokeObjectURL(url)
   }, [s.file])
+
+  // learn the Clarity time-estimate constant from each finished Clarity run (once per job)
+  useEffect(() => {
+    if (f?.id === 'clarity' && s.record?.feature === 'clarity' && s.record.job !== calibratedJob.current) {
+      calibratedJob.current = s.record.job
+      calibrateClarity(s.record, dims)
+    }
+  }, [f?.id, s.record, dims])
 
   if (!f) return null
   const visible = (p: ParamSpec) => !p.depends_on || s.values[p.depends_on.param] === p.depends_on.value
@@ -179,6 +250,10 @@ export default function Controls({ s }: { s: Studio }) {
   const liteRelief = f.id === 'relief' && s.models && !s.models.installed
   const px = Number(s.values.pixel_mm ?? 0.1) || 0.1
   const finalSize = dims ? `${Math.round(dims.w * px)} × ${Math.round(dims.h * px)} mm` : '—'
+
+  // Clarity: a live, self-calibrating time estimate that reacts to every setting change.
+  const clarityEstSec = f.id === 'clarity' ? clarityEstimateSec(s.values, dims) : null
+  const estLabel = clarityEstSec ? `~${fmtDur(clarityEstSec)} est.` : f.est_runtime
 
   return (
     <section style={{ borderRight: '1px solid var(--hf-border)', display: 'flex', flexDirection: 'column', minHeight: 0, background: 'var(--hf-bg-base)' }}>
@@ -244,6 +319,28 @@ export default function Controls({ s }: { s: Studio }) {
           </div>
         )}
 
+        {/* how it works & tuning tips (feature-provided guide) */}
+        {f.guide && f.guide.length > 0 && (
+          <div style={{ border: '1px solid var(--hf-border)', borderRadius: 12, background: 'var(--hf-surface-1)', overflow: 'hidden' }}>
+            <button onClick={() => setGuideOpen(!guideOpen)}
+              style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 9, padding: '11px 14px', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--hf-text-secondary)' }}>
+              <Icon name="sparkle" size={15} sw={1.8} />
+              <span style={{ flex: 1, textAlign: 'left', font: '600 12.5px var(--hf-font-sans)' }}>How it works &amp; tuning tips</span>
+              <span style={{ transform: guideOpen ? 'rotate(180deg)' : 'rotate(0)', transition: 'transform .18s', display: 'flex' }}><Icon name="chevronDown" size={14} sw={1.6} /></span>
+            </button>
+            {guideOpen && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 12, padding: '2px 14px 14px' }}>
+                {f.guide.map((g, i) => (
+                  <div key={i} style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                    <span style={{ font: '600 11px var(--hf-font-sans)', letterSpacing: '.04em', textTransform: 'uppercase', color: 'var(--hf-text-tertiary)' }}>{g.h}</span>
+                    <span style={{ font: '400 12.5px var(--hf-font-sans)', lineHeight: 1.5, color: 'var(--hf-text-secondary)' }}>{g.b}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
         {/* basic params */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
           {basic.map((p) => p.control === 'lora'
@@ -285,7 +382,7 @@ export default function Controls({ s }: { s: Studio }) {
       {/* generate footer */}
       <div style={{ flexShrink: 0, borderTop: '1px solid var(--hf-border)', background: 'var(--hf-bg-base)', padding: '11px 22px 13px', display: 'flex', flexDirection: 'column', gap: 9 }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: 11.5, color: 'var(--hf-text-tertiary)' }}>
-          <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}><Icon name="clock" size={13} sw={2} />{f.est_runtime}</span>
+          <span style={{ display: 'flex', alignItems: 'center', gap: 6 }} title={clarityEstSec ? 'Estimated from your settings; calibrates to your machine after each run' : ''}><Icon name="clock" size={13} sw={2} />{estLabel}</span>
           <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}><Icon name="system" size={13} sw={2} />{f.vram}</span>
         </div>
         {s.running ? (

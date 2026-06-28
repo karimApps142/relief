@@ -32,6 +32,7 @@ export type FeatureSchema = {
   vram: string
   output_kinds: string[]
   icon: string
+  guide?: Array<{ h: string; b: string }>
   params: ParamSpec[]
 }
 
@@ -64,6 +65,8 @@ export type Progress = {
   node?: string | null
   label?: string
   percent?: number
+  total?: number
+  done?: number
   phases?: string[]
   phase_idx?: number
   tiles_total?: number

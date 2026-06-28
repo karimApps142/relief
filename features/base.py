@@ -63,6 +63,7 @@ class Feature:
     vram: str = ""                  # approx peak VRAM, e.g. "~2–4 GB"
     output_kinds: list = []         # ["Heightmap PNG", "3D preview GLB", "STL mesh"]
     icon: str = "box"               # semantic icon hint: box|text|image|upscale
+    guide: list = []                # optional [{"h": heading, "b": body}] → UI "How it works & tips" panel
 
     def run(self, inputs: dict, params: dict, out_dir: Path) -> dict:
         """inputs: {kind: value}. params: coerced dict. Returns {artifact_name: path}."""
@@ -77,6 +78,7 @@ class Feature:
             "needs_comfy": self.needs_comfy, "engine": self.engine,
             "est_runtime": self.est_runtime, "vram": self.vram,
             "output_kinds": self.output_kinds, "icon": self.icon,
+            "guide": getattr(self, "guide", []),
             "params": [p.as_dict() for p in self.params],
         }
 
