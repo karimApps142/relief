@@ -11,10 +11,19 @@ Run: uvicorn server:app --host 0.0.0.0 --port 8000
 (The legacy service.py and app_gradio.py still work during the migration.)
 """
 import os
+import re
 import json
 import time
 import uuid
 from pathlib import Path
+
+
+def _safe_name(name):
+    """Strip characters Windows forbids in filenames (: ? * < > | " / \\, control chars),
+    so saving an uploaded file never fails with [Errno 22] Invalid argument."""
+    base = os.path.basename(name or "upload")
+    base = re.sub(r'[<>:"/\\|?*\x00-\x1f]', "_", base).strip(" .")
+    return (base or "upload")[:120]
 
 from fastapi import FastAPI, UploadFile, File, Form, HTTPException
 from fastapi.responses import JSONResponse, FileResponse
@@ -228,7 +237,7 @@ async def run_feature(fid: str, file: UploadFile = File(None), params: str = For
 
     inputs = {}
     if file is not None:
-        dst = out_dir / f"input_{file.filename}"
+        dst = out_dir / f"input_{_safe_name(file.filename)}"
         dst.write_bytes(await file.read())
         inputs["image"] = str(dst)
 

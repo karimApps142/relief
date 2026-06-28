@@ -127,7 +127,7 @@ class ComfyUIClient:
         try:
             with urllib.request.urlopen(req, timeout=self.timeout) as r:
                 j = json.loads(r.read().decode())
-        except urllib.error.URLError:
+        except OSError:                                   # URLError + raw socket errno (Win)
             raise self._unreachable()
         return f"{j['subfolder']}/{j['name']}" if j.get("subfolder") else j["name"]
 
@@ -152,7 +152,7 @@ class ComfyUIClient:
                 return json.loads(r.read().decode())["prompt_id"]
         except urllib.error.HTTPError as e:               # ComfyUI rejected the graph
             raise ComfyUIError(f"/prompt {e.code}: {e.read().decode(errors='replace')[:400]}")
-        except urllib.error.URLError:
+        except OSError:                                   # URLError + raw socket errno (Win)
             raise self._unreachable()
 
     async def _watch_ws(self, pid, deadline):
