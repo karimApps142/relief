@@ -311,6 +311,36 @@ def ensure_upscaler(filename):
     return _dest("upscale_models", filename)
 
 
+# Prebuilt custom_rasterizer wheel (the Image→3D texture bake) matching the box: cp311 /
+# torch 2.5.1 / CUDA 12.x. The wrapper's own wheels are cp312-only; this community build fits.
+RASTERIZER_WHEEL = ("https://huggingface.co/doang/ComfyUI-Wheels/resolve/main/"
+                    "custom_rasterizer-0.1.0+torch251.cuda124-cp311-cp311-win_amd64.whl")
+
+
+def rasterizer_installed():
+    """True if the custom_rasterizer CUDA module is importable in the shared venv (no CUDA init)."""
+    import importlib.util
+    try:
+        return importlib.util.find_spec("custom_rasterizer") is not None
+    except Exception:
+        return False
+
+
+def install_rasterizer():
+    """pip-install the prebuilt custom_rasterizer wheel into the shared venv so the Image→3D
+    texture bake can run. Idempotent; returns True if importable afterwards, raises on pip error.
+    ComfyUI re-imports the module per run, so no restart is normally needed."""
+    import importlib
+    if rasterizer_installed():
+        return True
+    r = subprocess.run([sys.executable, "-m", "pip", "install", RASTERIZER_WHEEL],
+                       capture_output=True, text=True)
+    if r.returncode != 0:
+        raise RuntimeError((r.stderr or r.stdout or "pip install failed").strip()[-600:])
+    importlib.invalidate_caches()
+    return rasterizer_installed()
+
+
 def _download(labels):
     all_models = {**MODELS, **RELIGHT_MODELS, **HUNYUAN3D_MODELS, **CLARITY_MODELS, **UPSCALE_MODELS}  # gate uses MODELS; download grabs all
     items = all_models if not labels else {k: all_models[k] for k in labels if k in all_models}

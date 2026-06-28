@@ -140,6 +140,22 @@ def _is_texture_error(err):
                                 "bakefrommultiview", "texgen", "differentiable_renderer"))
 
 
+def _texture_unavailable_hint():
+    try:
+        import comfy_manager
+        whl = comfy_manager.RASTERIZER_WHEEL
+    except Exception:
+        whl = "the custom_rasterizer wheel"
+    return ("Textured mode needs the 'custom_rasterizer' CUDA module, and it isn't available on "
+            "this machine (the auto-install of the prebuilt wheel didn't take — usually a CUDA "
+            "build mismatch, or ComfyUI needs a restart to pick it up).\n\n"
+            "Use Texture = 'Geometry only' or 'Auto' for a fully-usable untextured mesh — for "
+            "CNC / relief you don't need the texture.\n\n"
+            "To enable texturing, on the box run:\n"
+            f"  .venv\\Scripts\\python.exe -m pip install \"{whl}\"\n"
+            "then restart ComfyUI and try again.")
+
+
 def _learn_workflow_from_history(client):
     """Fallback: recover the API graph from a prior ComfyUI run (its exact prompt is in /history)."""
     try:
@@ -268,9 +284,10 @@ class ImageTo3DFeature(Feature):
          "b": "Generates a full 3D model from a single photo (Hunyuan3D). The shape always works; "
               "PBR texturing is an extra step that needs the custom_rasterizer CUDA module."},
         {"h": "Texture modes",
-         "b": "Auto (recommended): textures if custom_rasterizer is installed, else returns clean "
-              "geometry — no wasted run. Textured: force the texture bake (errors if the module is "
-              "missing). Geometry only: skip texturing for a faster, untextured mesh."},
+         "b": "Auto (recommended): textures if the custom_rasterizer module is present, else "
+              "returns clean geometry — no wasted run. Textured: force the bake — auto-installs the "
+              "prebuilt custom_rasterizer wheel the first time (restart ComfyUI if it doesn't load). "
+              "Geometry only: skip texturing for a faster, untextured mesh."},
         {"h": "Geometry vs texture",
          "b": "For CNC relief / 3D-printing you usually only need the GEOMETRY — an untextured mesh "
               "is fully usable (it just previews gray). Texturing adds surface color/PBR maps, which "
@@ -337,11 +354,21 @@ class ImageTo3DFeature(Feature):
             return glb, False
 
         # texture only if asked AND the custom_rasterizer CUDA module is actually present — so on a
-        # box without it we go straight to geometry (no wasted shape-generation pass).
+        # box without it Auto goes straight to geometry (no wasted shape-generation pass). When the
+        # user explicitly forces 'Textured', try to auto-provision the prebuilt wheel first.
         mode = params.get("texture", "auto")
+        if mode == "on" and not _rasterizer_available():
+            try:
+                import comfy_manager
+                print("[image3d] custom_rasterizer missing — installing the prebuilt wheel …")
+                comfy_manager.install_rasterizer()
+            except Exception as e:
+                print(f"[image3d] custom_rasterizer auto-install failed: {e}")
         want_texture = mode == "on" or (mode == "auto" and _rasterizer_available())
 
         if not want_texture:
+            if mode == "on":                              # forced texture but it couldn't be provisioned
+                raise RuntimeError(_texture_unavailable_hint())
             glb, textured = _run_geometry()
         else:
             graph = _load_textured()
@@ -352,11 +379,13 @@ class ImageTo3DFeature(Feature):
                                            label="image3d·textured", max_wait=1800)
                 textured = True
             except ComfyUIError as e:
-                if mode == "auto" and _is_texture_error(e):
+                if not _is_texture_error(e):
+                    raise
+                if mode == "auto":                        # graceful: untextured mesh instead
                     print(f"[image3d] texture bake unavailable ({e}); exporting geometry only")
                     glb, textured = _run_geometry()
-                else:
-                    raise
+                else:                                     # forced: clear, actionable message
+                    raise RuntimeError(_texture_unavailable_hint() + f"\n\n(engine said: {e})")
 
         print(f"[image3d] produced {'textured' if textured else 'geometry-only'} mesh")
         model = out / "model.glb"; model.write_bytes(glb)
