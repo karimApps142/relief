@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { Studio } from './studio'
 import { Button } from './ds'
 import { Icon } from './icons'
@@ -54,10 +54,9 @@ function ArtifactCard({ name, url }: { name: string; url: string }) {
   )
 }
 
-// Drag-to-wipe before/after comparison for the upscalers: the uploaded input (before)
-// under the generated image (after), revealed left→right by a draggable divider. Both
-// use object-fit: contain in the same box, so the (aspect-preserved) frames stay aligned.
-function BeforeAfter({ before, after }: { before: string; after: string }) {
+// shared drag-to-wipe state: the divider position + pointer handlers, reused by the inline
+// card and the full-screen overlay so they behave identically at any size.
+function useWipe() {
   const [pos, setPos] = useState(50)
   const ref = useRef<HTMLDivElement>(null)
   const dragging = useRef(false)
@@ -67,34 +66,94 @@ function BeforeAfter({ before, after }: { before: string; after: string }) {
     const r = el.getBoundingClientRect()
     setPos(Math.max(0, Math.min(100, ((clientX - r.left) / r.width) * 100)))
   }
-  const badge: React.CSSProperties = { position: 'absolute', top: 10, padding: '3px 9px', borderRadius: 99, font: '600 10.5px var(--hf-font-sans)', letterSpacing: '.06em', textTransform: 'uppercase', background: 'rgba(0,0,0,.55)', color: '#fff', backdropFilter: 'blur(4px)', pointerEvents: 'none' }
-  const imgBase: React.CSSProperties = { position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'contain', display: 'block' }
+  const handlers = {
+    onPointerDown: (e: React.PointerEvent) => { dragging.current = true; e.currentTarget.setPointerCapture(e.pointerId); moveTo(e.clientX) },
+    onPointerMove: (e: React.PointerEvent) => { if (dragging.current) moveTo(e.clientX) },
+    onPointerUp: (e: React.PointerEvent) => { dragging.current = false; e.currentTarget.releasePointerCapture?.(e.pointerId) },
+    onPointerCancel: () => { dragging.current = false },
+  }
+  return { pos, ref, handlers }
+}
+
+const wipeBadge: React.CSSProperties = { position: 'absolute', top: 10, padding: '3px 9px', borderRadius: 99, font: '600 10.5px var(--hf-font-sans)', letterSpacing: '.06em', textTransform: 'uppercase', background: 'rgba(0,0,0,.55)', color: '#fff', backdropFilter: 'blur(4px)', pointerEvents: 'none' }
+
+// Before/After labels + the divider line and round drag handle, positioned at `pos` percent.
+function WipeChrome({ pos }: { pos: number }) {
+  return (
+    <>
+      <span style={{ ...wipeBadge, left: 10 }}>Before</span>
+      <span style={{ ...wipeBadge, right: 10 }}>After</span>
+      <div style={{ position: 'absolute', top: 0, bottom: 0, left: `${pos}%`, width: 2, marginLeft: -1, background: '#fff', boxShadow: '0 0 6px rgba(0,0,0,.45)', pointerEvents: 'none' }}>
+        <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', width: 34, height: 34, borderRadius: 99, background: '#fff', boxShadow: '0 1px 6px rgba(0,0,0,.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#333' }}>
+          <Icon name="chevronLeft" size={12} sw={2.6} /><Icon name="chevronRight" size={12} sw={2.6} />
+        </div>
+      </div>
+    </>
+  )
+}
+
+const imgFill: React.CSSProperties = { position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'contain', display: 'block' }
+
+// Inline before/after card: the uploaded input (before) under the generated image (after),
+// revealed left→right by a draggable divider. A Full-screen button opens the large overlay.
+function BeforeAfter({ before, after, onExpand }: { before: string; after: string; onExpand: () => void }) {
+  const { pos, ref, handlers } = useWipe()
   return (
     <div style={{ border: '1px solid var(--hf-border)', borderRadius: 16, overflow: 'hidden', background: 'var(--hf-surface-1)', boxShadow: 'var(--hf-sheen-top)' }}>
-      <div ref={ref}
-        onPointerDown={(e) => { dragging.current = true; e.currentTarget.setPointerCapture(e.pointerId); moveTo(e.clientX) }}
-        onPointerMove={(e) => { if (dragging.current) moveTo(e.clientX) }}
-        onPointerUp={(e) => { dragging.current = false; e.currentTarget.releasePointerCapture?.(e.pointerId) }}
-        onPointerCancel={() => { dragging.current = false }}
+      <div ref={ref} {...handlers}
         style={{ position: 'relative', aspectRatio: '4/5', background: 'var(--hf-surface-inset)', cursor: 'ew-resize', touchAction: 'none', userSelect: 'none' }}>
-        <img src={after} draggable={false} style={imgBase} />
-        <img src={before} draggable={false} style={{ ...imgBase, clipPath: `inset(0 ${100 - pos}% 0 0)` }} />
-        <span style={{ ...badge, left: 10 }}>Before</span>
-        <span style={{ ...badge, right: 10 }}>After</span>
-        <div style={{ position: 'absolute', top: 0, bottom: 0, left: `${pos}%`, width: 2, marginLeft: -1, background: '#fff', boxShadow: '0 0 6px rgba(0,0,0,.45)', pointerEvents: 'none' }}>
-          <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', width: 34, height: 34, borderRadius: 99, background: '#fff', boxShadow: '0 1px 6px rgba(0,0,0,.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#333' }}>
-            <Icon name="chevronLeft" size={12} sw={2.6} /><Icon name="chevronRight" size={12} sw={2.6} />
-          </div>
-        </div>
+        <img src={after} draggable={false} style={imgFill} />
+        <img src={before} draggable={false} style={{ ...imgFill, clipPath: `inset(0 ${100 - pos}% 0 0)` }} />
+        <WipeChrome pos={pos} />
+        <button onClick={onExpand} title="Compare full screen"
+          style={{ position: 'absolute', top: 8, left: '50%', transform: 'translateX(-50%)', height: 28, padding: '0 11px', display: 'flex', alignItems: 'center', gap: 6, borderRadius: 99, background: 'var(--hf-glass-bg)', backdropFilter: 'blur(18px)', border: '1px solid var(--hf-glass-border)', color: '#fff', font: '600 11px var(--hf-font-sans)', cursor: 'pointer' }}>
+          <Icon name="expand" size={13} sw={2} />Full screen
+        </button>
       </div>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, padding: '12px 14px', borderTop: '1px solid var(--hf-border-subtle)' }}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 2, minWidth: 0 }}>
           <strong style={{ fontSize: 13 }}>Before / After</strong>
           <span style={{ font: '400 11px var(--hf-font-mono)', color: 'var(--hf-text-tertiary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>drag to compare · {after.split('/').pop()}</span>
         </div>
-        <a href={after} download title="Download" style={{ width: 34, height: 34, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 9, border: '1px solid var(--hf-border)', background: 'var(--hf-surface-2)', color: 'var(--hf-text-secondary)' }}>
-          <Icon name="download" size={16} />
-        </a>
+        <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
+          <button onClick={onExpand} title="Compare full screen"
+            style={{ width: 34, height: 34, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 9, border: '1px solid var(--hf-border)', background: 'var(--hf-surface-2)', color: 'var(--hf-text-secondary)', cursor: 'pointer' }}>
+            <Icon name="expand" size={15} />
+          </button>
+          <a href={after} download title="Download" style={{ width: 34, height: 34, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 9, border: '1px solid var(--hf-border)', background: 'var(--hf-surface-2)', color: 'var(--hf-text-secondary)' }}>
+            <Icon name="download" size={16} />
+          </a>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// Full-screen overlay: the same wipe at the image's natural size. Esc or the Close button exits.
+function FullscreenCompare({ before, after, onClose }: { before: string; after: string; onClose: () => void }) {
+  const { pos, ref, handlers } = useWipe()
+  useEffect(() => {
+    const h = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
+    window.addEventListener('keydown', h)
+    return () => window.removeEventListener('keydown', h)
+  }, [onClose])
+  const btn: React.CSSProperties = { height: 34, padding: '0 13px', display: 'flex', alignItems: 'center', gap: 7, borderRadius: 10, border: '1px solid var(--hf-glass-border)', background: 'var(--hf-glass-bg)', backdropFilter: 'blur(18px)', color: '#fff', font: '600 13px var(--hf-font-sans)', cursor: 'pointer', textDecoration: 'none' }
+  return (
+    <div style={{ position: 'fixed', inset: 0, zIndex: 400, background: 'rgba(8,10,14,.94)', backdropFilter: 'blur(8px)', display: 'flex', flexDirection: 'column', animation: 'rs-rise .2s var(--hf-ease-out)' }}>
+      <div style={{ flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, padding: '14px 18px' }}>
+        <span style={{ color: '#fff', font: '700 14px var(--hf-font-sans)', letterSpacing: '-.01em' }}>Before / After — drag to compare</span>
+        <div style={{ display: 'flex', gap: 9 }}>
+          <a href={after} download style={btn}><Icon name="download" size={15} />Download</a>
+          <button onClick={onClose} style={btn}><Icon name="x" size={15} sw={2.4} />Close <span style={{ opacity: .6, fontSize: 11, marginLeft: 1 }}>Esc</span></button>
+        </div>
+      </div>
+      <div style={{ flex: 1, minHeight: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 18px 18px' }}>
+        <div ref={ref} {...handlers}
+          style={{ position: 'relative', display: 'inline-block', lineHeight: 0, cursor: 'ew-resize', touchAction: 'none', userSelect: 'none' }}>
+          <img src={after} draggable={false} style={{ display: 'block', maxWidth: '92vw', maxHeight: 'calc(100vh - 120px)', objectFit: 'contain' }} />
+          <img src={before} draggable={false} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', clipPath: `inset(0 ${100 - pos}% 0 0)` }} />
+          <WipeChrome pos={pos} />
+        </div>
       </div>
     </div>
   )
@@ -103,6 +162,8 @@ function BeforeAfter({ before, after }: { before: string; after: string }) {
 export default function Results({ s }: { s: Studio }) {
   const f = s.active
   const p = s.progress
+  const [zoom, setZoom] = useState(false)
+  useEffect(() => { setZoom(false) }, [s.record])   // a new result closes any open full-screen compare
   if (!f) return null
 
   // ---- idle ----
@@ -226,9 +287,13 @@ export default function Results({ s }: { s: Studio }) {
 
       <div style={{ display: 'grid', gridTemplateColumns: grid, gap: 14, alignItems: 'start' }}>
         {compareArt
-          ? <BeforeAfter before={s.preview} after={compareArt[1]} />
+          ? <BeforeAfter before={s.preview} after={compareArt[1]} onExpand={() => setZoom(true)} />
           : arts.map(([name, url]) => <ArtifactCard key={name} name={name} url={url} />)}
       </div>
+
+      {zoom && compareArt && s.preview && (
+        <FullscreenCompare before={s.preview} after={compareArt[1]} onClose={() => setZoom(false)} />
+      )}
 
       <div style={{ border: '1px solid var(--hf-border)', borderRadius: 14, background: 'var(--hf-surface-1)', padding: '15px 17px' }}>
         <div style={{ marginBottom: 13 }}><span style={eyebrow}>Run metadata</span></div>

@@ -7,6 +7,16 @@ import { Icon, featureIcon } from './icons'
 
 const eyebrow: React.CSSProperties = { font: '600 11px var(--hf-font-sans)', letterSpacing: '.12em', textTransform: 'uppercase', color: 'var(--hf-text-tertiary)' }
 
+// Clarity presets are a UI quick-start: picking one fills the (always-visible) sliders, and
+// nudging a slider flips the Preset to 'Custom'. Mirrors features/clarity.py's documented values.
+const CLARITY_PRESETS: Record<string, Record<string, any>> = {
+  subtle: { creativity: 0.2, resemblance: 0.85, hdr: 5, detail_lora: 'more_details.safetensors' },
+  balanced: { creativity: 0.35, resemblance: 0.6, hdr: 6, detail_lora: 'more_details.safetensors' },
+  creative: { creativity: 0.55, resemblance: 0.45, hdr: 7, detail_lora: 'add_detail.safetensors' },
+  max: { creativity: 0.7, resemblance: 0.35, hdr: 8, detail_lora: 'add_detail.safetensors' },
+}
+const CLARITY_PRESET_KEYS = ['creativity', 'resemblance', 'hdr', 'detail_lora']
+
 function valueText(p: ParamSpec, v: any): string {
   if (p.control === 'slider' || p.control === 'stepper') {
     const n = Number(v)
@@ -152,6 +162,20 @@ export default function Controls({ s }: { s: Studio }) {
   const visible = (p: ParamSpec) => !p.depends_on || s.values[p.depends_on.param] === p.depends_on.value
   const basic = f.params.filter((p) => p.group === 'basic' && visible(p))
   const advanced = f.params.filter((p) => p.group === 'advanced' && visible(p))
+
+  // Clarity: a Preset pick fills the sliders; touching a preset-driven slider switches to Custom.
+  const onParam = (p: ParamSpec, v: any) => {
+    if (f.id === 'clarity' && p.name === 'preset') {
+      s.setVal('preset', v)
+      const preset = CLARITY_PRESETS[v]
+      if (preset) Object.entries(preset).forEach(([k, val]) => s.setVal(k, val))
+      return
+    }
+    if (f.id === 'clarity' && CLARITY_PRESET_KEYS.includes(p.name) && s.values.preset !== 'custom') {
+      s.setVal('preset', 'custom')
+    }
+    s.setVal(p.name, v)
+  }
   const liteRelief = f.id === 'relief' && s.models && !s.models.installed
   const px = Number(s.values.pixel_mm ?? 0.1) || 0.1
   const finalSize = dims ? `${Math.round(dims.w * px)} × ${Math.round(dims.h * px)} mm` : '—'
@@ -224,7 +248,7 @@ export default function Controls({ s }: { s: Studio }) {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
           {basic.map((p) => p.control === 'lora'
             ? <LoraField key={p.name} s={s} />
-            : <ParamField key={p.name} p={p} value={s.values[p.name]} onChange={(v) => s.setVal(p.name, v)} />)}
+            : <ParamField key={p.name} p={p} value={s.values[p.name]} onChange={(v) => onParam(p, v)} />)}
         </div>
 
         {/* final STL size (relief) */}
@@ -251,7 +275,7 @@ export default function Controls({ s }: { s: Studio }) {
               <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
                 {advanced.map((p) => p.control === 'lora'
                   ? <LoraField key={p.name} s={s} />
-                  : <ParamField key={p.name} p={p} value={s.values[p.name]} onChange={(v) => s.setVal(p.name, v)} />)}
+                  : <ParamField key={p.name} p={p} value={s.values[p.name]} onChange={(v) => onParam(p, v)} />)}
               </div>
             )}
           </div>

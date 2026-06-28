@@ -59,7 +59,7 @@ def _load_workflow():
     return None, None
 
 
-def _autobuild_workflow(client):
+def _autobuild_workflow(client, object_info=None):
     """Build the textured workflow ourselves — no manual ComfyUI step. Read the wrapper's bundled
     UI example and convert it to a pruned API prompt using ComfyUI's live /object_info."""
     try:
@@ -71,7 +71,7 @@ def _autobuild_workflow(client):
         if example is None:
             return None
         ui = json.loads(example.read_text(encoding="utf-8"))
-        graph, exp = build_textured_prompt(ui, client.get_object_info())
+        graph, exp = build_textured_prompt(ui, object_info or client.get_object_info())
         ctypes = {nd.get("class_type") for nd in (graph or {}).values()}
         if exp is None or not ({"Hy3DGenerateMesh", "Hy3DExportMesh"} <= ctypes):
             return None
@@ -112,6 +112,59 @@ def _nodes_of(graph, class_type):
             if isinstance(nd, dict) and nd.get("class_type") == class_type]
 
 
+def _combo_specs(object_info, class_type):
+    """The node's {input_name: spec} for required + optional inputs (or {} if unknown)."""
+    info = (object_info or {}).get(class_type)
+    if not isinstance(info, dict):
+        return {}
+    spec_in = info.get("input") if isinstance(info.get("input"), dict) else {}
+    return {**(spec_in.get("required") or {}), **(spec_in.get("optional") or {})}
+
+
+def _graph_valid(graph, object_info):
+    """False if any combo (list-typed) widget value is no longer allowed by the node's current
+    schema — e.g. a cache built before the Hy3D sampler dropped the 'fixed' scheduler option (or
+    one with widgets shifted by a leaked control_after_generate value). Triggers a clean rebuild."""
+    if not object_info:
+        return True                                       # can't check → assume ok
+    for nd in graph.values():
+        if not isinstance(nd, dict):
+            continue
+        specs = _combo_specs(object_info, nd.get("class_type"))
+        for name, val in (nd.get("inputs") or {}).items():
+            if isinstance(val, list):                     # a link [node, slot], not a widget value
+                continue
+            spec = specs.get(name)
+            if isinstance(spec, (list, tuple)) and spec and isinstance(spec[0], list) and val not in spec[0]:
+                return False
+    return True
+
+
+def _repair_combos(graph, object_info):
+    """Clamp any combo widget whose value isn't in the node's allowed options to the node's
+    default (or first option). A self-healing net for example/cache enum drift (the dropped
+    scheduler option), so a single removed value can't fail the whole prompt."""
+    if not object_info:
+        return graph
+    for nd in graph.values():
+        if not isinstance(nd, dict):
+            continue
+        specs = _combo_specs(object_info, nd.get("class_type"))
+        for name, val in list((nd.get("inputs") or {}).items()):
+            if isinstance(val, list):
+                continue
+            spec = specs.get(name)
+            if not (isinstance(spec, (list, tuple)) and spec and isinstance(spec[0], list)):
+                continue
+            options = spec[0]
+            if options and val not in options:
+                opts = spec[1] if len(spec) > 1 and isinstance(spec[1], dict) else {}
+                default = opts.get("default", options[0])
+                nd["inputs"][name] = default if default in options else options[0]
+                print(f"[image3d] repaired {nd.get('class_type')}.{name}: {val!r} → {nd['inputs'][name]!r}")
+    return graph
+
+
 class ImageTo3DFeature(Feature):
     id = "image3d"
     name = "Image → 3D"
@@ -139,12 +192,22 @@ class ImageTo3DFeature(Feature):
 
         # 0. find the API workflow: an override/cached file → else build it from the wrapper's
         #    example via /object_info → else recover it from a prior ComfyUI run in /history.
+        #    A stale cache (built against an older node — e.g. a since-removed scheduler option,
+        #    or widgets shifted by a leaked control_after_generate value) is rebuilt cleanly.
         graph, _src = _load_workflow()
+        try:
+            oi = client.get_object_info()
+        except Exception:
+            oi = None
+        if graph is not None and not _graph_valid(graph, oi):
+            print("[image3d] cached workflow uses an option the node no longer accepts — rebuilding")
+            graph = None
         if graph is None:
-            graph = _autobuild_workflow(client) or _learn_workflow_from_history(client)
+            graph = _autobuild_workflow(client, oi) or _learn_workflow_from_history(client)
         if graph is None:
             raise RuntimeError(_SETUP_HINT)
         graph = json.loads(json.dumps(graph))             # deep copy so we don't mutate the template
+        _repair_combos(graph, oi)                          # heal any remaining enum drift in place
 
         # 1. upload the photo, point every LoadImage / Hy3DUploadMesh-style image input at it.
         src = Image.open(inputs["image"]).convert("RGB")

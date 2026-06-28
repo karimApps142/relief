@@ -17,6 +17,10 @@ _VIRTUAL = {"Reroute", "PrimitiveNode", "Note", "MarkdownNote"}
 _DISPLAY = {"PreviewImage", "Preview3D", "Preview3DAnimation", "MaskPreview+", "MaskPreview",
             "PreviewAny", "SaveImage"}
 _PRIMITIVE_TYPES = ("INT", "FLOAT", "STRING", "BOOLEAN")
+# The frontend injects a `control_after_generate` combo right after a seed widget; its value is
+# one of these. /object_info doesn't always flag it, so we also detect it by name + value.
+_SEED_NAMES = {"seed", "noise_seed", "rand_seed"}
+_CONTROL_VALUES = {"fixed", "randomize", "increment", "decrement"}
 
 
 def _links_index(ui):
@@ -87,8 +91,14 @@ def convert_ui_to_api(ui, object_info):
                 if not is_widget:
                     continue
                 inputs[name] = wv[wi]; wi += 1
-                if opts.get("control_after_generate") and wi < len(wv):
-                    wi += 1                               # skip the control_after_generate widget
+                # Skip the frontend-injected control_after_generate combo that trails a seed
+                # widget. /object_info usually DOESN'T flag it (the frontend adds it by widget
+                # name), so also detect it by value — else 'fixed'/'randomize' leaks into the
+                # next input (e.g. scheduler) and shifts every widget after it.
+                if wi < len(wv) and (opts.get("control_after_generate")
+                        or (name in _SEED_NAMES and isinstance(wv[wi], str)
+                            and wv[wi] in _CONTROL_VALUES)):
+                    wi += 1
         api[str(nid)] = {"class_type": t, "inputs": inputs}
     return api
 

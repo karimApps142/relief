@@ -12,8 +12,9 @@ Pipeline per run:
   output clamp → save.
 
 Improvements over the first cut:
-- PRESETS (Subtle/Balanced/Creative/Max detail) drive Creativity/Resemblance/HDR/LoRA in one
-  pick; 'Custom' exposes the sliders.
+- PRESETS (Subtle/Balanced/Creative/Max detail) are a one-click quick-start that fills the
+  Creativity / Resemblance / HDR / LoRA controls, which stay visible for hand-tuning (the UI
+  fills the sliders and flips to 'Custom' when you nudge one — the sliders are authoritative).
 - MULTI-PASS: Scale > 2 is decomposed into successive ≤2× diffusion passes (the real clarity
   recipe), each re-detailing — far cleaner at high scale than one oversized pass.
 - SEAM FIX: a half-tile pass on the final stage removes faint tile seams.
@@ -43,13 +44,8 @@ _POS_SUFFIX = "masterpiece, best quality, highres, sharp focus, fine detail, int
 _NEG = "blurry, lowres, low quality, worst quality, jpeg artifacts, oversharpened, noise, deformed"
 _MAX_OUTPUT_PX = 8192          # hard cap on the output long edge → bounded VRAM / file size
 
-# preset -> the four "feel" params it drives (clarity.ai-style). 'custom' uses the sliders.
-_PRESETS = {
-    "subtle":   {"creativity": 0.20, "resemblance": 0.85, "hdr": 5, "detail_lora": "more_details.safetensors"},
-    "balanced": {"creativity": 0.35, "resemblance": 0.60, "hdr": 6, "detail_lora": "more_details.safetensors"},
-    "creative": {"creativity": 0.55, "resemblance": 0.45, "hdr": 7, "detail_lora": "add_detail.safetensors"},
-    "max":      {"creativity": 0.70, "resemblance": 0.35, "hdr": 8, "detail_lora": "add_detail.safetensors"},
-}
+# The Preset quick-start values live in the UI (web/src/Controls.tsx CLARITY_PRESETS); it fills
+# the visible sliders, so the server just reads whatever the sliders hold — no override here.
 # sensible per-LoRA strength (Detail Tweaker / slider want more push than more_details)
 _LORA_STRENGTH = {
     "more_details.safetensors": 0.5, "add_detail.safetensors": 0.7,
@@ -140,10 +136,10 @@ class ClarityFeature(Feature):
     vram = "~4–8 GB"
     output_kinds = ["Image PNG · detailed"]
     inputs = ["image"]
-    _CUSTOM = {"param": "preset", "value": "custom"}
     params = [
         ParamSpec("preset", "select", "balanced", "Preset",
-                  help="Quick looks. Pick Custom to drive Creativity / Resemblance / HDR / LoRA by hand.",
+                  help="Quick-start — fills the Creativity / Resemblance / HDR sliders below. "
+                       "Nudge any slider and this switches to Custom.",
                   choices=[{"value": "subtle", "label": "Subtle (faithful cleanup)"},
                            {"value": "balanced", "label": "Balanced"},
                            {"value": "creative", "label": "Creative (more invention)"},
@@ -158,20 +154,18 @@ class ClarityFeature(Feature):
                   help="Run 4×-UltraSharp on the finished image for extra crispness. "
                        "Multiplies the final size by 4 (so Scale 2× → 8× total). Off to keep Scale."),
         ParamSpec("creativity", "number", 0.35, "Creativity", 0.1, 1.0, 0.05, control="slider",
-                  depends_on=_CUSTOM,
-                  help="Denoise — higher invents more new detail; lower stays faithful."),
+                  help="Denoise — higher invents more new detail; lower stays faithful to the source."),
         ParamSpec("resemblance", "number", 0.6, "Resemblance", 0.0, 2.0, 0.05, control="slider",
-                  depends_on=_CUSTOM,
-                  help="Tile-ControlNet strength — how tightly to keep the original structure."),
+                  help="Tile-ControlNet strength — how tightly to keep the original structure. "
+                       "Lower lets it drift; higher locks composition."),
         ParamSpec("checkpoint", "select", "juggernaut_reborn.safetensors", "Detail model",
                   group="advanced", help="Photoreal SD1.5 checkpoint the detail is dreamed with.",
                   choices=[{"value": "juggernaut_reborn.safetensors", "label": "Juggernaut Reborn (photoreal)"},
                            {"value": "v1-5-pruned-emaonly-fp16.safetensors", "label": "SD 1.5 base (lighter)"}]),
         ParamSpec("hdr", "number", 6, "HDR / contrast", 1, 12, 0.5, control="slider", group="advanced",
-                  depends_on=_CUSTOM,
                   help="CFG — higher = punchier contrast & micro-detail; too high looks 'fried'."),
         ParamSpec("detail_lora", "select", "more_details.safetensors", "Detail LoRA", group="advanced",
-                  depends_on=_CUSTOM, help="Extra detail/sharpness. Detail Tweaker is the strongest.",
+                  help="Extra detail/sharpness. Detail Tweaker is the strongest.",
                   choices=[{"value": "more_details.safetensors", "label": "more_details (subtle)"},
                            {"value": "add_detail.safetensors", "label": "Detail Tweaker (strong)"},
                            {"value": "detail_slider_v4.safetensors", "label": "Detail slider"},
@@ -197,14 +191,11 @@ class ClarityFeature(Feature):
         client = ComfyUIClient()
         out_dir = Path(out_dir)
 
-        # preset drives the four "feel" params unless Custom is chosen
-        preset = params.get("preset", "balanced")
-        if preset != "custom" and preset in _PRESETS:
-            p = _PRESETS[preset]
-            creativity, resemblance, hdr, detail_lora = p["creativity"], p["resemblance"], p["hdr"], p["detail_lora"]
-        else:
-            creativity, resemblance, hdr = params["creativity"], params["resemblance"], params["hdr"]
-            detail_lora = params.get("detail_lora", "more_details.safetensors")
+        # the sliders are authoritative; the UI 'preset' just pre-fills them client-side
+        creativity = params["creativity"]
+        resemblance = params["resemblance"]
+        hdr = params["hdr"]
+        detail_lora = params.get("detail_lora", "more_details.safetensors")
         detail_strength = _LORA_STRENGTH.get(detail_lora, 0.6)
 
         # VRAM/speed safety: detail a sanely-sized source, then upscale back
