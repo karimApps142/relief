@@ -16,6 +16,7 @@ Design notes (hardened after review):
   (ships with uvicorn[standard]) is optional.
 """
 import os
+import sys
 import json
 import time
 import uuid
@@ -194,15 +195,32 @@ class ComfyUIClient:
                     if t == "execution_success" or (t == "executing" and d.get("node") is None):
                         return                             # this prompt finished
 
+    def _run_ws(self, pid, deadline):
+        """Run the async ws watcher on a SelectorEventLoop. asyncio.run() uses the Proactor
+        loop on Windows, which is unstable in a worker thread ([Errno 22]); the Selector
+        loop handles client sockets fine. On a ws failure the caller falls back to polling."""
+        loop = asyncio.SelectorEventLoop() if sys.platform == "win32" else asyncio.new_event_loop()
+        try:
+            loop.run_until_complete(self._watch_ws(pid, deadline))
+        finally:
+            try:
+                loop.close()
+            except Exception:
+                pass
+
     def _poll_until_done(self, pid, deadline):
+        fails = 0                                          # tolerate transient /history hiccups
         while time.monotonic() < deadline:
             try:
                 if pid in self._get_json(f"/history/{pid}"):
                     return
-            except urllib.error.URLError:
-                raise self._unreachable()
+                fails = 0
+            except Exception:
+                fails += 1
+                if fails >= 8:                             # ~8s of consecutive failures → give up
+                    raise self._unreachable()
             time.sleep(1.0)
-        raise ComfyUIError(f"ComfyUI timed out")
+        raise ComfyUIError("ComfyUI timed out")
 
     def _fetch_output(self, pid):
         try:
@@ -212,7 +230,7 @@ class ComfyUIClient:
                     return self._get_bytes("/view", {
                         "filename": im["filename"], "subfolder": im.get("subfolder", ""),
                         "type": im.get("type", "output")})
-        except urllib.error.URLError:
+        except OSError:                                   # URLError subclasses OSError
             raise self._unreachable()
         raise ComfyUIError("ComfyUI finished but produced no image")
 
@@ -234,7 +252,7 @@ class ComfyUIClient:
                         if isinstance(it, dict) and isinstance(it.get("filename"), str) \
                                 and it["filename"].lower().endswith(exts):
                             cands.append(it)
-        except urllib.error.URLError:
+        except OSError:                                   # URLError subclasses OSError
             raise self._unreachable()
         if not cands:
             raise ComfyUIError(f"ComfyUI finished but produced no {'/'.join(exts)} file")
@@ -275,7 +293,7 @@ class ComfyUIClient:
             pid = self._submit(graph)                     # queue EXACTLY once
             if _HAS_WS:
                 try:
-                    asyncio.run(self._watch_ws(pid, deadline))
+                    self._run_ws(pid, deadline)
                 except ComfyUIError:
                     raise
                 except Exception:
