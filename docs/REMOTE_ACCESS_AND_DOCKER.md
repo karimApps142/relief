@@ -5,23 +5,27 @@ Two operational guides for the GPU box (`DESKTOP-BVI0N3I`, Windows 11 Pro, RTX 3
 - **Part A** — SSH from the MacBook so you drive the Windows box from your Mac terminal (git pull,
   start the app, run inference) and view the UI locally over a tunnel. This is how you "handle
   most of it from the Mac."
-- **Part B** — Docker, for cloning the setup onto the *other* Windows machines once native works.
+- **Part B** — Docker, for cloning the setup onto the _other_ Windows machines once native works.
 
 ---
 
 ## ⚡ Quick start — connect & run (the everyday commands)
 
 **1. On the Mac** (Terminal) — SSH into the box over Tailscale:
+
 ```bash
 ssh ad@100.86.189.84
+cd /d F:\relief
 ```
 
 **2. On the box** — pull latest + start the app:
+
 ```
 cd /d F:\relief
 git pull
 .venv\Scripts\python.exe app_gradio.py
 ```
+
 Wait for `Running on http://0.0.0.0:7860`.
 
 **3. View it on the Mac** — open in the browser (no tunnel needed; Tailscale routes directly):
@@ -31,6 +35,7 @@ Wait for `Running on http://0.0.0.0:7860`.
 **Stop:** `Ctrl+C` in that terminal, then `exit` to leave SSH.
 
 Notes:
+
 - Keep the SSH terminal open — closing it stops the app.
 - If `ssh` asks for a password, enter the Windows **`ad`** account password.
 - `connection refused / timed out` → the box is off/asleep or not on Tailscale; power it on.
@@ -94,6 +99,7 @@ Now install that public key on Windows. **Which file depends on whether the acco
 Administrator** — this is the #1 thing people get wrong:
 
 **If `<win-user>` is a standard (non-admin) user** — PowerShell on Windows:
+
 ```powershell
 mkdir $env:USERPROFILE\.ssh -Force
 Add-Content $env:USERPROFILE\.ssh\authorized_keys "PASTE_THE_PUB_KEY_LINE_HERE"
@@ -101,6 +107,7 @@ Add-Content $env:USERPROFILE\.ssh\authorized_keys "PASTE_THE_PUB_KEY_LINE_HERE"
 
 **If `<win-user>` is an Administrator** (common on a personal PC) — sshd ignores the per-user file
 and uses a shared file that needs locked-down permissions:
+
 ```powershell
 Add-Content C:\ProgramData\ssh\administrators_authorized_keys "PASTE_THE_PUB_KEY_LINE_HERE"
 # fix permissions or sshd silently rejects the key:
@@ -109,6 +116,7 @@ icacls.exe C:\ProgramData\ssh\administrators_authorized_keys /inheritance:r `
 ```
 
 Test from the Mac:
+
 ```bash
 ssh -i ~/.ssh/winbox <win-user>@<win-ip>      # should log in with NO password
 ```
@@ -128,6 +136,7 @@ Host winbox
 ```
 
 Now it's just:
+
 ```bash
 ssh winbox
 ```
@@ -135,6 +144,7 @@ ssh winbox
 ## A5. The workflow — drive the GPU box from the Mac
 
 **Run commands remotely** (edit on Mac → push → pull + run on Windows, all from one terminal):
+
 ```bash
 ssh winbox
 # now on Windows:
@@ -145,16 +155,19 @@ python app_gradio.py            # or: uvicorn service:app --host 0.0.0.0 --port 
 ```
 
 **See the UI on the Mac** via an SSH tunnel — forward the Windows port back to the Mac so you open
-it in your *Mac* browser:
+it in your _Mac_ browser:
+
 ```bash
 # Mac terminal: tunnel 7860 (Gradio) — keep this open
 ssh -L 7860:localhost:7860 winbox
 # in that session, start the app:  cd Desktop\relief; .venv\Scripts\Activate.ps1; python app_gradio.py
 ```
+
 Then browse to **http://localhost:7860 on the Mac** — it's the 3060 doing the work, displayed
 locally. (For the API instead, tunnel `-L 8000:localhost:8000` and start uvicorn.)
 
 **One-shot remote command** (no interactive session):
+
 ```bash
 ssh winbox "cd Desktop\relief; git pull"
 ```
@@ -176,9 +189,9 @@ Tailscale name. Everything else above is unchanged.
 ## B1. When to bother
 
 **Get the native run working first** (`WINDOWS_SETUP.md`). Docker's value is **reproducing the
-torch/CUDA stack across the *other* Windows machines** without re-fighting the install — not
+torch/CUDA stack across the _other_ Windows machines** without re-fighting the install — not
 debugging the first box. So: native here → confirm real output → then containerize for the fleet.
-Docker removes the *Python-dependency* pain, **not** the GPU-driver setup — every machine still
+Docker removes the _Python-dependency_ pain, **not** the GPU-driver setup — every machine still
 needs the NVIDIA driver + WSL2.
 
 > Don't bother on the Mac — Docker on Apple Silicon can't reach an NVIDIA GPU.
@@ -197,6 +210,7 @@ needs the NVIDIA driver + WSL2.
 docker run --rm --gpus all nvidia/cuda:12.1.1-base-ubuntu22.04 nvidia-smi
 # should print the RTX 3060 table
 ```
+
 If that fails, fix it before building — it's the driver/WSL2 layer, not the image.
 
 ## B4. Build + run (with a persistent weights volume)
@@ -221,6 +235,7 @@ docker run --gpus all -p 8000:8000 `
 The `Dockerfile` runs **`uvicorn service:app` on port 8000** — the JSON API
 (`/relief`, `/models/status`, `/models/download`), **not** the Gradio UI. So with the container
 running you'd:
+
 ```powershell
 curl.exe -X POST http://localhost:8000/models/download      # once
 curl.exe -F "file=@img.jpg" -F "backend=auto" http://localhost:8000/relief
@@ -228,11 +243,13 @@ curl.exe -F "file=@img.jpg" -F "backend=auto" http://localhost:8000/relief
 
 Want the **Gradio UI from the container too**? Cleanest is to mount it onto the same FastAPI app so
 one container serves both at `:8000` (API) and `:8000/ui` (UI). Add to `service.py`:
+
 ```python
 import gradio as gr
 from app_gradio import demo
 app = gr.mount_gradio_app(app, demo, path="/ui")
 ```
+
 Rebuild, and the UI is at `http://localhost:8000/ui`. (Ask me and I'll wire this in.)
 
 ## B6. Deploy to the other Windows machines
