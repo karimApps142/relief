@@ -38,8 +38,14 @@ class UpscaleFeature(Feature):
     ]
 
     def run(self, inputs, params, out_dir):
+        import comfy_manager
+        model = params["model_name"]
+        # fetch the chosen ESRGAN model on demand if it isn't on the box yet (~64 MB), so
+        # picking Remacri/RealESRGAN works without a separate Download step. ComfyUI rescans
+        # the upscale_models folder (dir mtime changes) and sees the new file on this run.
+        comfy_manager.ensure_upscaler(model)
         client = ComfyUIClient()
         name = client.upload_image(inputs["image"])
         out = Path(out_dir) / "upscale.png"
-        out.write_bytes(client.generate(_build_graph(name, params["model_name"])))
+        out.write_bytes(client.generate(_build_graph(name, model)))
         return {"image": str(out)}

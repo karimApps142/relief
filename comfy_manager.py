@@ -93,6 +93,15 @@ CLARITY_MODELS = {
     "clarity · Sharpness LoRA (~9 MB)":
         ("philz1337x/loras", "add_sharpness.safetensors", "loras"),
 }
+# EXTRA UPSCALERS = the other ESRGAN models the Upscale feature's dropdown offers besides
+# 4x-UltraSharp (which is in MODELS). Without these, picking them fails ComfyUI validation
+# ('value_not_in_list'). Small (~67 MB each); downloaded alongside the core, NOT gating.
+UPSCALE_MODELS = {
+    "upscaler · 4x Foolhardy Remacri (~64 MB)":
+        ("FacehugmanIII/4x_foolhardy_Remacri", "4x_foolhardy_Remacri.pth", "upscale_models"),
+    "upscaler · RealESRGAN x4plus (~64 MB)":
+        ("lllyasviel/Annotators", "RealESRGAN_x4plus.pth", "upscale_models"),
+}
 
 LORA_DIR = COMFY_DIR / "models" / "loras"                 # user-supplied custom LoRAs land here
 
@@ -159,6 +168,7 @@ def status():
         "relight_models": {label: _path_ok(_dest(sub, p)) for label, (_, p, sub) in RELIGHT_MODELS.items()},
         "hunyuan3d_models": {label: _path_ok(_dest(sub, p)) for label, (_, p, sub) in HUNYUAN3D_MODELS.items()},
         "clarity_models": {label: _path_ok(_dest(sub, p)) for label, (_, p, sub) in CLARITY_MODELS.items()},
+        "upscale_models": {label: _path_ok(_dest(sub, p)) for label, (_, p, sub) in UPSCALE_MODELS.items()},
         "nodes": _nodes_status(),
         "busy": _task["running"],
         "action": _task["action"],
@@ -281,8 +291,28 @@ def download_async(labels=None):
     return True
 
 
+def ensure_upscaler(filename):
+    """Make sure an upscale model the UI offers is on disk, downloading it on demand the first
+    time it's picked (small, ~64 MB) so Remacri/RealESRGAN 'just work' without a separate
+    Download step. Returns the dest path; raises with a clear message if the fetch fails. A
+    user-dropped file we don't host is left for ComfyUI to resolve."""
+    for repo, path_in_repo, sub in {**MODELS, **UPSCALE_MODELS}.values():
+        if sub == "upscale_models" and path_in_repo.rsplit("/", 1)[-1] == filename:
+            dest = _dest(sub, path_in_repo)
+            if _path_ok(dest):
+                return dest
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            try:
+                _http_download(f"https://huggingface.co/{repo}/resolve/main/{path_in_repo}",
+                               dest, filename)
+            except Exception as e:
+                raise RuntimeError(f"Could not download upscale model '{filename}': {e}")
+            return dest
+    return _dest("upscale_models", filename)
+
+
 def _download(labels):
-    all_models = {**MODELS, **RELIGHT_MODELS, **HUNYUAN3D_MODELS, **CLARITY_MODELS}  # gate uses MODELS; download grabs all
+    all_models = {**MODELS, **RELIGHT_MODELS, **HUNYUAN3D_MODELS, **CLARITY_MODELS, **UPSCALE_MODELS}  # gate uses MODELS; download grabs all
     items = all_models if not labels else {k: all_models[k] for k in labels if k in all_models}
     failures = []
     for label, (repo, path_in_repo, sub) in items.items():
