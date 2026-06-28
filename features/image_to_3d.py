@@ -28,10 +28,11 @@ from pathlib import Path
 from PIL import Image
 
 from .base import Feature, ParamSpec
-from ._comfy import ComfyUIClient
+from ._comfy import ComfyUIClient, ComfyUIError
 
 _ROOT = Path(__file__).resolve().parent.parent
 _CACHE = _ROOT / "data" / "hy3d_workflow_api.json"          # learned/overridable API workflow
+_UNTEX_CACHE = _ROOT / "data" / "hy3d_workflow_geometry_api.json"   # geometry-only variant
 # API-format workflow the headless run drives. Override with HY3D_WORKFLOW_API.
 _WORKFLOW_CANDIDATES = [os.environ.get("HY3D_WORKFLOW_API"), str(_CACHE)]
 _SETUP_HINT = (
@@ -59,18 +60,27 @@ def _load_workflow():
     return None, None
 
 
-def _autobuild_workflow(client, object_info=None):
-    """Build the textured workflow ourselves — no manual ComfyUI step. Read the wrapper's bundled
-    UI example and convert it to a pruned API prompt using ComfyUI's live /object_info."""
+def _example_ui():
+    """The Hunyuan3D wrapper's bundled UI example workflow (dict), or None if not installed."""
     try:
         import comfy_manager as cm
-        from ._hy3d import build_textured_prompt
         exdir = cm.COMFY_DIR / "custom_nodes" / "ComfyUI-Hunyuan3DWrapper" / "example_workflows"
         example = next((exdir / n for n in ("hy3d_example_01.json", "hy3d_example_1.json")
                         if (exdir / n).is_file()), None)
-        if example is None:
-            return None
-        ui = json.loads(example.read_text(encoding="utf-8"))
+        return json.loads(example.read_text(encoding="utf-8")) if example else None
+    except Exception as e:
+        print(f"[image3d] example workflow unavailable ({e})")
+        return None
+
+
+def _autobuild_workflow(client, object_info=None):
+    """Build the textured workflow ourselves — no manual ComfyUI step. Read the wrapper's bundled
+    UI example and convert it to a pruned API prompt using ComfyUI's live /object_info."""
+    from ._hy3d import build_textured_prompt
+    ui = _example_ui()
+    if ui is None:
+        return None
+    try:
         graph, exp = build_textured_prompt(ui, object_info or client.get_object_info())
         ctypes = {nd.get("class_type") for nd in (graph or {}).values()}
         if exp is None or not ({"Hy3DGenerateMesh", "Hy3DExportMesh"} <= ctypes):
@@ -80,6 +90,54 @@ def _autobuild_workflow(client, object_info=None):
     except Exception as e:
         print(f"[image3d] auto-build skipped ({e})")
         return None
+
+
+def _build_geometry_workflow(client, object_info=None):
+    """Geometry-only API graph (exports the mesh, NO texture bake → no custom_rasterizer needed).
+    Cached separately from the textured graph. Used when texturing is off/unavailable."""
+    if _UNTEX_CACHE.is_file():
+        try:
+            g = json.loads(_UNTEX_CACHE.read_text(encoding="utf-8"))
+            if _graph_valid(g, object_info):
+                return g
+        except Exception:
+            pass
+    from ._hy3d import build_untextured_prompt
+    ui = _example_ui()
+    if ui is None:
+        return None
+    try:
+        graph, exp = build_untextured_prompt(ui, object_info or client.get_object_info())
+        ctypes = {nd.get("class_type") for nd in (graph or {}).values()}
+        if exp is None or not ({"Hy3DGenerateMesh", "Hy3DExportMesh"} <= ctypes):
+            return None
+        try:
+            _UNTEX_CACHE.parent.mkdir(parents=True, exist_ok=True)
+            _UNTEX_CACHE.write_text(json.dumps(graph), encoding="utf-8")
+        except Exception:
+            pass
+        return graph
+    except Exception as e:
+        print(f"[image3d] geometry-only build skipped ({e})")
+        return None
+
+
+def _rasterizer_available():
+    """True if the custom_rasterizer CUDA module (texture bake) is importable in the shared venv.
+    Checked without importing it (no CUDA init). When absent, we skip the doomed textured attempt
+    and go straight to geometry — no wasted shape-generation pass."""
+    try:
+        import importlib.util
+        return importlib.util.find_spec("custom_rasterizer") is not None
+    except Exception:
+        return False
+
+
+def _is_texture_error(err):
+    """A failure in the TEXTURE branch (so geometry-only would still succeed) vs a shape failure."""
+    s = str(err).lower()
+    return any(k in s for k in ("custom_rasterizer", "rendermultiview", "applytexture",
+                                "bakefrommultiview", "texgen", "differentiable_renderer"))
 
 
 def _learn_workflow_from_history(client):
@@ -195,20 +253,40 @@ def _repair_numbers(graph, object_info):
 class ImageTo3DFeature(Feature):
     id = "image3d"
     name = "Image → 3D"
-    description = ("Photo → textured 3D model (Hunyuan3D shape + paint). Exports a PBR-textured "
-                  "GLB plus OBJ / STL / PLY and an interactive 3D preview.")
+    description = ("Photo → 3D model (Hunyuan3D shape). Exports a GLB plus OBJ / STL / PLY and an "
+                  "interactive 3D preview. Adds PBR texture when the custom_rasterizer module is "
+                  "installed, otherwise returns clean geometry.")
     needs_comfy = True
     inputs = ["image"]
     engine = "comfy"
     icon = "box"
     est_runtime = "~2–8 min"
     vram = "~8–12 GB"
-    output_kinds = ["Textured GLB", "3D preview", "OBJ", "STL", "PLY"]
+    output_kinds = ["GLB", "3D preview", "OBJ", "STL", "PLY"]
+    guide = [
+        {"h": "What it does",
+         "b": "Generates a full 3D model from a single photo (Hunyuan3D). The shape always works; "
+              "PBR texturing is an extra step that needs the custom_rasterizer CUDA module."},
+        {"h": "Texture modes",
+         "b": "Auto (recommended): textures if custom_rasterizer is installed, else returns clean "
+              "geometry — no wasted run. Textured: force the texture bake (errors if the module is "
+              "missing). Geometry only: skip texturing for a faster, untextured mesh."},
+        {"h": "Geometry vs texture",
+         "b": "For CNC relief / 3D-printing you usually only need the GEOMETRY — an untextured mesh "
+              "is fully usable (it just previews gray). Texturing adds surface color/PBR maps, which "
+              "matter for rendering, not for carving."},
+    ]
     params = [
+        ParamSpec("texture", "select", "auto", "Texture", control="seg",
+                  help="Auto = texture if custom_rasterizer is available, else clean geometry. "
+                       "Textured = force the bake. Geometry only = skip texturing (faster).",
+                  choices=[{"value": "auto", "label": "Auto"},
+                           {"value": "on", "label": "Textured"},
+                           {"value": "off", "label": "Geometry only"}]),
         ParamSpec("seed", "number", 0, "Seed (0 = random)", 0, 2_147_483_647, 1, control="stepper",
                   help="Patched into the workflow's shape-generation node. 0 = a fresh random seed each run."),
         ParamSpec("formats", "select", "all", "Extra exports", control="seg", group="advanced",
-                  help="The textured GLB is always produced; also re-export these geometry formats.",
+                  help="The GLB is always produced; also re-export these geometry formats.",
                   choices=[{"value": "all", "label": "OBJ+STL+PLY"}, {"value": "obj", "label": "OBJ"},
                            {"value": "stl", "label": "STL"}, {"value": "none", "label": "GLB only"}]),
     ]
@@ -216,47 +294,71 @@ class ImageTo3DFeature(Feature):
     def run(self, inputs, params, out_dir):
         out = Path(out_dir)
         client = ComfyUIClient()
-
-        # 0. find the API workflow: an override/cached file → else build it from the wrapper's
-        #    example via /object_info → else recover it from a prior ComfyUI run in /history.
-        #    A stale cache (built against an older node — e.g. a since-removed scheduler option,
-        #    or widgets shifted by a leaked control_after_generate value) is rebuilt cleanly.
-        graph, _src = _load_workflow()
         try:
             oi = client.get_object_info()
         except Exception:
             oi = None
-        if graph is not None and not _graph_valid(graph, oi):
-            print("[image3d] cached workflow uses an option the node no longer accepts — rebuilding")
-            graph = None
-        if graph is None:
-            graph = _autobuild_workflow(client, oi) or _learn_workflow_from_history(client)
-        if graph is None:
-            raise RuntimeError(_SETUP_HINT)
-        graph = json.loads(json.dumps(graph))             # deep copy so we don't mutate the template
-        _repair_combos(graph, oi)                          # heal any remaining enum drift in place
-        _repair_numbers(graph, oi)                         # …and any out-of-range INT/FLOAT widgets
 
-        # 1. upload the photo, point every LoadImage / Hy3DUploadMesh-style image input at it.
+        # upload the photo once — reused by the textured attempt and the geometry fallback.
         src = Image.open(inputs["image"]).convert("RGB")
         tmp = out / "img3d_input.png"; src.save(tmp)
         name = client.upload_image(str(tmp))
-        load_nodes = _nodes_of(graph, "LoadImage")
-        for nid in load_nodes:
-            graph[nid].setdefault("inputs", {})["image"] = name
-        if not load_nodes:
-            raise RuntimeError("The workflow has no LoadImage node to feed the photo into — "
-                               "re-export an API-format workflow whose input is a LoadImage node.")
-
-        # 2. seed: patch the shape-generation node unless the user pinned one.
         seed = int(params.get("seed") or 0) or random.randint(1, 2_147_483_647)
-        for nid in _nodes_of(graph, "Hy3DGenerateMesh"):
-            if "seed" in graph[nid].get("inputs", {}):
-                graph[nid]["inputs"]["seed"] = seed
 
-        # 3. run headless → fetch the TEXTURED glb (the graph exports an untextured one too).
-        glb = client.generate_file(graph, exts=(".glb",), prefer="textured",
-                                   label="image3d·textured", max_wait=1800)
+        def _prep(graph):
+            """Deep-copy, heal enum/number drift, point LoadImage at our photo, patch the seed."""
+            g = json.loads(json.dumps(graph))             # never mutate the template/cache
+            _repair_combos(g, oi); _repair_numbers(g, oi)
+            load_nodes = _nodes_of(g, "LoadImage")
+            if not load_nodes:
+                raise RuntimeError("The workflow has no LoadImage node to feed the photo into — "
+                                   "re-export an API-format workflow whose input is a LoadImage node.")
+            for nid in load_nodes:
+                g[nid].setdefault("inputs", {})["image"] = name
+            for nid in _nodes_of(g, "Hy3DGenerateMesh"):
+                if "seed" in g[nid].get("inputs", {}):
+                    g[nid]["inputs"]["seed"] = seed
+            return g
+
+        def _load_textured():
+            # cached/override file → build from the wrapper example → recover from /history. A stale
+            # cache (an option the node dropped, or shifted widgets) is rebuilt cleanly.
+            graph, _src = _load_workflow()
+            if graph is not None and not _graph_valid(graph, oi):
+                print("[image3d] cached workflow uses an option the node no longer accepts — rebuilding")
+                graph = None
+            return graph or _autobuild_workflow(client, oi) or _learn_workflow_from_history(client)
+
+        def _run_geometry():
+            g = _build_geometry_workflow(client, oi)
+            if g is None:
+                raise RuntimeError("Couldn't build a geometry-only workflow.\n" + _SETUP_HINT)
+            glb = client.generate_file(_prep(g), exts=(".glb",), label="image3d·geometry", max_wait=1800)
+            return glb, False
+
+        # texture only if asked AND the custom_rasterizer CUDA module is actually present — so on a
+        # box without it we go straight to geometry (no wasted shape-generation pass).
+        mode = params.get("texture", "auto")
+        want_texture = mode == "on" or (mode == "auto" and _rasterizer_available())
+
+        if not want_texture:
+            glb, textured = _run_geometry()
+        else:
+            graph = _load_textured()
+            if graph is None:
+                raise RuntimeError(_SETUP_HINT)
+            try:
+                glb = client.generate_file(_prep(graph), exts=(".glb",), prefer="textured",
+                                           label="image3d·textured", max_wait=1800)
+                textured = True
+            except ComfyUIError as e:
+                if mode == "auto" and _is_texture_error(e):
+                    print(f"[image3d] texture bake unavailable ({e}); exporting geometry only")
+                    glb, textured = _run_geometry()
+                else:
+                    raise
+
+        print(f"[image3d] produced {'textured' if textured else 'geometry-only'} mesh")
         model = out / "model.glb"; model.write_bytes(glb)
         arts = {"model_glb": str(model), "preview3d": str(model)}
 

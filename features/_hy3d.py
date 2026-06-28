@@ -158,3 +158,43 @@ def build_textured_prompt(ui, object_info):
     if exp is None:
         return api, None
     return prune_to(api, [exp]), exp
+
+
+def _mesh_producer(api):
+    """The node emitting the bare generated mesh — what Hy3DApplyTexture would texture. Used to
+    export geometry directly, skipping the texture bake (and its custom_rasterizer dependency)."""
+    applied = [nid for nid, nd in api.items() if nd["class_type"] == "Hy3DApplyTexture"]
+    if applied:
+        for v in api[applied[0]]["inputs"].values():
+            if isinstance(v, list) and len(v) == 2 and v[0] in api and "Mesh" in api[v[0]]["class_type"]:
+                return v[0]
+    for ct in ("Hy3DPostprocessMesh", "Hy3DGenerateMesh"):
+        c = [nid for nid, nd in api.items() if nd["class_type"] == ct]
+        if c:
+            return c[-1]
+    return None
+
+
+def pick_untextured_export(api):
+    """An Hy3DExportMesh NOT fed (transitively) by Hy3DApplyTexture — the geometry-only export."""
+    exports = [nid for nid, nd in api.items() if nd["class_type"] == "Hy3DExportMesh"]
+    applied = {nid for nid, nd in api.items() if nd["class_type"] == "Hy3DApplyTexture"}
+    return next((nid for nid in exports if not _feeds_from(api, nid, applied)), None)
+
+
+def build_untextured_prompt(ui, object_info):
+    """UI workflow → pruned API prompt that exports GEOMETRY only — no texture bake, so it does
+    NOT need the custom_rasterizer CUDA module. Uses the example's untextured export if it has one,
+    else synthesizes an Hy3DExportMesh straight off the mesh producer. Returns (graph, export_id)."""
+    api = convert_ui_to_api(ui, object_info)
+    exp = pick_untextured_export(api)
+    if exp is None:                                       # synthesize one off the mesh producer
+        mesh_src = _mesh_producer(api)
+        if mesh_src is None:
+            return api, None
+        tmpl = next((nd for nd in api.values() if nd["class_type"] == "Hy3DExportMesh"), None)
+        inputs = dict(tmpl["inputs"]) if tmpl else {"file_format": "glb", "save_file": True}
+        inputs["trimesh"] = [mesh_src, 0]                 # the wrapper's mesh slot is named 'trimesh'
+        exp = str(max((int(k) for k in api if str(k).isdigit()), default=0) + 1)
+        api[exp] = {"class_type": "Hy3DExportMesh", "inputs": inputs}
+    return prune_to(api, [exp]), exp
