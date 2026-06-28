@@ -191,7 +191,12 @@ class ComfyUIClient:
                         pass
                 elif d.get("prompt_id") == pid:
                     if t == "execution_error":
-                        raise ComfyUIError(d.get("exception_message") or "ComfyUI execution error")
+                        nt = d.get("node_type") or "?"     # which node failed
+                        nid = d.get("node_id") or "?"
+                        msg = d.get("exception_message") or "execution error"
+                        tb = d.get("traceback") or []
+                        tail = " | ".join(s.strip() for s in tb[-2:]) if tb else ""
+                        raise ComfyUIError(f"{nt} (#{nid}): {msg}" + (f" — {tail}" if tail else ""))
                     if t == "execution_success" or (t == "executing" and d.get("node") is None):
                         return                             # this prompt finished
 
