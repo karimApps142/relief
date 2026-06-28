@@ -97,6 +97,7 @@ CLARITY_MODELS = {
 LORA_DIR = COMFY_DIR / "models" / "loras"                 # user-supplied custom LoRAs land here
 
 _proc = None                                              # the launched ComfyUI process
+_logfh = None                                             # its log file handle (kept alive)
 _lock = threading.Lock()
 _task = {"action": None, "running": False, "log": [], "error": None, "done": False}
 
@@ -376,35 +377,49 @@ def delete_lora(name):
 
 
 # ----------------------------------------------------------------------------- launch
-def _pump(proc):
-    """Stream ComfyUI's stdout/stderr into our task log (and comfy.log) so boot errors
-    are visible in the UI instead of vanishing into DEVNULL."""
-    logfile = COMFY_DIR / "comfy.log"
+def _tail_log(logfile, proc):
+    """Follow ComfyUI's log FILE → task log, until the process exits. We write ComfyUI's
+    output to a real file (not a PIPE): on Windows, tqdm flushing to a piped stream raises
+    [Errno 22] (e.g. inside UltimateSDUpscale's per-tile bars) — a real file flushes fine."""
     try:
-        with open(logfile, "w", encoding="utf-8", errors="replace") as fh:
-            for line in proc.stdout:
-                line = line.rstrip()
-                fh.write(line + "\n"); fh.flush()
-                _log("[comfy] " + line)
+        with open(logfile, "r", encoding="utf-8", errors="replace") as f:
+            while True:
+                line = f.readline()
+                if line:
+                    _log("[comfy] " + line.rstrip())
+                elif proc.poll() is not None:
+                    for rest in f.read().splitlines():     # drain the tail
+                        _log("[comfy] " + rest.rstrip())
+                    break
+                else:
+                    time.sleep(0.3)
     except Exception:
         pass
 
 
 def start():
-    """Launch ComfyUI headless if installed and not already up. Streams its boot log
-    into the UI and detects an early crash instead of silently 'starting' forever."""
-    global _proc
+    """Launch ComfyUI headless if installed and not already up. Its output goes to a log
+    FILE (NOT a pipe — pipes break tqdm's flush on Windows → [Errno 22]) which we tail into
+    the UI; detects an early crash instead of silently 'starting' forever."""
+    global _proc, _logfh
     if not is_installed():
         return {"ok": False, "error": "ComfyUI is not installed yet"}
     if is_running():
         return {"ok": True, "already_running": True}
+    try:
+        if _logfh:
+            _logfh.close()
+    except Exception:
+        pass
+    logfile = COMFY_DIR / "comfy.log"
     _log(f"starting ComfyUI ({sys.executable} main.py --listen {_HOST} --port {_PORT}) …")
+    _logfh = open(logfile, "wb")                          # real file → tqdm.flush() is safe
+    env = {**os.environ, "PYTHONUNBUFFERED": "1", "PYTHONIOENCODING": "utf-8"}
     _proc = subprocess.Popen(
         [sys.executable, "-u", "main.py", "--listen", _HOST, "--port", _PORT],
-        cwd=str(COMFY_DIR), stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-        text=True, bufsize=1, encoding="utf-8", errors="replace",
+        cwd=str(COMFY_DIR), stdout=_logfh, stderr=subprocess.STDOUT, env=env,
     )
-    threading.Thread(target=_pump, args=(_proc,), daemon=True).start()
+    threading.Thread(target=_tail_log, args=(logfile, _proc), daemon=True).start()
     for _ in range(120):                                  # up to 60s: torch + custom nodes load
         if is_running():
             _log("✓ ComfyUI is up")
@@ -419,7 +434,7 @@ def start():
 
 def stop(wait=12):
     """Stop the ComfyUI we launched and wait for the port to release."""
-    global _proc
+    global _proc, _logfh
     if _proc is not None:
         try:
             _proc.terminate()
@@ -432,6 +447,12 @@ def stop(wait=12):
         except Exception:
             pass
         _proc = None
+    if _logfh is not None:
+        try:
+            _logfh.close()
+        except Exception:
+            pass
+        _logfh = None
     for _ in range(24):                                   # wait for :8188 to free
         if not is_running():
             return True
