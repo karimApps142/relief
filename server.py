@@ -258,7 +258,12 @@ async def run_feature(fid: str, file: UploadFile = File(None), params: str = For
     try:
         artifacts = await run_in_threadpool(_execute)
     except Exception as e:  # surface the error to the client instead of a 500 page
-        return JSONResponse(status_code=500, content={"job": job, "error": str(e)})
+        import traceback
+        traceback.print_exc()                              # full traceback → server console
+        tb = traceback.format_exc().rstrip().splitlines()
+        where = next((ln.strip() for ln in reversed(tb) if ln.strip().startswith("File ")), "")
+        return JSONResponse(status_code=500, content={
+            "job": job, "error": f"{type(e).__name__}: {e}  ·  {where}"})
 
     duration = time.monotonic() - t0
     urls = {k: f"/api/jobs/{job}/{Path(v).name}" for k, v in artifacts.items()}
