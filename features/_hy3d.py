@@ -197,4 +197,8 @@ def build_untextured_prompt(ui, object_info):
         inputs["trimesh"] = [mesh_src, 0]                 # the wrapper's mesh slot is named 'trimesh'
         exp = str(max((int(k) for k in api if str(k).isdigit()), default=0) + 1)
         api[exp] = {"class_type": "Hy3DExportMesh", "inputs": inputs}
-    return prune_to(api, [exp]), exp
+    g = prune_to(api, [exp])
+    if exp in g:                                          # ensure it writes a fetchable .glb
+        g[exp]["inputs"]["file_format"] = "glb"
+        g[exp]["inputs"]["save_file"] = True
+    return g, exp

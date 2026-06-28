@@ -254,12 +254,14 @@ class ComfyUIClient:
             raise self._unreachable()
         raise ComfyUIError("ComfyUI finished but produced no image")
 
-    def _fetch_output_file(self, pid, exts, prefer=None):
+    def _fetch_output_file(self, pid, exts, prefer=None, since=None):
         """Fetch a saved output file whose name ends in one of `exts` (e.g. an exported
         GLB mesh). Scans every output node key-agnostically, since non-image savers list
         their files under their own ui key ('3d', etc.). When several match and `prefer`
         is given, return the one whose filename contains it (e.g. 'textured'); else the
-        LAST match (export nodes usually run last)."""
+        LAST match (export nodes usually run last). Some savers (kijai's Hy3DExportMesh)
+        return only a path STRING and register NOTHING in /history — so when the history
+        scan comes up empty, fall back to the newest matching file ComfyUI wrote to disk."""
         exts = tuple(e.lower() for e in exts)
         cands = []
         try:
@@ -274,12 +276,36 @@ class ComfyUIClient:
                             cands.append(it)
         except OSError:                                   # URLError subclasses OSError
             raise self._unreachable()
-        if not cands:
-            raise ComfyUIError(f"ComfyUI finished but produced no {'/'.join(exts)} file")
-        pick = next((c for c in cands if prefer and prefer.lower() in c["filename"].lower()), cands[-1])
-        return self._get_bytes("/view", {
-            "filename": pick["filename"], "subfolder": pick.get("subfolder", ""),
-            "type": pick.get("type", "output")})
+        if cands:
+            pick = next((c for c in cands if prefer and prefer.lower() in c["filename"].lower()), cands[-1])
+            return self._get_bytes("/view", {
+                "filename": pick["filename"], "subfolder": pick.get("subfolder", ""),
+                "type": pick.get("type", "output")})
+        disk = self._newest_output_on_disk(exts, prefer, since)   # Hy3DExportMesh & friends
+        if disk is not None:
+            return disk
+        raise ComfyUIError(f"ComfyUI finished but produced no {'/'.join(exts)} file")
+
+    def _newest_output_on_disk(self, exts, prefer=None, since=None):
+        """Box-local fallback: the newest file under ComfyUI's output dir matching `exts` (and
+        `prefer` if any) written since `since` (epoch secs). For savers that don't register in
+        /history. Returns bytes, or None if ComfyUI's dir is unknown/empty (e.g. remote engine)."""
+        try:
+            import comfy_manager
+            outdir = comfy_manager.COMFY_DIR / "output"
+            if not outdir.exists():
+                return None
+            files = [p for p in outdir.rglob("*")
+                     if p.suffix.lower() in exts and p.is_file()
+                     and (since is None or p.stat().st_mtime >= since)]
+            if prefer:
+                files = [p for p in files if prefer.lower() in p.name.lower()] or files
+            if not files:
+                return None
+            newest = max(files, key=lambda p: p.stat().st_mtime)
+            return newest.read_bytes()
+        except Exception:
+            return None
 
     # --------------------------------------------------------------------- public
     def generate(self, graph, label="", max_wait=600, total_steps=0):
@@ -312,6 +338,7 @@ class ComfyUIClient:
         graphs save to disk rather than emitting an `images` output."""
         _reset_progress(label, total=total_steps)
         deadline = time.monotonic() + max_wait
+        since = time.time() - 5                            # disk-fallback: only files from this run
         try:
             pid = self._submit(graph)                     # queue EXACTLY once
             if _HAS_WS:
@@ -323,6 +350,6 @@ class ComfyUIClient:
                     self._poll_until_done(pid, deadline)   # ws missing/closed/quiet → poll
             else:
                 self._poll_until_done(pid, deadline)
-            return self._fetch_output_file(pid, exts, prefer)
+            return self._fetch_output_file(pid, exts, prefer, since)
         finally:
             _clear_progress()
