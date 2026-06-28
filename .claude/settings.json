@@ -39,7 +39,11 @@
       "Bash(curl -s http://127.0.0.1:8000/api/health)",
       "Bash(curl -s -o /dev/null -w \"HTTP %{http_code}, %{size_download} bytes, type=%{content_type}\\\\n\" http://127.0.0.1:8000/)",
       "Bash(python3 -m py_compile relief_core.py)",
-      "Bash(timeout 20 ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 ad@100.86.189.84 'nvidia-smi --query-gpu=name,memory.total,driver_version --format=csv 2>nul || nvidia-smi')"
+      "Bash(timeout 20 ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 ad@100.86.189.84 'nvidia-smi --query-gpu=name,memory.total,driver_version --format=csv 2>nul || nvidia-smi')",
+      "Bash(./.venv/bin/python -m py_compile features/clarity.py comfy_manager.py)",
+      "Bash(PYTHONPATH=. ./.venv/bin/python /private/tmp/claude-501/-Users-apple-Desktop-workspace-myapps-CNC-BRG/d3ea8f59-75d4-4e4b-a1f1-65e5130e0ea1/scratchpad/check_v2.py)",
+      "Bash(PYTHONPATH=. ./.venv/bin/python /private/tmp/claude-501/-Users-apple-Desktop-workspace-myapps-CNC-BRG/d3ea8f59-75d4-4e4b-a1f1-65e5130e0ea1/scratchpad/check_run.py)",
+      "Bash(PYTHONPATH=. ./.venv/bin/python -c \"import server, comfy_manager as cm; print\\('features:', list\\(server.REGISTRY\\)\\); print\\('clarity_models:', len\\(cm.CLARITY_MODELS\\), 'files'\\); print\\('✓ imports clean'\\)\")"
     ]
   }
 }

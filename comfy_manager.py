@@ -82,8 +82,16 @@ CLARITY_MODELS = {
         ("lllyasviel/ControlNet-v1-1", "control_v11f1e_sd15_tile.pth", "controlnet"),
     "clarity · Juggernaut Reborn checkpoint (~2 GB)":
         ("dantea1118/juggernaut_reborn", "juggernaut_reborn.safetensors", "checkpoints"),
-    "clarity · more_details LoRA (~0.1 GB)":
+    # Detail LoRAs (all SD1.5, from the same repo): more_details (subtle), Detail Tweaker
+    # (strong), the LECO detail slider, and a sharpness LoRA. Small; ~58 MB combined.
+    "clarity · more_details LoRA (~9 MB)":
         ("philz1337x/loras", "more_details.safetensors", "loras"),
+    "clarity · Detail Tweaker LoRA (~36 MB)":
+        ("philz1337x/loras", "add_detail.safetensors", "loras"),
+    "clarity · Detail slider LoRA (~13 MB)":
+        ("philz1337x/loras", "detail_slider_v4.safetensors", "loras"),
+    "clarity · Sharpness LoRA (~9 MB)":
+        ("philz1337x/loras", "add_sharpness.safetensors", "loras"),
 }
 
 LORA_DIR = COMFY_DIR / "models" / "loras"                 # user-supplied custom LoRAs land here

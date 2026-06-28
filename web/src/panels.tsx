@@ -68,7 +68,7 @@ export function ComfyWizard({ s }: { s: Studio }) {
     { key: 'download', label: 'Download models',
       desc: isRelight ? 'Fetch the relight models (~3.7 GB).'
         : isImage3d ? 'Fetch the Hunyuan3D shape model (~4.9 GB). Paint models auto-download on first run.'
-        : isClarity ? 'Fetch the clarity models — Tile ControlNet + photoreal checkpoint + detail LoRA (~3.5 GB).'
+        : isClarity ? 'Fetch the clarity models — Tile ControlNet + photoreal checkpoint + 4 detail LoRAs (~3.5 GB).'
         : 'Fetch the 4 model files (~11.7 GB total).',
       done: allM, available: c.installed && !allM, btn: 'Download', showModels: true },
     c.running

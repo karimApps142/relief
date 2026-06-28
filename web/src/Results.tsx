@@ -1,3 +1,4 @@
+import { useRef, useState } from 'react'
 import type { Studio } from './studio'
 import { Button } from './ds'
 import { Icon } from './icons'
@@ -46,6 +47,52 @@ function ArtifactCard({ name, url }: { name: string; url: string }) {
           <span style={{ font: '400 11px var(--hf-font-mono)', color: 'var(--hf-text-tertiary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{url.split('/').pop()}</span>
         </div>
         <a href={url} download title="Download" style={{ width: 34, height: 34, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 9, border: '1px solid var(--hf-border)', background: 'var(--hf-surface-2)', color: 'var(--hf-text-secondary)' }}>
+          <Icon name="download" size={16} />
+        </a>
+      </div>
+    </div>
+  )
+}
+
+// Drag-to-wipe before/after comparison for the upscalers: the uploaded input (before)
+// under the generated image (after), revealed left→right by a draggable divider. Both
+// use object-fit: contain in the same box, so the (aspect-preserved) frames stay aligned.
+function BeforeAfter({ before, after }: { before: string; after: string }) {
+  const [pos, setPos] = useState(50)
+  const ref = useRef<HTMLDivElement>(null)
+  const dragging = useRef(false)
+  const moveTo = (clientX: number) => {
+    const el = ref.current
+    if (!el) return
+    const r = el.getBoundingClientRect()
+    setPos(Math.max(0, Math.min(100, ((clientX - r.left) / r.width) * 100)))
+  }
+  const badge: React.CSSProperties = { position: 'absolute', top: 10, padding: '3px 9px', borderRadius: 99, font: '600 10.5px var(--hf-font-sans)', letterSpacing: '.06em', textTransform: 'uppercase', background: 'rgba(0,0,0,.55)', color: '#fff', backdropFilter: 'blur(4px)', pointerEvents: 'none' }
+  const imgBase: React.CSSProperties = { position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'contain', display: 'block' }
+  return (
+    <div style={{ border: '1px solid var(--hf-border)', borderRadius: 16, overflow: 'hidden', background: 'var(--hf-surface-1)', boxShadow: 'var(--hf-sheen-top)' }}>
+      <div ref={ref}
+        onPointerDown={(e) => { dragging.current = true; e.currentTarget.setPointerCapture(e.pointerId); moveTo(e.clientX) }}
+        onPointerMove={(e) => { if (dragging.current) moveTo(e.clientX) }}
+        onPointerUp={(e) => { dragging.current = false; e.currentTarget.releasePointerCapture?.(e.pointerId) }}
+        onPointerCancel={() => { dragging.current = false }}
+        style={{ position: 'relative', aspectRatio: '4/5', background: 'var(--hf-surface-inset)', cursor: 'ew-resize', touchAction: 'none', userSelect: 'none' }}>
+        <img src={after} draggable={false} style={imgBase} />
+        <img src={before} draggable={false} style={{ ...imgBase, clipPath: `inset(0 ${100 - pos}% 0 0)` }} />
+        <span style={{ ...badge, left: 10 }}>Before</span>
+        <span style={{ ...badge, right: 10 }}>After</span>
+        <div style={{ position: 'absolute', top: 0, bottom: 0, left: `${pos}%`, width: 2, marginLeft: -1, background: '#fff', boxShadow: '0 0 6px rgba(0,0,0,.45)', pointerEvents: 'none' }}>
+          <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', width: 34, height: 34, borderRadius: 99, background: '#fff', boxShadow: '0 1px 6px rgba(0,0,0,.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#333' }}>
+            <Icon name="chevronLeft" size={12} sw={2.6} /><Icon name="chevronRight" size={12} sw={2.6} />
+          </div>
+        </div>
+      </div>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, padding: '12px 14px', borderTop: '1px solid var(--hf-border-subtle)' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 2, minWidth: 0 }}>
+          <strong style={{ fontSize: 13 }}>Before / After</strong>
+          <span style={{ font: '400 11px var(--hf-font-mono)', color: 'var(--hf-text-tertiary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>drag to compare · {after.split('/').pop()}</span>
+        </div>
+        <a href={after} download title="Download" style={{ width: 34, height: 34, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 9, border: '1px solid var(--hf-border)', background: 'var(--hf-surface-2)', color: 'var(--hf-text-secondary)' }}>
           <Icon name="download" size={16} />
         </a>
       </div>
@@ -163,6 +210,10 @@ export default function Results({ s }: { s: Studio }) {
     { k: 'Model', v: meta.model || '—' },
   ]
   const grid = (f.id === 'relief' || f.id === 'depthmap') ? 'repeat(2, minmax(0,1fr))' : 'minmax(0, 520px)'
+  // Upscalers compare against the source: swap the plain image card for a before/after wipe
+  // when we still hold the uploaded input (a fresh run; not a re-opened history item).
+  const compareArt = (f.id === 'upscale' || f.id === 'clarity') && s.preview
+    ? arts.find(([, url]) => kindOf(url) === 'image') : null
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 18, animation: 'rs-rise .3s var(--hf-ease-out)' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -174,7 +225,9 @@ export default function Results({ s }: { s: Studio }) {
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: grid, gap: 14, alignItems: 'start' }}>
-        {arts.map(([name, url]) => <ArtifactCard key={name} name={name} url={url} />)}
+        {compareArt
+          ? <BeforeAfter before={s.preview} after={compareArt[1]} />
+          : arts.map(([name, url]) => <ArtifactCard key={name} name={name} url={url} />)}
       </div>
 
       <div style={{ border: '1px solid var(--hf-border)', borderRadius: 14, background: 'var(--hf-surface-1)', padding: '15px 17px' }}>
