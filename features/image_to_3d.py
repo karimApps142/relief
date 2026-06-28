@@ -165,6 +165,33 @@ def _repair_combos(graph, object_info):
     return graph
 
 
+def _repair_numbers(graph, object_info):
+    """Reset any INT/FLOAT widget whose value falls outside the node's schema [min,max] back to
+    the node default — the numeric twin of _repair_combos. Guards against a misaligned widget
+    (e.g. a 512 resolution landing in cfg_image, which maxes at 100) failing the whole prompt
+    with 'value_bigger_than_max', and against a node lowering a bound after the cache was built."""
+    if not object_info:
+        return graph
+    for nd in graph.values():
+        if not isinstance(nd, dict):
+            continue
+        specs = _combo_specs(object_info, nd.get("class_type"))
+        for name, val in list((nd.get("inputs") or {}).items()):
+            if isinstance(val, bool) or not isinstance(val, (int, float)):
+                continue                                   # skip links, bools, strings
+            spec = specs.get(name)
+            if not (isinstance(spec, (list, tuple)) and spec and spec[0] in ("INT", "FLOAT")):
+                continue
+            opts = spec[1] if len(spec) > 1 and isinstance(spec[1], dict) else {}
+            lo, hi = opts.get("min"), opts.get("max")
+            if (lo is not None and val < lo) or (hi is not None and val > hi):
+                default = opts.get("default", lo if lo is not None else 0)
+                nd["inputs"][name] = default
+                print(f"[image3d] repaired {nd.get('class_type')}.{name}: {val!r} → {default!r} "
+                      f"(outside [{lo}, {hi}])")
+    return graph
+
+
 class ImageTo3DFeature(Feature):
     id = "image3d"
     name = "Image → 3D"
@@ -208,6 +235,7 @@ class ImageTo3DFeature(Feature):
             raise RuntimeError(_SETUP_HINT)
         graph = json.loads(json.dumps(graph))             # deep copy so we don't mutate the template
         _repair_combos(graph, oi)                          # heal any remaining enum drift in place
+        _repair_numbers(graph, oi)                         # …and any out-of-range INT/FLOAT widgets
 
         # 1. upload the photo, point every LoadImage / Hy3DUploadMesh-style image input at it.
         src = Image.open(inputs["image"]).convert("RGB")
