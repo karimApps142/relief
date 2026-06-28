@@ -47,7 +47,11 @@ echo [5/6] prebuilt RTX 3060 (Ampere) CUDA-op wheels, in order ...
 "%VENV%" -m pip install %W%/nvdiffrast-0.4.0-cp312-cp312-win_amd64.whl || goto err
 "%VENV%" -m pip install %W%/cumesh-0.0.1-cp312-cp312-win_amd64.whl || goto err
 "%VENV%" -m pip install %W%/flex_gemm-1.0.0-cp312-cp312-win_amd64.whl || goto err
-"%VENV%" -m pip install %W%/o_voxel-0.0.1-cp312-cp312-win_amd64.whl || goto err
+REM o_voxel's metadata pins cumesh @ git+...JeffreyXiang/CuMesh, which makes pip try to
+REM REBUILD cumesh from source (needs CUDA_HOME). The prebuilt cumesh above already satisfies
+REM it at runtime, so install o_voxel's plain deps first, then o_voxel itself with --no-deps.
+"%VENV%" -m pip install trimesh zstandard easydict || goto err
+"%VENV%" -m pip install --no-deps %W%/o_voxel-0.0.1-cp312-cp312-win_amd64.whl || goto err
 
 echo(
 echo [6/6] verify the extensions import ...
