@@ -66,8 +66,10 @@ class PortraitReliefFeature(Feature):
         ParamSpec("normal_gain", "number", 0.7, "Detail strength", 0.0, 1.5, 0.05, control="slider", group="advanced",
                   help="How strongly the Sapiens normal detail stands out."),
         ParamSpec("surface_detail", "number", 0.0, "Surface detail", 0.0, 1.5, 0.05, control="slider", group="advanced",
-                  help="Inject fine pore / wrinkle / fabric / hair-strand micro-relief from the photo. "
-                       "0 = off (geometry unchanged); try ~0.35 for extra surface texture."),
+                  help="Inject fine, EDGE-AWARE line detail (hair/fabric/feature lines) from the photo. "
+                       "0 = off; try ~0.4 for extra surface texture."),
+        ParamSpec("surface_smooth", "number", 0.3, "Surface polish", 0.0, 1.0, 0.05, control="slider", group="advanced",
+                  help="Edge-preserving polish: removes grainy noise, keeps grooves + lines crisp for a clean surface."),
         ParamSpec("black_bg", "bool", True, "Black background", group="advanced"),
         ParamSpec("make_solid", "bool", False, "Make solid", group="advanced"),
     ]
@@ -103,6 +105,7 @@ class PortraitReliefFeature(Feature):
             normal_detail=True, normal_source="sapiens", normal_gain=params.get("normal_gain", 0.7),
             black_bg=params.get("black_bg", True), make_solid=params.get("make_solid", False),
             surface_detail=params.get("surface_detail", 0.0),
+            surface_smooth=params.get("surface_smooth", 0.3),
             colormap=params.get("colormap", "turbo"), face_crop=True)
         artifacts.update(generate_relief(work, str(out_dir), rp, backend="auto"))
         return artifacts

@@ -42,10 +42,13 @@ class ReliefFeature(Feature):
         ParamSpec("pixel_mm", "number", 0.1, "Pixel size", 0.02, 0.5, 0.01, control="slider",
                   suffix=" mm/px", help="Real-world size of one pixel → sets STL dimensions."),
         ParamSpec("surface_detail", "number", 0.0, "Surface detail", 0.0, 1.5, 0.05, control="slider",
-                  help="Inject fine pore / wrinkle / fabric-weave / hair-strand micro-relief from the "
-                       "photo onto the heightmap. 0 = smooth depth only (geometry unchanged); raise it "
-                       "for more surface texture (higher = also more risk of carving photo texture). "
-                       "Try ~0.35 for portraits."),
+                  help="Inject fine, EDGE-AWARE line detail (hair strands, fabric, feature lines) from the "
+                       "photo. Carves only along real lines and leaves flat areas clean — 0 = smooth depth "
+                       "only. Try ~0.4 for portraits."),
+        ParamSpec("surface_smooth", "number", 0.3, "Surface polish", 0.0, 1.0, 0.05, control="slider",
+                  help="Edge-preserving polish that removes grainy 'sandpaper' noise while keeping grooves "
+                       "and feature lines crisp — for a clean, neat surface. 0 = off; raise for a cleaner "
+                       "carve (too high softens fine lines)."),
         ParamSpec("colormap", "select", "turbo", "Heat-map view", control="seg",
                   help="Also render a colour 'surface heat map' of the relief (PNG + 3D). Visualization "
                        "only — the grayscale heightmap and STL are unchanged. Off skips it.",

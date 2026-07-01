@@ -359,12 +359,15 @@ def fuse_depth_normals(depth, normal_height, detail=0.7, sigma=12.0):
 
 # ----- REAL fine surface detail: inject the pore/wrinkle/fabric/strand octave -----
 # The tiled depth carries the form + mid detail; the depth model still smooths the
-# FINEST octave (pores, wrinkles, fabric weave, single hair strands). This extracts
-# that band from the photo — the same MAD-normalized multi-scale bands compose_relief
-# uses, de-grained first so sensor noise isn't carved — and adds a small, amplitude-
-# controlled slice onto the height. This DOES change the geometry (STL/heightmap).
-# `amount` ~[0,1.5]; 0 returns the input untouched. Gated to the subject mask.
-def add_surface_detail(height, luma, mask=None, amount=0.5, sigma=6.0):
+# FINEST octave (fabric weave, single hair strands, feature lines). This extracts that
+# band from the photo — the same MAD-normalized multi-scale bands compose_relief uses,
+# de-grained first — and adds a small, amplitude-controlled slice onto the height.
+# EDGE-AWARE by default: the injected detail is gated by structure-tensor coherence, so
+# it carves ALONG real lines (hair, jaw, lashes) but leaves flat regions (cheeks, plain
+# cloth, background) clean instead of turning photo grain/skin texture into sandpaper —
+# the 'clean neat surface with clear lines' the sculpt.ok-class reliefs show.
+# This DOES change geometry. `amount` ~[0,1.5]; 0 returns the input untouched.
+def add_surface_detail(height, luma, mask=None, amount=0.5, sigma=6.0, edge_aware=True):
     if amount is None or float(amount) <= 0 or luma is None:
         return height.astype(np.float32)
     h = height.astype(np.float32)
@@ -381,6 +384,10 @@ def add_surface_detail(height, luma, mask=None, amount=0.5, sigma=6.0):
 
     detail = band(sigma * 0.5) + 0.7 * band(sigma * 0.25)    # fine + micro
     detail = detail - detail.mean()
+    if edge_aware:                                           # carve only along coherent structure
+        _, coh = _structure_tensor(_edge_preserve(l, 0.05), rho=1.2, sigma_t=2.5)
+        coh = np.clip(cv2.GaussianBlur(coh, (0, 0), 2.0), 0.0, 1.0)
+        detail = detail * coh                               # flat/noisy areas (low coh) -> ~0 detail
     if mask is not None and mask.shape[:2] == (H, W) and (mask > 0.5).any():
         rng = float(np.subtract(*np.percentile(h[mask > 0.5], [99, 1])))
     else:
@@ -481,7 +488,7 @@ def depth_to_heightmap(depth, mask=None, luma=None, invert=False, refine=0.6,
 
 def tiled_relief_heightmap(depth, mask=None, invert=False, base=0.50, fig_span=0.45, bg=None,
                            normal_map=None, normal_detail=0.7, normal_sigma=12.0,
-                           surface_detail=0.0, surface_luma=None):
+                           surface_detail=0.0, surface_luma=None, surface_smooth=0.0):
     """LEAN heightmap for TILED depth: the tiling already baked the facial detail
     into the depth, so do only robust percentile-normalize -> (invert) -> re-stretch
     inside the subject -> seat on a flat base. NO bilateral / guided-refine / gamma /
@@ -503,7 +510,14 @@ def tiled_relief_heightmap(depth, mask=None, invert=False, base=0.50, fig_span=0
         d = np.clip((d - d.min()) / (d.max() - d.min() + 1e-8), 0.0, 1.0).astype(np.float32)
     if surface_detail and float(surface_detail) > 0 and surface_luma is not None:
         d = np.clip(add_surface_detail(d, surface_luma, mask, amount=float(surface_detail)),
-                    0.0, 1.0).astype(np.float32)             # inject fine pore/wrinkle/strand octave
+                    0.0, 1.0).astype(np.float32)             # inject fine, edge-aware line detail
+    if surface_smooth and float(surface_smooth) > 0:         # edge-preserving polish: kill grain, keep grooves/lines
+        ds = denoise_surface(d, strength=float(surface_smooth))
+        if mask is not None and mask.shape[:2] == d.shape[:2]:
+            m2 = (mask > 0.5).astype(np.float32)
+            d = (m2 * ds + (1.0 - m2) * d).astype(np.float32)  # clean the subject; leave bg plate alone
+        else:
+            d = ds.astype(np.float32)
     bg_lvl = base if bg is None else float(bg)
     if mask is not None and mask.shape[:2] == d.shape[:2]:
         m = mask > 0.5

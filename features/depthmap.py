@@ -44,9 +44,12 @@ class DepthMapFeature(Feature):
                   depends_on={"param": "normals", "value": True},
                   help="How strongly the normal-derived detail stands out in the depth."),
         ParamSpec("surface_detail", "number", 0.0, "Surface detail", 0.0, 1.5, 0.05, control="slider",
-                  help="Inject fine pore / wrinkle / fabric / hair-strand micro-relief from the photo onto "
-                       "the depth. 0 = smooth depth only (geometry unchanged); raise it for more surface "
-                       "texture. Try ~0.35 for portraits."),
+                  help="Inject fine, EDGE-AWARE line detail (hair strands, fabric, feature lines) from the "
+                       "photo. Carves only along real lines, leaves flat areas clean. 0 = smooth depth only. "
+                       "Try ~0.4 for portraits."),
+        ParamSpec("surface_smooth", "number", 0.3, "Surface polish", 0.0, 1.0, 0.05, control="slider",
+                  help="Edge-preserving polish that removes grainy noise while keeping grooves and feature "
+                       "lines crisp — a clean, neat surface. 0 = off; raise for a cleaner carve."),
         ParamSpec("colormap", "select", "turbo", "Heat-map view", control="seg",
                   help="Also render a colour 'surface heat map' of the depth (PNG + 3D). Visualization only — "
                        "the 16-bit carve-ready depth is unchanged. Off skips it.",
@@ -99,7 +102,8 @@ class DepthMapFeature(Feature):
             bg=(0.0 if mask is not None else None),
             normal_map=(normal_map if use_normals else None),
             normal_detail=params.get("normal_gain", 0.7),
-            surface_detail=params.get("surface_detail", 0.0), surface_luma=luma)
+            surface_detail=params.get("surface_detail", 0.0), surface_luma=luma,
+            surface_smooth=params.get("surface_smooth", 0.0))
         height16 = rc.to_heightmap_16bit(height, normalize=False)
 
         cv2.imwrite(str(out / "depth_16bit.png"), height16)                    # carve-ready

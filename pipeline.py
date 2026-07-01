@@ -44,7 +44,8 @@ class ReliefParams:
     normal_detail: bool = False     # fuse surface-normal facial relief onto the depth form
     normal_gain: float = 0.7        # how strongly the normal-derived detail stands out
     normal_source: str = "sapiens"  # which normal model: sapiens (human, sharpest) | marigold
-    surface_detail: float = 0.0     # inject fine pore/wrinkle/fabric/strand micro-relief (0 = off, geometry byte-identical to pre-feature; opt-in so default carves never silently change)
+    surface_detail: float = 0.0     # inject fine, EDGE-AWARE line detail (0 = off; carves only along real lines, leaves flat areas clean)
+    surface_smooth: float = 0.3     # edge-preserving polish: removes grain/sandpaper noise, keeps grooves + feature lines crisp (0 = off)
     colormap: str = "turbo"         # heat-map render: turbo|inferno|magma|viridis|plasma|jet|off (viz only)
     backend: str = None             # "lite" | "full" | "auto" | None (env default)
     # --- legacy fields (ignored by the tiled engine; kept so service.py / app_gradio
@@ -123,7 +124,8 @@ def _generate_relief(image_path, out_dir, params, be):
                                        bg=(0.0 if params.black_bg else None),
                                        normal_map=normal_map, normal_detail=params.normal_gain,
                                        surface_detail=getattr(params, "surface_detail", 0.0),
-                                       surface_luma=luma)
+                                       surface_luma=luma,
+                                       surface_smooth=getattr(params, "surface_smooth", 0.0))
 
     # 3. export 16-bit (no renormalize — keep the shallow base/range we built)
     height16 = rc.to_heightmap_16bit(height, normalize=False)
