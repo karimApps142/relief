@@ -43,7 +43,11 @@
       "Bash(./.venv/bin/python -m py_compile features/clarity.py comfy_manager.py)",
       "Bash(PYTHONPATH=. ./.venv/bin/python /private/tmp/claude-501/-Users-apple-Desktop-workspace-myapps-CNC-BRG/d3ea8f59-75d4-4e4b-a1f1-65e5130e0ea1/scratchpad/check_v2.py)",
       "Bash(PYTHONPATH=. ./.venv/bin/python /private/tmp/claude-501/-Users-apple-Desktop-workspace-myapps-CNC-BRG/d3ea8f59-75d4-4e4b-a1f1-65e5130e0ea1/scratchpad/check_run.py)",
-      "Bash(PYTHONPATH=. ./.venv/bin/python -c \"import server, comfy_manager as cm; print\\('features:', list\\(server.REGISTRY\\)\\); print\\('clarity_models:', len\\(cm.CLARITY_MODELS\\), 'files'\\); print\\('✓ imports clean'\\)\")"
+      "Bash(PYTHONPATH=. ./.venv/bin/python -c \"import server, comfy_manager as cm; print\\('features:', list\\(server.REGISTRY\\)\\); print\\('clarity_models:', len\\(cm.CLARITY_MODELS\\), 'files'\\); print\\('✓ imports clean'\\)\")",
+      "Bash(curl -sL \"https://raw.githubusercontent.com/PozzettiAndrea/ComfyUI-TRELLIS2/main/workflows/geometry_only_512.json\")",
+      "Bash(python3 -c ' *)",
+      "Bash(curl -s \"https://huggingface.co/api/models/Comfy-Org/TRELLIS.2?blobs=true\")",
+      "Bash(curl -s \"https://api.github.com/repos/PozzettiAndrea/ComfyUI-TRELLIS2/git/trees/main?recursive=1\")"
     ]
   }
 }
