@@ -41,7 +41,7 @@ class PortraitReliefFeature(Feature):
     icon = "portrait"
     est_runtime = "~1–5 min"
     vram = "~6–10 GB"
-    output_kinds = ["Heightmap PNG", "3D preview GLB", "STL mesh"]
+    output_kinds = ["Heightmap PNG", "Heat map", "3D preview GLB", "STL mesh"]
     params = [
         ParamSpec("delight", "bool", True, "Delight first (flatten shadows)",
                   help="IC-Light 'even' relight removes directional shadows so they aren't carved "
@@ -58,8 +58,16 @@ class PortraitReliefFeature(Feature):
                            {"value": "ultra", "label": "Ultra · 100"}, {"value": "max", "label": "Max · 144"}]),
         ParamSpec("relief_depth_mm", "number", 8.0, "Relief depth", 2, 20, 0.5, control="slider", suffix=" mm"),
         ParamSpec("pixel_mm", "number", 0.1, "Pixel size", 0.02, 0.5, 0.01, control="slider", suffix=" mm/px"),
+        ParamSpec("colormap", "select", "turbo", "Heat-map view", control="seg",
+                  help="Also render a colour 'surface heat map' (PNG + 3D). Visualization only. Off skips it.",
+                  choices=[{"value": "off", "label": "Off"}, {"value": "turbo", "label": "Turbo"},
+                           {"value": "inferno", "label": "Inferno"}, {"value": "viridis", "label": "Viridis"},
+                           {"value": "magma", "label": "Magma"}]),
         ParamSpec("normal_gain", "number", 0.7, "Detail strength", 0.0, 1.5, 0.05, control="slider", group="advanced",
                   help="How strongly the Sapiens normal detail stands out."),
+        ParamSpec("surface_detail", "number", 0.0, "Surface detail", 0.0, 1.5, 0.05, control="slider", group="advanced",
+                  help="Inject fine pore / wrinkle / fabric / hair-strand micro-relief from the photo. "
+                       "0 = off (geometry unchanged); try ~0.35 for extra surface texture."),
         ParamSpec("black_bg", "bool", True, "Black background", group="advanced"),
         ParamSpec("make_solid", "bool", False, "Make solid", group="advanced"),
     ]
@@ -94,6 +102,7 @@ class PortraitReliefFeature(Feature):
             relief_depth_mm=params["relief_depth_mm"], pixel_mm=params["pixel_mm"],
             normal_detail=True, normal_source="sapiens", normal_gain=params.get("normal_gain", 0.7),
             black_bg=params.get("black_bg", True), make_solid=params.get("make_solid", False),
-            face_crop=True)
+            surface_detail=params.get("surface_detail", 0.0),
+            colormap=params.get("colormap", "turbo"), face_crop=True)
         artifacts.update(generate_relief(work, str(out_dir), rp, backend="auto"))
         return artifacts

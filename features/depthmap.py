@@ -23,7 +23,7 @@ class DepthMapFeature(Feature):
     icon = "layers"
     est_runtime = "~10 s – 3 min"
     vram = "~2–4 GB"
-    output_kinds = ["Depth 16-bit PNG", "3D preview GLB", "Normal PNG"]
+    output_kinds = ["Depth 16-bit PNG", "Heat map", "3D preview GLB", "Normal PNG"]
     params = [
         ParamSpec("depth_model", "select", "depth-anything", "Depth model", control="seg",
                   choices=[{"value": "depth-anything", "label": "Depth-Anything"},
@@ -43,6 +43,16 @@ class DepthMapFeature(Feature):
         ParamSpec("normal_gain", "number", 0.7, "Detail strength", 0.0, 1.5, 0.05, control="slider",
                   depends_on={"param": "normals", "value": True},
                   help="How strongly the normal-derived detail stands out in the depth."),
+        ParamSpec("surface_detail", "number", 0.0, "Surface detail", 0.0, 1.5, 0.05, control="slider",
+                  help="Inject fine pore / wrinkle / fabric / hair-strand micro-relief from the photo onto "
+                       "the depth. 0 = smooth depth only (geometry unchanged); raise it for more surface "
+                       "texture. Try ~0.35 for portraits."),
+        ParamSpec("colormap", "select", "turbo", "Heat-map view", control="seg",
+                  help="Also render a colour 'surface heat map' of the depth (PNG + 3D). Visualization only — "
+                       "the 16-bit carve-ready depth is unchanged. Off skips it.",
+                  choices=[{"value": "off", "label": "Off"}, {"value": "turbo", "label": "Turbo"},
+                           {"value": "inferno", "label": "Inferno"}, {"value": "viridis", "label": "Viridis"},
+                           {"value": "magma", "label": "Magma"}]),
         ParamSpec("relief_depth_mm", "number", 5.0, "3D depth", 2, 20, 0.5, control="slider", suffix=" mm",
                   group="advanced", help="Z height of the interactive 3D preview (lower = shallower, lithophane-like)."),
         ParamSpec("invert", "bool", False, "Invert depth", group="advanced",
@@ -83,17 +93,29 @@ class DepthMapFeature(Feature):
         # 4. fuse depth (form) + normals (detail), seat on a black plate -> the relief-style
         #    "black background + grayscale surface" heightmap. base>0 keeps the figure off pure
         #    black so the silhouette stays crisp; fig_span uses the rest of the range.
+        luma = np.asarray(image.convert("L"), np.float32) / 255.0    # fine-detail source
         height = rc.tiled_relief_heightmap(
             depth, mask, invert=params.get("invert", False), base=0.12, fig_span=0.88,
             bg=(0.0 if mask is not None else None),
             normal_map=(normal_map if use_normals else None),
-            normal_detail=params.get("normal_gain", 0.7))
+            normal_detail=params.get("normal_gain", 0.7),
+            surface_detail=params.get("surface_detail", 0.0), surface_luma=luma)
         height16 = rc.to_heightmap_16bit(height, normalize=False)
 
         cv2.imwrite(str(out / "depth_16bit.png"), height16)                    # carve-ready
         cv2.imwrite(str(out / "depth_preview.png"), (height16 >> 8).astype(np.uint8))  # 8-bit viewable
         arts = {"depth_16bit": str(out / "depth_16bit.png"),
                 "depth_preview": str(out / "depth_preview.png")}
+
+        # colour "surface heat map" render (viz only; the 16-bit depth above is untouched)
+        cmap = params.get("colormap", "turbo")
+        if cmap and str(cmap).lower() != "off":
+            hmask = mask
+            if hmask is not None and hmask.shape[:2] != height16.shape[:2]:
+                hmask = cv2.resize(hmask, (height16.shape[1], height16.shape[0]))
+            heat = rc.colorize_height(height16, hmask, cmap=cmap)
+            cv2.imwrite(str(out / "depth_heat.png"), cv2.cvtColor(heat, cv2.COLOR_RGB2BGR))
+            arts["depth_heat"] = str(out / "depth_heat.png")
 
         # 5. normal map export — background neutralised when masking (kills the noisy bg)
         if use_normals and normal_map is not None:
@@ -109,4 +131,9 @@ class DepthMapFeature(Feature):
         rc.heightmap_to_preview(height16, z_scale_mm=float(params.get("relief_depth_mm", 5.0)),
                                 pixel_mm=0.1, max_px=448).export(str(preview))
         arts["preview3d"] = str(preview)
+        if "depth_heat" in arts:                 # matching vertex-coloured 3D heat map
+            heat3d = out / "heat3d.glb"
+            rc.heightmap_to_preview(height16, z_scale_mm=float(params.get("relief_depth_mm", 5.0)),
+                                    pixel_mm=0.1, max_px=448, colormap=cmap).export(str(heat3d))
+            arts["heat3d"] = str(heat3d)
         return arts

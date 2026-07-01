@@ -17,7 +17,7 @@ class ReliefFeature(Feature):
     icon = "box"
     est_runtime = "~5 s – 4 min"
     vram = "~2–4 GB"
-    output_kinds = ["Heightmap PNG", "3D preview GLB", "STL mesh"]
+    output_kinds = ["Heightmap PNG", "Heat map", "3D preview GLB", "STL mesh"]
     params = [
         ParamSpec("depth_model", "select", "depth-anything", "Depth model", control="seg",
                   help="Monocular-depth model that estimates 3D shape from one photo.",
@@ -41,6 +41,17 @@ class ReliefFeature(Feature):
                   suffix=" mm", help="Physical carve depth of the relief."),
         ParamSpec("pixel_mm", "number", 0.1, "Pixel size", 0.02, 0.5, 0.01, control="slider",
                   suffix=" mm/px", help="Real-world size of one pixel → sets STL dimensions."),
+        ParamSpec("surface_detail", "number", 0.0, "Surface detail", 0.0, 1.5, 0.05, control="slider",
+                  help="Inject fine pore / wrinkle / fabric-weave / hair-strand micro-relief from the "
+                       "photo onto the heightmap. 0 = smooth depth only (geometry unchanged); raise it "
+                       "for more surface texture (higher = also more risk of carving photo texture). "
+                       "Try ~0.35 for portraits."),
+        ParamSpec("colormap", "select", "turbo", "Heat-map view", control="seg",
+                  help="Also render a colour 'surface heat map' of the relief (PNG + 3D). Visualization "
+                       "only — the grayscale heightmap and STL are unchanged. Off skips it.",
+                  choices=[{"value": "off", "label": "Off"}, {"value": "turbo", "label": "Turbo"},
+                           {"value": "inferno", "label": "Inferno"}, {"value": "viridis", "label": "Viridis"},
+                           {"value": "magma", "label": "Magma"}]),
         ParamSpec("black_bg", "bool", True, "Black background", group="advanced",
                   help="Background sits at zero height vs a mid-gray plate."),
         ParamSpec("invert", "bool", False, "Invert depth", group="advanced",

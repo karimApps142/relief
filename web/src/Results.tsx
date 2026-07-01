@@ -12,7 +12,7 @@ function kindOf(url: string): 'glb' | 'image' | 'mesh' {
   if (/\.(png|jpg|jpeg|webp)$/.test(u)) return 'image'
   return 'mesh'
 }
-const ARTLABEL: Record<string, string> = { heightmap: 'Heightmap', preview3d: '3D preview', stl: 'STL mesh', image: 'Image', depth_16bit: 'Depth (16-bit)', depth_preview: 'Depth preview', normal: 'Normal map' }
+const ARTLABEL: Record<string, string> = { heightmap: 'Heightmap', preview3d: '3D preview', stl: 'STL mesh', image: 'Image', depth_16bit: 'Depth (16-bit)', depth_preview: 'Depth preview', normal: 'Normal map', relief_heat: 'Heat map', depth_heat: 'Heat map', heat3d: '3D heat map' }
 
 function ArtifactCard({ name, url }: { name: string; url: string }) {
   const kind = kindOf(url)

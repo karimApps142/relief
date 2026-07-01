@@ -44,6 +44,8 @@ class ReliefParams:
     normal_detail: bool = False     # fuse surface-normal facial relief onto the depth form
     normal_gain: float = 0.7        # how strongly the normal-derived detail stands out
     normal_source: str = "sapiens"  # which normal model: sapiens (human, sharpest) | marigold
+    surface_detail: float = 0.0     # inject fine pore/wrinkle/fabric/strand micro-relief (0 = off, geometry byte-identical to pre-feature; opt-in so default carves never silently change)
+    colormap: str = "turbo"         # heat-map render: turbo|inferno|magma|viridis|plasma|jet|off (viz only)
     backend: str = None             # "lite" | "full" | "auto" | None (env default)
     # --- legacy fields (ignored by the tiled engine; kept so service.py / app_gradio
     #     don't break). Detail now comes from tiling, not these. ---
@@ -115,15 +117,30 @@ def _generate_relief(image_path, out_dir, params, be):
     # 2b. subject mask -> seat on a flat base.
     relief_progress.phase(1)
     mask = be.remove_background(image) if params.flatten_bg else None
+    luma = np.asarray(image.convert("L"), np.float32) / 255.0   # fine-detail source
     height = rc.tiled_relief_heightmap(depth, mask, invert=params.invert,
                                        base=params.base_height, fig_span=params.fig_span,
                                        bg=(0.0 if params.black_bg else None),
-                                       normal_map=normal_map, normal_detail=params.normal_gain)
+                                       normal_map=normal_map, normal_detail=params.normal_gain,
+                                       surface_detail=getattr(params, "surface_detail", 0.0),
+                                       surface_luma=luma)
 
     # 3. export 16-bit (no renormalize — keep the shallow base/range we built)
     height16 = rc.to_heightmap_16bit(height, normalize=False)
     png_path = out / "relief_heightmap.png"
     cv2.imwrite(str(png_path), height16)         # 16-bit PNG
+
+    # 3b. optional heat-map render — a colored "surface heat map" PNG (visualization only;
+    #     the 16-bit heightmap + STL above are untouched). Background painted flat.
+    heat_path = None
+    cmap = getattr(params, "colormap", "turbo")
+    if cmap and str(cmap).lower() != "off":
+        hmask = mask
+        if hmask is not None and hmask.shape[:2] != height16.shape[:2]:
+            hmask = cv2.resize(hmask, (height16.shape[1], height16.shape[0]))
+        heat = rc.colorize_height(height16, hmask, cmap=cmap)
+        heat_path = out / "relief_heat.png"
+        cv2.imwrite(str(heat_path), cv2.cvtColor(heat, cv2.COLOR_RGB2BGR))
 
     # 4. STL
     relief_progress.phase(2)
@@ -140,5 +157,12 @@ def _generate_relief(image_path, out_dir, params, be):
     rc.heightmap_to_preview(height16, params.relief_depth_mm,
                             params.pixel_mm).export(str(preview_path))
 
-    return {"heightmap": str(png_path), "stl": str(stl_path),
+    arts = {"heightmap": str(png_path), "stl": str(stl_path),
             "preview3d": str(preview_path)}
+    if heat_path is not None:
+        arts["relief_heat"] = str(heat_path)
+        heat3d_path = out / "heat3d.glb"         # same relief, vertex-colored by the ramp
+        rc.heightmap_to_preview(height16, params.relief_depth_mm, params.pixel_mm,
+                                colormap=cmap).export(str(heat3d_path))
+        arts["heat3d"] = str(heat3d_path)
+    return arts

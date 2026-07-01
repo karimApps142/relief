@@ -357,6 +357,96 @@ def fuse_depth_normals(depth, normal_height, detail=0.7, sigma=12.0):
     return (form + float(detail) * feat).astype(np.float32)
 
 
+# ----- REAL fine surface detail: inject the pore/wrinkle/fabric/strand octave -----
+# The tiled depth carries the form + mid detail; the depth model still smooths the
+# FINEST octave (pores, wrinkles, fabric weave, single hair strands). This extracts
+# that band from the photo — the same MAD-normalized multi-scale bands compose_relief
+# uses, de-grained first so sensor noise isn't carved — and adds a small, amplitude-
+# controlled slice onto the height. This DOES change the geometry (STL/heightmap).
+# `amount` ~[0,1.5]; 0 returns the input untouched. Gated to the subject mask.
+def add_surface_detail(height, luma, mask=None, amount=0.5, sigma=6.0):
+    if amount is None or float(amount) <= 0 or luma is None:
+        return height.astype(np.float32)
+    h = height.astype(np.float32)
+    H, W = h.shape
+    l = _edge_preserve(np.asarray(luma, np.float32), 0.06)   # de-grain before extracting
+    if l.shape[:2] != (H, W):
+        l = cv2.resize(l, (W, H))
+    l = (l - l.min()) / (l.max() - l.min() + 1e-8)
+
+    def band(s):                                             # unit-amplitude high-pass octave
+        hp = l - cv2.GaussianBlur(l, (0, 0), s)
+        rstd = 1.4826 * np.median(np.abs(hp - np.median(hp))) + 1e-6
+        return hp / rstd
+
+    detail = band(sigma * 0.5) + 0.7 * band(sigma * 0.25)    # fine + micro
+    detail = detail - detail.mean()
+    if mask is not None and mask.shape[:2] == (H, W) and (mask > 0.5).any():
+        rng = float(np.subtract(*np.percentile(h[mask > 0.5], [99, 1])))
+    else:
+        rng = float(np.subtract(*np.percentile(h, [99, 1])))
+    out = h + float(amount) * 0.08 * rng * detail            # a small fraction of the range
+    if mask is not None and mask.shape[:2] == (H, W):
+        m = (mask > 0.5).astype(np.float32)
+        out = m * out + (1.0 - m) * h                        # enrich the subject only
+    return out.astype(np.float32)
+
+
+# ----- Heat-map RENDER of a heightmap (VISUALIZATION only; geometry unchanged) -----
+# Pro relief/CNC tools show the surface as a perceptual color ramp (turbo/inferno) with
+# an oblique hillshade multiplied in. Grayscale buries fine relief in a near-black band;
+# a color ramp + relief shading makes every ridge, pore and strand read as a "highly
+# detailed surface" — while the underlying data is identical. Returns RGB uint8; the
+# STL / 16-bit heightmap are NOT affected by this.
+_CMAPS = {"turbo": "COLORMAP_TURBO", "inferno": "COLORMAP_INFERNO",
+          "magma": "COLORMAP_MAGMA", "viridis": "COLORMAP_VIRIDIS",
+          "plasma": "COLORMAP_PLASMA", "jet": "COLORMAP_JET"}
+
+
+def _cv_colormap(name):
+    return getattr(cv2, _CMAPS.get(str(name).lower(), "COLORMAP_TURBO"),
+                   cv2.COLORMAP_JET)
+
+
+def _hillshade(h, azimuth=315.0, altitude=45.0, z=2.5):
+    """Oblique relief shading in [0,1] from a height field — exposes the micro-slopes
+    (pores / wrinkles / strands) a flat color ramp alone can't convey."""
+    h = h.astype(np.float32)
+    gy, gx = np.gradient(h * float(z))
+    slope = np.pi / 2.0 - np.arctan(np.hypot(gx, gy))
+    aspect = np.arctan2(-gy, gx)
+    az = np.deg2rad(360.0 - azimuth + 90.0)
+    alt = np.deg2rad(altitude)
+    hs = np.sin(alt) * np.sin(slope) + np.cos(alt) * np.cos(slope) * np.cos(az - aspect)
+    return np.clip(hs, 0.0, 1.0).astype(np.float32)
+
+
+def colorize_height(height16, mask=None, cmap="turbo", shade=0.35, bg=(14, 14, 16)):
+    """RGB uint8 'surface heat map' of a heightmap. Robust-normalizes the height (within
+    the subject mask when given, so the ramp spends its full range on the relief, not the
+    flat base), applies a perceptual color ramp, then multiplies in an oblique hillshade
+    (`shade` 0..1) to reveal fine surface structure. Background (mask<=0.5) is painted a
+    flat neutral `bg`. Display/export only — does NOT change geometry."""
+    h = np.asarray(height16).astype(np.float32)
+    m = None
+    if mask is not None and mask.shape[:2] == h.shape[:2] and (mask > 0.5).any():
+        m = mask > 0.5
+        lo, hi = np.percentile(h[m], [1, 99])
+    else:
+        lo, hi = np.percentile(h, [1, 99])
+    n = np.clip((h - lo) / (hi - lo + 1e-8), 0.0, 1.0)
+    color = cv2.applyColorMap((n * 255.0).astype(np.uint8), _cv_colormap(cmap))  # BGR
+    color = cv2.cvtColor(color, cv2.COLOR_BGR2RGB).astype(np.float32)
+    if shade and shade > 0:                                  # relief shading -> micro-detail
+        hs = _hillshade(n)
+        hs = hs / (np.median(hs) + 1e-6)                     # center the flat surface at ~1.0
+        color = np.clip(color * ((1.0 - shade) + shade * hs)[..., None], 0.0, 255.0)
+    color = color.astype(np.uint8)
+    if m is not None:
+        color[~m] = np.asarray(bg, np.uint8)
+    return color
+
+
 # ----- DEPTH-FIRST: raw monocular depth -> clean smooth relief heightmap -----
 # The correct data for bas-relief / CNC / lithophane is a SMOOTH CONTINUOUS depth
 # field (near = high), NOT an emboss/edge map. This robust-normalizes the depth,
@@ -390,7 +480,8 @@ def depth_to_heightmap(depth, mask=None, luma=None, invert=False, refine=0.6,
 
 
 def tiled_relief_heightmap(depth, mask=None, invert=False, base=0.50, fig_span=0.45, bg=None,
-                           normal_map=None, normal_detail=0.7, normal_sigma=12.0):
+                           normal_map=None, normal_detail=0.7, normal_sigma=12.0,
+                           surface_detail=0.0, surface_luma=None):
     """LEAN heightmap for TILED depth: the tiling already baked the facial detail
     into the depth, so do only robust percentile-normalize -> (invert) -> re-stretch
     inside the subject -> seat on a flat base. NO bilateral / guided-refine / gamma /
@@ -410,6 +501,9 @@ def tiled_relief_heightmap(depth, mask=None, invert=False, base=0.50, fig_span=0
         nh = integrate_normals(np.asarray(normal_map, np.float32))   # normals -> height
         d = fuse_depth_normals(d, nh, detail=float(normal_detail), sigma=float(normal_sigma))
         d = np.clip((d - d.min()) / (d.max() - d.min() + 1e-8), 0.0, 1.0).astype(np.float32)
+    if surface_detail and float(surface_detail) > 0 and surface_luma is not None:
+        d = np.clip(add_surface_detail(d, surface_luma, mask, amount=float(surface_detail)),
+                    0.0, 1.0).astype(np.float32)             # inject fine pore/wrinkle/strand octave
     bg_lvl = base if bg is None else float(bg)
     if mask is not None and mask.shape[:2] == d.shape[:2]:
         m = mask > 0.5
@@ -536,7 +630,7 @@ def heightmap_to_surface(height16, z_scale_mm=8.0, pixel_mm=0.1):
     return trimesh.Trimesh(vertices=V, faces=F, process=False)
 
 
-def heightmap_to_preview(height16, z_scale_mm=8.0, pixel_mm=0.1, max_px=320):
+def heightmap_to_preview(height16, z_scale_mm=8.0, pixel_mm=0.1, max_px=320, colormap=None):
     """Lightweight DOWNSAMPLED, viewer-oriented SOLID mesh for the in-browser 3D
     preview. A closed solid renders correctly lit from any angle (an open surface
     goes dark/invisible from the back). The full-res STL (100+ MB) is too heavy
@@ -556,6 +650,21 @@ def heightmap_to_preview(height16, z_scale_mm=8.0, pixel_mm=0.1, max_px=320):
                        [0, 0, 1, 0],
                        [0, 0, 0, 1]])
     trimesh.repair.fix_normals(m)               # outward normals after the reflection
+    if colormap is not None:                    # 3D "surface heat map": per-vertex color ramp
+        hn = h.astype(np.float32)
+        lo, hi = np.percentile(hn, [1, 99])
+        u8 = (np.clip((hn - lo) / (hi - lo + 1e-8), 0, 1) * 255).astype(np.uint8)
+        cols = cv2.cvtColor(cv2.applyColorMap(u8, _cv_colormap(colormap)),
+                            cv2.COLOR_BGR2RGB).reshape(-1, 3)
+        N = cols.shape[0]                        # solid = N top verts, then N base verts
+        if len(m.vertices) == 2 * N:             # (grid verts are unique -> no merge on process)
+            rgba = np.full((2 * N, 4), 255, np.uint8)
+            rgba[:N, :3] = cols; rgba[N:, :3] = (20, 20, 24)   # lit surface + dark base slab
+            try:
+                m.visual = trimesh.visual.ColorVisuals(m, vertex_colors=rgba)
+                return m
+            except Exception:
+                pass                             # fall through to the matte material
     # matte, non-metallic material so the viewer's lighting reveals the relief
     # surface instead of washing out as flat white.
     m.visual = trimesh.visual.TextureVisuals(
