@@ -6,13 +6,14 @@ import { fmtDur } from './api'
 
 const eyebrow: React.CSSProperties = { font: '600 11px var(--hf-font-sans)', letterSpacing: '.12em', textTransform: 'uppercase', color: 'var(--hf-text-tertiary)' }
 
-function kindOf(url: string): 'glb' | 'image' | 'mesh' {
+function kindOf(url: string): 'glb' | 'image' | 'audio' | 'mesh' {
   const u = url.toLowerCase()
   if (u.endsWith('.glb') || u.endsWith('.gltf')) return 'glb'
   if (/\.(png|jpg|jpeg|webp)$/.test(u)) return 'image'
+  if (/\.(wav|mp3|flac|ogg|m4a)$/.test(u)) return 'audio'
   return 'mesh'
 }
-const ARTLABEL: Record<string, string> = { heightmap: 'Heightmap', preview3d: '3D preview', stl: 'STL mesh', image: 'Image', depth_16bit: 'Depth (16-bit)', depth_preview: 'Depth preview', normal: 'Normal map', relief_heat: 'Heat map', depth_heat: 'Heat map', heat3d: '3D heat map' }
+const ARTLABEL: Record<string, string> = { heightmap: 'Heightmap', preview3d: '3D preview', stl: 'STL mesh', image: 'Image', depth_16bit: 'Depth (16-bit)', depth_preview: 'Depth preview', normal: 'Normal map', relief_heat: 'Heat map', depth_heat: 'Heat map', heat3d: '3D heat map', audio: 'Speech' }
 
 function ArtifactCard({ name, url }: { name: string; url: string }) {
   const kind = kindOf(url)
@@ -33,6 +34,12 @@ function ArtifactCard({ name, url }: { name: string; url: string }) {
             exposure="0.95" shadow-intensity="1.0" shadow-softness="0.85"
             tone-mapping="neutral" interaction-prompt="none"
             style={{ width: '100%', height: '100%', backgroundColor: 'transparent' }} />
+        </div>
+      )}
+      {kind === 'audio' && (
+        <div style={{ padding: '26px 18px 22px', background: 'var(--hf-surface-inset)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16 }}>
+          <span style={{ width: 52, height: 52, borderRadius: 14, background: 'var(--hf-surface-2)', border: '1px solid var(--hf-border)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--hf-text-secondary)' }}><Icon name="waveform" size={26} sw={1.7} /></span>
+          <audio src={url} controls style={{ width: '100%' }} />
         </div>
       )}
       {kind === 'mesh' && (

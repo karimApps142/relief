@@ -319,6 +319,29 @@ export default function Controls({ s }: { s: Studio }) {
           </div>
         )}
 
+        {/* reference-voice input (Text → Speech cloning) — optional, so it never gates Generate */}
+        {f.needs_audio && s.values.mode !== 'design' && s.values.mode !== 'preset' && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <span style={eyebrow}>Reference voice</span>
+            {s.file ? (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 14px', border: '1px solid var(--hf-border)', borderRadius: 14, background: 'var(--hf-surface-2)' }}>
+                <span style={{ width: 34, height: 34, flexShrink: 0, borderRadius: 9, background: 'var(--hf-fill-medium)', color: 'var(--hf-text-secondary)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Icon name="mic" size={18} /></span>
+                <span style={{ flex: 1, minWidth: 0, font: '500 12px var(--hf-font-mono)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.file.name}</span>
+                <label style={{ flexShrink: 0, height: 30, padding: '0 12px', display: 'flex', alignItems: 'center', borderRadius: 9, border: '1px solid var(--hf-border)', background: 'var(--hf-surface-1)', font: '600 12px var(--hf-font-sans)', cursor: 'pointer' }}>
+                  Replace<input type="file" accept="audio/*" style={{ display: 'none' }} onChange={(e) => e.target.files?.[0] && s.onUpload(e.target.files[0])} />
+                </label>
+              </div>
+            ) : (
+              <label style={{ border: '1.5px dashed var(--hf-border-strong)', background: 'var(--hf-surface-1)', borderRadius: 14, aspectRatio: '16/6.5', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 6, cursor: 'pointer', color: 'var(--hf-text-tertiary)' }}>
+                <Icon name="mic" size={22} sw={1.7} />
+                <span style={{ fontSize: 13, fontWeight: 500 }}>Drop a voice sample or click to upload</span>
+                <span style={{ fontSize: 11 }}>WAV · MP3 · ~10s of one speaker</span>
+                <input type="file" accept="audio/*" style={{ display: 'none' }} onChange={(e) => e.target.files?.[0] && s.onUpload(e.target.files[0])} />
+              </label>
+            )}
+          </div>
+        )}
+
         {/* how it works & tuning tips (feature-provided guide) */}
         {f.guide && f.guide.length > 0 && (
           <div style={{ border: '1px solid var(--hf-border)', borderRadius: 12, background: 'var(--hf-surface-1)', overflow: 'hidden' }}>

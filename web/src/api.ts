@@ -26,6 +26,7 @@ export type FeatureSchema = {
   inputs: string[]
   needs_image: boolean
   needs_mesh?: boolean
+  needs_audio?: boolean
   needs_comfy: boolean
   engine: 'local' | 'comfy'
   est_runtime: string

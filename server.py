@@ -187,6 +187,9 @@ def _human_size(nbytes):
 
 
 def _model_label(feat, coerced):
+    if feat.id == "text2speech":
+        return {"clone": "Chatterbox (clone)", "design": "Indic Parler-TTS",
+                "preset": "Indic Parler-TTS"}.get(coerced.get("mode"), "Text-to-Speech")
     if feat.engine == "comfy":
         if feat.id == "upscale":
             return coerced.get("model_name", "")
@@ -239,7 +242,11 @@ async def run_feature(fid: str, file: UploadFile = File(None), params: str = For
     if file is not None:
         dst = out_dir / f"input_{_safe_name(file.filename)}"
         dst.write_bytes(await file.read())
-        inputs["image"] = str(dst)
+        # key by the feature's declared input kind (image | mesh | audio | …) and keep an
+        # "image" alias so existing image/mesh features that read inputs["image"] still work.
+        kind = feat.inputs[0] if getattr(feat, "inputs", None) else "image"
+        inputs[kind] = str(dst)
+        inputs.setdefault("image", str(dst))
 
     coerced = feat.coerce(raw)
 

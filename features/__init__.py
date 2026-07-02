@@ -18,6 +18,7 @@ from .img2img import Img2ImgFeature
 from .upscale import UpscaleFeature
 from .clarity import ClarityFeature
 from .relight import RelightFeature
+from .text_to_speech import TextToSpeechFeature
 
 REGISTRY = {}
 
@@ -38,3 +39,4 @@ register(Img2ImgFeature())           # Krea-2-Turbo img2img via ComfyUI
 register(UpscaleFeature())           # ESRGAN upscale via ComfyUI
 register(ClarityFeature())           # Clarity-style creative upscale (SD1.5 + Tile ControlNet + USDU)
 register(RelightFeature())           # IC-Light relight/delight via ComfyUI
+register(TextToSpeechFeature())      # local Hindi/Urdu/English TTS (Indic Parler design + Chatterbox clone)

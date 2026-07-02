@@ -22,3 +22,15 @@ spandrel                 # Face Restore: loads the GFPGAN net (clean loader, Com
 #   pip install --no-deps git+https://github.com/ByteDance-Seed/Depth-Anything-3
 #   pip install omegaconf e3nn typer addict jaxtyping roma plyfile
 #   (do NOT 'pip install xformers' — its latest needs torch>=2.10 and nukes cu121)
+# Text-to-Speech (optional feature — Hindi / Urdu / English). Both engines pin their
+# own torch/transformers, so install WITHOUT deps + only the light leaves, to keep the
+# cu121 stack above intact (mirrors the DA3 approach). Imported lazily in models_tts.py,
+# so skipping this leaves the rest of the app unaffected. Install on the box once:
+#   Indic Parler-TTS  (voice DESIGN + presets · Hindi/Urdu/English · Apache-2.0):
+#     pip install --no-deps git+https://github.com/huggingface/parler-tts.git
+#     pip install sentencepiece protobuf soundfile descript-audio-codec
+#   Chatterbox Multilingual  (voice CLONING · Hindi/English/+ · MIT):
+#     pip install --no-deps chatterbox-tts
+#     pip install resemble-perth s3tokenizer conformer librosa omegaconf
+#   (torch/torchaudio/transformers/accelerate above satisfy both. If Parler errors on
+#    transformers, `pip install -U "transformers>=4.46"`.)
