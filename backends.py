@@ -42,10 +42,12 @@ class LiteBackend:
         return (n + 1.0) / 2.0                      # HxWx3 in [0,1]
 
     def estimate_depth(self, image: Image.Image, model="lite", tiling=False,
-                       grids=None, da3_variant=None, face_crop=True):
+                       grids=None, da3_variant=None, face_crop=True, on_tile=None):
         # crude luminance pseudo-depth so the Mac/lite path still yields a heightmap
         rgb = np.asarray(image.convert("RGB"))
         g = cv2.cvtColor(rgb, cv2.COLOR_RGB2GRAY).astype(np.float32) / 255.0
+        if on_tile:
+            on_tile()
         return cv2.GaussianBlur(g, (0, 0), 8)
 
     def estimate_parts(self, image: Image.Image):
@@ -71,20 +73,29 @@ class FullBackend:
         return self._m.estimate_normals_stable(image)
 
     def estimate_depth(self, image, model="depth-anything", tiling=False,
-                       grids=((3, 3), (6, 6)), da3_variant="DA3MONO-LARGE", face_crop=True):
+                       grids=((3, 3), (6, 6)), da3_variant="DA3MONO-LARGE", face_crop=True,
+                       on_tile=None):
         _tile = rc.tiled_depth_facecrop if face_crop else rc.tiled_depth
         if model == "depth-anything":                  # DA-V2-L: crop-friendly, input_size scalable
             if tiling:
-                return _tile(image, self._m.estimate_depth, grids=grids, input_size=768)
+                return _tile(image, self._m.estimate_depth, grids=grids, input_size=896,
+                             on_tile=on_tile)
+            if on_tile:
+                on_tile()
             return self._m.estimate_depth(image)
         if model == "depth-anything-3":                # DA3 (capped ~504; tiling helps modestly)
             try:
                 D = lambda pil, **_: self._m.estimate_depth_da3(pil, variant=da3_variant)
-                return _tile(image, D, grids=grids) if tiling \
-                    else self._m.estimate_depth_da3(image, variant=da3_variant)
+                if tiling:
+                    return _tile(image, D, grids=grids, on_tile=on_tile)
+                if on_tile:
+                    on_tile()
+                return self._m.estimate_depth_da3(image, variant=da3_variant)
             except Exception:
                 return self._m.estimate_depth(image)   # fallback: Depth-Anything-V2
         # sapiens: NEVER tile — the whole-person prior breaks on context-free crops
+        if on_tile:
+            on_tile()
         try:
             return self._m.estimate_depth_sapiens(image)
         except Exception:

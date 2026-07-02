@@ -47,6 +47,7 @@ class ReliefParams:
     surface_detail: float = 0.0     # inject fine, EDGE-AWARE line detail (0 = off; carves only along real lines, leaves flat areas clean)
     surface_smooth: float = 0.3     # edge-preserving polish: removes grain/sandpaper noise, keeps grooves + feature lines crisp (0 = off)
     colormap: str = "turbo"         # heat-map render: turbo|inferno|magma|viridis|plasma|jet|off (viz only)
+    make_preview: bool = True       # emit the downsampled 3D-preview GLB (off for the lean CNC path)
     backend: str = None             # "lite" | "full" | "auto" | None (env default)
     # --- legacy fields (ignored by the tiled engine; kept so service.py / app_gradio
     #     don't break). Detail now comes from tiling, not these. ---
@@ -58,7 +59,18 @@ class ReliefParams:
     tiling: bool = True
 
 
-_TILES_TOTAL = {"off": 1, "low": 9, "medium": 36, "high": 64, "ultra": 100, "max": 144}
+def _count_passes(params):
+    """Exact number of depth forward-passes for this run — drives the tile progress bar.
+    tiled_depth = 1 global + coarse grid + fine grid; the face-crop path adds 1 body pass.
+    A grid of n×m overlapping tiles is (2n-1)×(2m-1) passes."""
+    if params.tile_detail == "off" or params.depth_model == "sapiens":
+        return 1
+    (a, b), (c, d) = _GRIDS.get(params.tile_detail, _GRIDS["medium"])
+    g = lambda x, y: (2 * x - 1) * (2 * y - 1)
+    n = 1 + g(a, b) + g(c, d)
+    if params.face_crop:
+        n += 1                                   # + the body global pass (face-crop path)
+    return n
 
 
 def generate_relief(image_path, out_dir, params: ReliefParams = ReliefParams(),
@@ -67,8 +79,10 @@ def generate_relief(image_path, out_dir, params: ReliefParams = ReliefParams(),
     import relief_progress
     be = get_backend(backend or getattr(params, "backend", None))
 
-    relief_progress.start(["Depth + tiling", "Heightmap", "STL mesh", "3D preview"],
-                          tiles_total=_TILES_TOTAL.get(params.tile_detail, 36))
+    phases = ["Depth + tiling", "Heightmap", "STL mesh"]
+    if getattr(params, "make_preview", True):
+        phases.append("3D preview")
+    relief_progress.start(phases, tiles_total=_count_passes(params))
     try:
         return _generate_relief(image_path, out_dir, params, be)
     finally:
@@ -94,7 +108,10 @@ def _generate_relief(image_path, out_dir, params, be):
     if "depth" not in cache:
         cache["depth"] = be.estimate_depth(image, model=params.depth_model, tiling=tiling,
                                            grids=grids, da3_variant=params.da3_variant,
-                                           face_crop=params.face_crop)
+                                           face_crop=params.face_crop,
+                                           on_tile=relief_progress.tick_tile)
+    else:
+        relief_progress.tick_tile(9999)        # cached depth: fill the tiling bar instantly
     depth = cache["depth"]
     if ckey is not None:
         _RAW_CACHE.clear(); _RAW_CACHE[ckey] = cache
@@ -153,14 +170,15 @@ def _generate_relief(image_path, out_dir, params, be):
     stl_path = out / "relief.stl"
     mesh.export(str(stl_path))
 
-    # lightweight downsampled GLB for the in-browser 3D viewer
-    relief_progress.phase(3)
-    preview_path = out / "preview.glb"
-    rc.heightmap_to_preview(height16, params.relief_depth_mm,
-                            params.pixel_mm).export(str(preview_path))
+    arts = {"heightmap": str(png_path), "stl": str(stl_path)}
 
-    arts = {"heightmap": str(png_path), "stl": str(stl_path),
-            "preview3d": str(preview_path)}
+    # lightweight downsampled GLB for the in-browser 3D viewer (skipped on the lean path)
+    if getattr(params, "make_preview", True):
+        relief_progress.phase(3)
+        preview_path = out / "preview.glb"
+        rc.heightmap_to_preview(height16, params.relief_depth_mm,
+                                params.pixel_mm).export(str(preview_path))
+        arts["preview3d"] = str(preview_path)
     if heat_path is not None:
         arts["relief_heat"] = str(heat_path)
         heat3d_path = out / "heat3d.glb"         # same relief, vertex-colored by the ramp

@@ -202,9 +202,10 @@ export default function Results({ s }: { s: Studio }) {
     const eta = percent > 3 && percent < 100 && s.elapsed > 4
       ? Math.round((s.elapsed * (100 - percent)) / percent) : 0
     const phaseLabel = phases[idx] || p?.node || (s.runState === 'submitting' ? 'Submitting' : 'Preparing…')
+    const tilesStat = (p?.tiles_total ?? 0) > 0 ? `${p?.tiles_done ?? 0} / ${p?.tiles_total}` : '—'
     const stats = isComfy
       ? [{ k: 'Time left', v: eta ? `~${fmtDur(eta)}` : 'estimating…' }, { k: 'Node', v: p?.node || '—' }, { k: 'Elapsed', v: fmtDur(s.elapsed) }]
-      : [{ k: 'Phase', v: phaseLabel }, { k: 'Tiles', v: String(p?.tiles_total ?? '—') }, { k: 'Elapsed', v: fmtDur(s.elapsed) }]
+      : [{ k: 'Phase', v: phaseLabel }, { k: 'Tiles', v: tilesStat }, { k: 'Elapsed', v: fmtDur(s.elapsed) }]
     return (
       <div style={{ maxWidth: 540, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 24, paddingTop: 14, animation: 'rs-rise .3s var(--hf-ease-out)' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>

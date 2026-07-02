@@ -71,6 +71,7 @@ export type Progress = {
   phases?: string[]
   phase_idx?: number
   tiles_total?: number
+  tiles_done?: number
   elapsed?: number
 }
 

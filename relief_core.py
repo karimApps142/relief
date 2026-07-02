@@ -766,7 +766,7 @@ def _tzd_norm(a):
     return (a - a.min()) / (a.max() - a.min() + 1e-12)
 
 
-def _tzd_grid(im_uint8, D, global01, num_x, num_y):
+def _tzd_grid(im_uint8, D, global01, num_x, num_y, on_tile=None):
     H, Wd = im_uint8.shape[:2]
     M, N = H // num_x, Wd // num_y
     win = _tzd_windows(M, N)
@@ -784,6 +784,8 @@ def _tzd_grid(im_uint8, D, global01, num_x, num_y):
             w = _tzd_select(win, x, y, x_all, y_all)
             acc[x:x + M, y:y + N] += w * t_al
             wsum[x:x + M, y:y + N] += w
+            if on_tile:                                  # progress: one forward pass done
+                on_tile()
     acc /= np.maximum(wsum, 1e-6)
     acc[acc < 0] = 0
     return acc
@@ -825,8 +827,8 @@ def _call_D(D, pil, input_size):
     return D(pil)
 
 
-def tiled_depth_facecrop(image, D, grids=((3, 3), (6, 6)), input_size=768,
-                         expand=0.6, feather=0.12):
+def tiled_depth_facecrop(image, D, grids=((3, 3), (6, 6)), input_size=896,
+                         expand=0.6, feather=0.12, on_tile=None):
     """Spend the tile budget on the FACE: one cheap global pass for the body form,
     the full overlapping-tile grid on a tight face crop (so the face fills the
     model input -> max detail), then composite the face depth back in (scale/shift
@@ -835,11 +837,13 @@ def tiled_depth_facecrop(image, D, grids=((3, 3), (6, 6)), input_size=768,
     img = image.convert("RGB")
     box = detect_face_box(img, expand)
     if box is None:
-        return tiled_depth(img, D, grids=grids, input_size=input_size)
+        return tiled_depth(img, D, grids=grids, input_size=input_size, on_tile=on_tile)
     body = _tzd_norm(np.asarray(_call_D(D, img, input_size), dtype=np.float64))  # 1 pass
+    if on_tile:
+        on_tile()
     x0, y0, x1, y1 = box
     face = _tzd_norm(tiled_depth(img.crop(box), D, grids=grids,
-                                 input_size=input_size).astype(np.float64))
+                                 input_size=input_size, on_tile=on_tile).astype(np.float64))
     region = body[y0:y1, x0:x1]
     if face.std() > 1e-6:                                 # match the body's local scale/shift
         face = region.mean() + region.std() * (face - face.mean()) / face.std()
@@ -849,11 +853,12 @@ def tiled_depth_facecrop(image, D, grids=((3, 3), (6, 6)), input_size=768,
     return _tzd_norm(out).astype(np.float32)
 
 
-def tiled_depth(image, D, grids=((3, 3), (6, 6)), input_size=768):
+def tiled_depth(image, D, grids=((3, 3), (6, 6)), input_size=896, on_tile=None):
     """High-res depth by fusing a global pass with two overlapping-tile grids
     (TilingZoeDepth). D(PIL[, input_size])->HxW float. Returns HxW [0,1] (near=large).
-    Each tile is run at the model's full resolution (input_size) so the face fills
-    the receptive field and fine geometry is recovered, then stitched seamlessly."""
+    Each tile is run at the model's full resolution (input_size — raised to 896 so each
+    crop yields ~35% more geometry pixels for a crisper carve) and stitched seamlessly.
+    `on_tile` is called once per forward pass to drive the progress bar."""
     import inspect
     try:
         accepts = "input_size" in inspect.signature(D).parameters
@@ -863,13 +868,19 @@ def tiled_depth(image, D, grids=((3, 3), (6, 6)), input_size=768):
     img = image.convert("RGB")
     im = np.asarray(img)
     global01 = _tzd_norm(np.asarray(Dt(img), dtype=np.float64))
+    if on_tile:                                          # the global pass counts as one tile
+        on_tile()
     (nx0, ny0), (nx1, ny1) = grids
-    coarse = _tzd_grid(im, Dt, global01, nx0, ny0)
-    fine = _tzd_grid(im, Dt, global01, nx1, ny1)
+    coarse = _tzd_grid(im, Dt, global01, nx0, ny0, on_tile=on_tile)
+    fine = _tzd_grid(im, Dt, global01, nx1, ny1, on_tile=on_tile)
+    # Fine-grid weight = a de-noised local-contrast (feature-line) map. Tightened from
+    # the old (blur 40, gain 5) to (blur 26, gain 6.5) so the fine tiles win more
+    # decisively ALONG real edges (eyes/lips/jaw/hairline) — sharper feature lines —
+    # while flat areas still take the stable coarse+global form (no tile seams).
     grey = im.mean(axis=2).astype(np.float32)
     diff = cv2.GaussianBlur(grey, (0, 0), 20) - grey
     diff = diff / (np.max(diff) + 1e-12)
-    diff = cv2.GaussianBlur(diff, (0, 0), 40) * 5.0
+    diff = cv2.GaussianBlur(diff, (0, 0), 26) * 6.5
     mask = np.clip(diff, 0, 0.999)
     combined = (mask * fine + (1 - mask) * ((coarse + global01) / 2)) / 2
     return (combined / (np.max(combined) + 1e-12)).astype(np.float32)
