@@ -65,13 +65,33 @@ def _uromanize(text):
         return _ur.uroman(text)
 
 
+def _detect_lang(text):
+    """Pick the MMS model by the SCRIPT actually typed — MMS voices are script-locked, so
+    the script is authoritative (a Devanagari-only Hindi model can't speak Latin/Arabic)."""
+    for ch in text:
+        o = ord(ch)
+        if 0x0900 <= o <= 0x097F:                  # Devanagari → Hindi
+            return "hi"
+        if (0x0600 <= o <= 0x06FF or 0x0750 <= o <= 0x077F
+                or 0xFB50 <= o <= 0xFDFF or 0xFE70 <= o <= 0xFEFF):   # Arabic/Nastaʿlīq → Urdu
+            return "ur"
+    return "en"                                    # Latin / other → English model
+
+
 def synthesize_mms(text, language="hi"):
-    """One fixed MMS voice for the language. Returns (float32 mono, sr=16 kHz)."""
-    repo = _MMS_REPO.get(language, _MMS_REPO["hi"])
-    model, tok = _mms(repo)
-    if getattr(tok, "is_uroman", False):           # Arabic/Nastaʿlīq etc. → romanize first
-        text = _uromanize(text)
-    inputs = tok(text, return_tensors="pt").to(DEVICE)
+    """One fixed MMS voice, model chosen from the typed script. Returns (float32 mono, 16 kHz)."""
+    lang = _detect_lang(text)                      # script wins over the dropdown
+    if language not in ("auto", lang):
+        print(f"[tts] text looks like {_LANG_NAME.get(lang, lang)}; using that MMS voice "
+              f"(Language was set to {_LANG_NAME.get(language, language)}).")
+    model, tok = _mms(_MMS_REPO[lang])
+    src = _uromanize(text) if getattr(tok, "is_uroman", False) else text
+    inputs = tok(src, return_tensors="pt")
+    if inputs["input_ids"].numel() == 0:           # nothing survived tokenization → VITS would crash
+        raise ValueError(
+            f"That text has no {_LANG_NAME.get(lang, lang)} characters to speak. Type it in the "
+            "right script — Devanagari for Hindi, Nastaʿlīq for Urdu, Latin for English.")
+    inputs = {k: v.to(DEVICE) for k, v in inputs.items()}
     with torch.inference_mode():
         wav = model(**inputs).waveform             # (1, N)
     audio = wav.squeeze().to(torch.float32).cpu().numpy()
