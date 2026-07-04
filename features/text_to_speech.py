@@ -42,24 +42,24 @@ class TextToSpeechFeature(Feature):
     engine = "local"
     needs_comfy = False
     icon = "speech"
-    est_runtime = "~5–40 s"
-    vram = "~2–4 GB · clone ~7 GB"
+    est_runtime = "~2–15 s"
+    vram = "~0.5–2 GB"
     output_kinds = ["Speech WAV"]
     guide = [
-        {"h": "Two engines",
-         "b": "Design & Preset use Indic Parler-TTS (20 Indic languages incl. Hindi + Urdu, "
-              "Apache-2.0). Cloning uses Chatterbox Multilingual (Hindi / English + more, MIT)."},
-        {"h": "Hindi & Urdu",
-         "b": "Type in Devanagari (Hindi) or Nastaʿlīq (Urdu) — the script sets the language. "
-              "Hindi is strongest; Urdu works via Voice design (there is no reliable open Urdu "
-              "cloning model yet)."},
+        {"h": "Engine",
+         "b": "Runs on MMS-TTS (Meta), bundled in transformers — Hindi, Urdu & English work "
+              "today with one clean fixed voice per language. Type in Devanagari (Hindi) or "
+              "Nastaʿlīq (Urdu); the script sets the language."},
+        {"h": "Voice design & presets",
+         "b": "The description / preset controls become active once the isolated Indic Parler-TTS "
+              "engine is set up (its deps conflict with this box's transformers, so it can't run "
+              "in-process). Until then all modes use the MMS voice."},
         {"h": "Voice cloning",
-         "b": "Switch Mode to Voice cloning and upload a clean ~10 s WAV/MP3 of a single speaker; "
-              "the output copies that timbre. Hindi & English only."},
-        {"h": "Voice design tips",
-         "b": "Be specific — gender, age, pitch, pace, emotion, plus 'very close-up recording, "
-              "excellent audio quality' for a clean result. Pick a Preset voice for a consistent, "
-              "repeatable speaker."},
+         "b": "Cloning needs the isolated Chatterbox engine (torch 2.6 / numpy<2 — conflicts here), "
+              "so it's not active yet. Hindi & English only when enabled; Urdu has no open cloner."},
+        {"h": "Urdu note",
+         "b": "The Urdu MMS voice may need a one-time 'pip install uroman' on the box (romanizer). "
+              "If a run reports it, install that and retry."},
     ]
     params = [
         ParamSpec("text", "text", "", "Text",
@@ -119,7 +119,8 @@ class TextToSpeechFeature(Feature):
                 exaggeration=params.get("exaggeration", 0.5),
                 cfg_weight=params.get("cfg_weight", 0.5), seed=seed)
         else:
-            audio, sr = models_tts.synthesize_design(text, _description(mode, params, language), seed=seed)
+            audio, sr = models_tts.synthesize_design(text, _description(mode, params, language),
+                                                     language=language, seed=seed)
 
         out = Path(out_dir) / "speech.wav"
         models_tts.write_wav(out, audio, sr)

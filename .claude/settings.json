@@ -47,7 +47,8 @@
       "Bash(curl -sL \"https://raw.githubusercontent.com/PozzettiAndrea/ComfyUI-TRELLIS2/main/workflows/geometry_only_512.json\")",
       "Bash(python3 -c ' *)",
       "Bash(curl -s \"https://huggingface.co/api/models/Comfy-Org/TRELLIS.2?blobs=true\")",
-      "Bash(curl -s \"https://api.github.com/repos/PozzettiAndrea/ComfyUI-TRELLIS2/git/trees/main?recursive=1\")"
+      "Bash(curl -s \"https://api.github.com/repos/PozzettiAndrea/ComfyUI-TRELLIS2/git/trees/main?recursive=1\")",
+      "Bash(python3 -m py_compile models_tts.py features/text_to_speech.py)"
     ]
   }
 }
