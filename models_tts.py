@@ -1,41 +1,40 @@
 """
-models_tts.py — Text-to-Speech model wrappers (Hindi / Urdu / English).
+models_tts.py — Text-to-Speech engine dispatch (Hindi / Urdu / English).
 
-Primary engine is **MMS-TTS** (Meta), which ships INSIDE `transformers` (VitsModel) —
-so it runs on the box's existing modern stack with no conflicting installs. It gives
-one clean, fixed voice per language (no cloning / no design), but it works today.
+The box runs a modern stack (transformers 5.12, numpy 2, torch 2.5+cu121). The good
+design/cloning models pin OLD, mutually-incompatible deps, so they can't import here.
+Strategy:
 
-Optional UPGRADES (voice design / cloning) need their own pinned deps that clash with
-the box's transformers/torch, so they can only run isolated (separate venv + subprocess,
-not yet wired). We still TRY them per call and fall back to MMS if they can't import, so
-the moment an isolated path exists they light up automatically:
-  • Indic Parler-TTS  — voice DESIGN + presets  (transformers==4.46 → conflicts in-venv)
-  • Chatterbox Multilingual — zero-shot CLONING  (torch==2.6 → conflicts in-venv)
+  • MMS-TTS (Meta VITS, bundled in transformers) is the always-works engine — one fixed
+    voice per language. We reshape it with Speed (VITS speaking_rate) + Pitch (librosa
+    pitch-shift) so the controls actually change the output.
+  • Real voice DESIGN (description → gender/pitch/pace/emotion) uses Indic Parler-TTS in
+    an ISOLATED venv (.venv-tts) driven as a subprocess (tts_worker.py). When that venv
+    exists we route Design through it automatically; otherwise we fall back to MMS+knobs.
+  • Voice CLONING (Chatterbox) is attempted in-process and reports a clear message if its
+    deps can't run here (a second isolated venv is the eventual home).
 
 GPU box only — imported lazily by features/text_to_speech.py inside run(), never on the Mac.
 """
 import functools
 import gc
+import os
+from pathlib import Path
 
 import numpy as np
 import torch
 
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 
-# language hint -> Chatterbox ISO code (Chatterbox has no Urdu)
-CLONE_LANGS = {"hi": "hi", "en": "en", "auto": "en"}
+CLONE_LANGS = {"hi": "hi", "en": "en", "auto": "en"}       # Chatterbox has no Urdu
 _LANG_NAME = {"hi": "Hindi", "ur": "Urdu", "en": "English", "auto": ""}
-
-# language -> MMS-TTS repo (VitsModel, bundled in transformers). Urdu uses the
-# Arabic-script (Nastaʿlīq) model to match what users type.
 _MMS_REPO = {"hi": "facebook/mms-tts-hin",
              "ur": "facebook/mms-tts-urd-script_arabic",
              "en": "facebook/mms-tts-eng",
              "auto": "facebook/mms-tts-hin"}
 
-# remembers whether the heavy optional engines actually import here, so we don't
-# re-attempt (and re-log) a guaranteed ImportError on every request.
-_engine_ok = {"parler": None, "chatterbox": None}
+_chatterbox_ok = [None]                                    # cache in-process clone availability
+_worker_missing = [False]                                  # cache "no .venv-tts" so we don't re-check
 
 
 # ---------- primary engine: MMS-TTS (bundled in transformers — always works) ----------
@@ -49,7 +48,6 @@ def _mms(repo):
 
 @functools.lru_cache(maxsize=1)
 def _uroman():
-    """uroman romanizer (only needed by some MMS languages, e.g. Urdu/Arabic script)."""
     import uroman as _ur
     return _ur.Uroman()
 
@@ -61,96 +59,142 @@ def _uromanize(text):
         raise RuntimeError("This language's MMS voice needs romanization. On the box run:\n"
                            "  pip install uroman") from e
     except AttributeError:
-        import uroman as _ur                       # tolerate older/alt package API
+        import uroman as _ur
         return _ur.uroman(text)
 
 
 def _detect_lang(text):
-    """Pick the MMS model by the SCRIPT actually typed — MMS voices are script-locked, so
-    the script is authoritative (a Devanagari-only Hindi model can't speak Latin/Arabic)."""
+    """Pick the MMS model by the SCRIPT typed — MMS voices are script-locked."""
     for ch in text:
         o = ord(ch)
-        if 0x0900 <= o <= 0x097F:                  # Devanagari → Hindi
-            return "hi"
+        if 0x0900 <= o <= 0x097F:
+            return "hi"                                    # Devanagari → Hindi
         if (0x0600 <= o <= 0x06FF or 0x0750 <= o <= 0x077F
-                or 0xFB50 <= o <= 0xFDFF or 0xFE70 <= o <= 0xFEFF):   # Arabic/Nastaʿlīq → Urdu
-            return "ur"
-    return "en"                                    # Latin / other → English model
+                or 0xFB50 <= o <= 0xFDFF or 0xFE70 <= o <= 0xFEFF):
+            return "ur"                                    # Arabic/Nastaʿlīq → Urdu
+    return "en"                                            # Latin / other → English
 
 
-def synthesize_mms(text, language="hi"):
-    """One fixed MMS voice, model chosen from the typed script. Returns (float32 mono, 16 kHz)."""
-    lang = _detect_lang(text)                      # script wins over the dropdown
+def _pitch_shift(audio, sr, semitones):
+    if not semitones or abs(float(semitones)) < 1e-3:
+        return audio
+    try:
+        import librosa
+        return librosa.effects.pitch_shift(np.asarray(audio, np.float32), sr=int(sr),
+                                           n_steps=float(semitones)).astype(np.float32)
+    except Exception as e:
+        print(f"[tts] pitch shift skipped ({type(e).__name__}: {e})")
+        return audio
+
+
+def synthesize_mms(text, language="hi", speed=1.0, pitch=0.0):
+    """MMS voice for the typed script, reshaped by speed (speaking_rate) + pitch (semitones).
+    Returns (float32 mono, sr)."""
+    lang = _detect_lang(text)
     if language not in ("auto", lang):
         print(f"[tts] text looks like {_LANG_NAME.get(lang, lang)}; using that MMS voice "
-              f"(Language was set to {_LANG_NAME.get(language, language)}).")
+              f"(Language was {_LANG_NAME.get(language, language)}).")
     model, tok = _mms(_MMS_REPO[lang])
     src = _uromanize(text) if getattr(tok, "is_uroman", False) else text
     inputs = tok(src, return_tensors="pt")
-    if inputs["input_ids"].numel() == 0:           # nothing survived tokenization → VITS would crash
+    if inputs["input_ids"].numel() == 0:
         raise ValueError(
             f"That text has no {_LANG_NAME.get(lang, lang)} characters to speak. Type it in the "
             "right script — Devanagari for Hindi, Nastaʿlīq for Urdu, Latin for English.")
+    try:                                                   # Speed → VITS speaking_rate (higher = faster)
+        model.speaking_rate = float(speed or 1.0)
+    except Exception:
+        pass
     inputs = {k: v.to(DEVICE) for k, v in inputs.items()}
     with torch.inference_mode():
-        wav = model(**inputs).waveform             # (1, N)
+        wav = model(**inputs).waveform                     # (1, N)
     audio = wav.squeeze().to(torch.float32).cpu().numpy()
-    return audio, int(model.config.sampling_rate)
+    sr = int(model.config.sampling_rate)
+    audio = _pitch_shift(audio, sr, pitch)                 # Pitch → librosa shift
+    return audio, sr
 
 
-# ---------- optional upgrade A: Indic Parler-TTS (voice design + presets) ----------
-@functools.lru_cache(maxsize=1)
-def _parler():
-    from parler_tts import ParlerTTSForConditionalGeneration
-    from transformers import AutoTokenizer
-    repo = "ai4bharat/indic-parler-tts"
-    model = ParlerTTSForConditionalGeneration.from_pretrained(repo).to(DEVICE).eval()
-    tok = AutoTokenizer.from_pretrained(repo)
-    desc_tok = AutoTokenizer.from_pretrained(model.config.text_encoder._name_or_path)
-    return model, tok, desc_tok
+# ---------- isolated voice-DESIGN engine: Indic Parler-TTS via subprocess ----------
+def _tts_venv_python():
+    """Interpreter of the isolated TTS venv, or None. Override with env TTS_VENV_PY."""
+    override = os.environ.get("TTS_VENV_PY")
+    if override:
+        return override if Path(override).exists() else None
+    base = Path(__file__).resolve().parent / ".venv-tts"
+    cand = base / ("Scripts/python.exe" if os.name == "nt" else "bin/python")
+    return str(cand) if cand.exists() else None
 
 
-def _parler_generate(text, description, seed=0):
-    model, tok, desc_tok = _parler()
-    if seed:
-        torch.manual_seed(int(seed))
-    desc = desc_tok(description, return_tensors="pt").to(DEVICE)
-    prompt = tok(text, return_tensors="pt").to(DEVICE)
-    with torch.inference_mode():
-        gen = model.generate(
-            input_ids=desc.input_ids, attention_mask=desc.attention_mask,
-            prompt_input_ids=prompt.input_ids, prompt_attention_mask=prompt.attention_mask)
-    audio = gen.to(torch.float32).cpu().numpy().squeeze()
-    return audio, int(model.config.sampling_rate)
+def _read_wav(path):
+    try:
+        import soundfile as sf
+        a, sr = sf.read(path, dtype="float32")
+        return (a.mean(axis=1) if a.ndim > 1 else a), int(sr)
+    except Exception:
+        import wave
+        with wave.open(path, "rb") as w:
+            sr, n = w.getframerate(), w.getnframes()
+            raw = w.readframes(n)
+        return np.frombuffer(raw, dtype="<i2").astype(np.float32) / 32768.0, int(sr)
 
 
-def synthesize_design(text, description, language="hi", seed=0):
-    """Voice design / preset. Uses Indic Parler-TTS if it can load in this env; otherwise
-    falls back to the always-available MMS voice for the language."""
-    if _engine_ok["parler"] is not False:
+def _run_design_worker(text, description, language, seed):
+    """Run Indic Parler-TTS in the isolated venv. Returns (audio, sr) or None if no venv."""
+    py = _tts_venv_python()
+    if not py:
+        _worker_missing[0] = True
+        return None
+    import subprocess, tempfile, json
+    try:                                                   # free main-process VRAM for the worker
+        import models
+        models.unload_all()
+    except Exception:
+        pass
+    _empty_cache()
+    tmp = tempfile.NamedTemporaryFile(suffix=".wav", delete=False).name
+    req = {"mode": "design", "text": text, "description": description,
+           "language": language, "seed": int(seed or 0), "out": tmp}
+    worker = str(Path(__file__).resolve().parent / "tts_worker.py")
+    proc = subprocess.run([py, worker], input=json.dumps(req),
+                          capture_output=True, text=True, timeout=900)
+    if proc.returncode != 0:
+        raise RuntimeError("Parler worker: " + (proc.stderr or proc.stdout or "failed")[-500:])
+    audio, sr = _read_wav(tmp)
+    try:
+        os.unlink(tmp)
+    except OSError:
+        pass
+    return audio, sr
+
+
+def synthesize_design(text, description, language="hi", seed=0, speed=1.0, pitch=0.0):
+    """Real voice design via the isolated Parler venv when present; otherwise the MMS voice
+    reshaped by the Speed + Pitch knobs."""
+    if not _worker_missing[0]:
         try:
-            _free_other("parler")
-            out = _parler_generate(text, description, seed)
-            _engine_ok["parler"] = True
-            return out
+            res = _run_design_worker(text, description, language, seed)
+            if res is not None:
+                return res
         except Exception as e:
-            _engine_ok["parler"] = False
-            print(f"[tts] Parler-TTS unavailable here ({type(e).__name__}) — using MMS-TTS. "
-                  "Voice design needs the isolated Parler venv.")
-    return synthesize_mms(text, language)
+            print(f"[tts] Parler design worker failed ({type(e).__name__}: {e}) — using MMS.")
+    return synthesize_mms(text, language, speed=speed, pitch=pitch)
 
 
-# ---------- optional upgrade B: Chatterbox Multilingual (zero-shot cloning) ----------
+# ---------- voice CLONING: Chatterbox (in-process attempt) ----------
 @functools.lru_cache(maxsize=1)
 def _chatterbox():
     from chatterbox.mtl_tts import ChatterboxMultilingualTTS
     return ChatterboxMultilingualTTS.from_pretrained(device=DEVICE)
 
 
+_CLONE_UNAVAILABLE = (
+    "Voice cloning isn't available in this environment yet — Chatterbox needs its own pinned "
+    "deps (torch 2.6 / numpy<2) that conflict with the box, so it must run in an isolated venv "
+    "(not wired up yet). Design & Preset work now; for Urdu use Voice design.")
+
+
 def synthesize_clone(text, ref_wav, language_id, exaggeration=0.5, cfg_weight=0.5, seed=0):
-    """Zero-shot clone via Chatterbox. Raises a clear message if it can't run in this env
-    (MMS can't clone — cloning needs the isolated Chatterbox setup)."""
-    if _engine_ok["chatterbox"] is False:
+    if _chatterbox_ok[0] is False:
         raise RuntimeError(_CLONE_UNAVAILABLE)
     try:
         _free_other("chatterbox")
@@ -163,26 +207,16 @@ def synthesize_clone(text, ref_wav, language_id, exaggeration=0.5, cfg_weight=0.
             wav = model.generate(text, **kwargs)
         except TypeError:
             wav = model.generate(text, language_id=language_id, audio_prompt_path=ref_wav)
-        _engine_ok["chatterbox"] = True
+        _chatterbox_ok[0] = True
         audio = wav.detach().to(torch.float32).cpu().squeeze().numpy()
         return audio, int(getattr(model, "sr", 24000))
-    except RuntimeError:
-        raise
     except Exception as e:
-        _engine_ok["chatterbox"] = False
+        _chatterbox_ok[0] = False
         raise RuntimeError(f"{_CLONE_UNAVAILABLE}\n[{type(e).__name__}: {e}]") from e
-
-
-_CLONE_UNAVAILABLE = (
-    "Voice cloning isn't available in this environment yet — Chatterbox needs its own "
-    "pinned deps (torch 2.6 / numpy<2) that conflict with the box, so it must run in an "
-    "isolated venv (not wired up yet). Design & Preset work now via MMS-TTS; for Urdu, "
-    "use Voice design.")
 
 
 # ---------- shared helpers ----------
 def write_wav(path, audio, sr):
-    """Write a float32 mono waveform to a 16-bit WAV (soundfile, torchaudio fallback)."""
     audio = np.clip(np.asarray(audio, dtype=np.float32), -1.0, 1.0)
     try:
         import soundfile as sf
@@ -199,12 +233,8 @@ def _empty_cache():
 
 
 def _free_other(keep):
-    """Drop the engines we're NOT about to use + any relief/depth models, so a small GPU
-    only ever holds one heavy model. Best-effort; harmless if nothing is loaded."""
     if keep != "chatterbox":
         _chatterbox.cache_clear()
-    if keep != "parler":
-        _parler.cache_clear()
     try:
         import models
         models.unload_all()
@@ -214,8 +244,6 @@ def _free_other(keep):
 
 
 def unload_tts():
-    """Free all TTS engines + VRAM (e.g. before a heavy image/relief run)."""
     _mms.cache_clear()
-    _parler.cache_clear()
     _chatterbox.cache_clear()
     _empty_cache()

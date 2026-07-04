@@ -48,7 +48,12 @@
       "Bash(python3 -c ' *)",
       "Bash(curl -s \"https://huggingface.co/api/models/Comfy-Org/TRELLIS.2?blobs=true\")",
       "Bash(curl -s \"https://api.github.com/repos/PozzettiAndrea/ComfyUI-TRELLIS2/git/trees/main?recursive=1\")",
-      "Bash(python3 -m py_compile models_tts.py features/text_to_speech.py)"
+      "Bash(python3 -m py_compile models_tts.py features/text_to_speech.py)",
+      "mcp__claude_ai_Google_Drive__get_file_metadata",
+      "mcp__claude_ai_Google_Drive__download_file_content",
+      "Bash(curl -s \"https://huggingface.co/api/models/jingheya/Lotus-2\")",
+      "Bash(python3 -m json.tool)",
+      "Bash(curl -s \"https://huggingface.co/jingheya/Lotus-2/raw/main/README.md\")"
     ]
   }
 }

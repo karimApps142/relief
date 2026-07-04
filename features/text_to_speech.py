@@ -50,10 +50,13 @@ class TextToSpeechFeature(Feature):
          "b": "Runs on MMS-TTS (Meta), bundled in transformers — Hindi, Urdu & English work "
               "today with one clean fixed voice per language. Type in Devanagari (Hindi) or "
               "Nastaʿlīq (Urdu); the script sets the language."},
-        {"h": "Voice design & presets",
-         "b": "The description / preset controls become active once the isolated Indic Parler-TTS "
-              "engine is set up (its deps conflict with this box's transformers, so it can't run "
-              "in-process). Until then all modes use the MMS voice."},
+        {"h": "Reshaping the voice now",
+         "b": "MMS has one voice per language and ignores the written description. Use Pitch "
+              "(+ lighter/higher, − deeper) and Speed to actually change how it sounds."},
+        {"h": "Real voice design (optional)",
+         "b": "Set up the isolated Parler venv (.venv-tts — see requirements-gpu.txt) and the "
+              "written description then truly drives gender/pitch/pace/emotion for Hindi/Urdu/"
+              "English. The app routes design to it automatically once the venv exists."},
         {"h": "Voice cloning",
          "b": "Cloning needs the isolated Chatterbox engine (torch 2.6 / numpy<2 — conflicts here), "
               "so it's not active yet. Hindi & English only when enabled; Urdu has no open cloner."},
@@ -76,8 +79,11 @@ class TextToSpeechFeature(Feature):
         ParamSpec("voice_description", "text", "", "Voice description",
                   depends_on={"param": "mode", "value": "design"},
                   placeholder="A warm, calm female voice, clear and expressive, close-up studio recording.",
-                  help="Describe the voice: gender, age, pitch, pace, emotion, recording feel. "
-                       "Indic Parler-TTS turns this into a voice."),
+                  help="Drives the voice ONLY with the isolated Parler engine (.venv-tts). With the "
+                       "built-in MMS voice, use Pitch + Speed below to reshape it."),
+        ParamSpec("pitch", "number", 0.0, "Pitch", -6.0, 6.0, 0.5, control="slider", suffix=" st",
+                  help="Shift the voice up/down in semitones (MMS engine). + = lighter/higher, "
+                       "− = deeper. Ignored once the Parler design engine is set up."),
         ParamSpec("speaker", "select", "Divya", "Preset voice",
                   depends_on={"param": "mode", "value": "preset"},
                   help="Named Indic Parler voices — most reliable for Hindi. For Urdu, prefer Voice design.",
@@ -85,7 +91,7 @@ class TextToSpeechFeature(Feature):
                            {"value": "Aman", "label": "Aman (m)"}, {"value": "Rani", "label": "Rani (f)"},
                            {"value": "Sunita", "label": "Sunita (f)"}, {"value": "Karan", "label": "Karan (m)"}]),
         ParamSpec("speed", "number", 1.0, "Speed", 0.7, 1.3, 0.05, control="slider", suffix="×",
-                  group="advanced", help="Speaking pace for Design / Preset (mapped into the voice description)."),
+                  help="Speaking pace (MMS engine): >1 faster, <1 slower."),
         ParamSpec("exaggeration", "number", 0.5, "Expressiveness", 0.25, 1.0, 0.05, control="slider",
                   group="advanced", depends_on={"param": "mode", "value": "clone"},
                   help="Chatterbox emotion intensity. 0.5 = natural; higher = more dramatic."),
@@ -119,8 +125,9 @@ class TextToSpeechFeature(Feature):
                 exaggeration=params.get("exaggeration", 0.5),
                 cfg_weight=params.get("cfg_weight", 0.5), seed=seed)
         else:
-            audio, sr = models_tts.synthesize_design(text, _description(mode, params, language),
-                                                     language=language, seed=seed)
+            audio, sr = models_tts.synthesize_design(
+                text, _description(mode, params, language), language=language, seed=seed,
+                speed=float(params.get("speed") or 1.0), pitch=float(params.get("pitch") or 0.0))
 
         out = Path(out_dir) / "speech.wav"
         models_tts.write_wav(out, audio, sr)
