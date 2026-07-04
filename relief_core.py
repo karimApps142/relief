@@ -827,7 +827,7 @@ def _call_D(D, pil, input_size):
     return D(pil)
 
 
-def tiled_depth_facecrop(image, D, grids=((3, 3), (6, 6)), input_size=896,
+def tiled_depth_facecrop(image, D, grids=((3, 3), (6, 6)), input_size=768,
                          expand=0.6, feather=0.12, on_tile=None):
     """Spend the tile budget on the FACE: one cheap global pass for the body form,
     the full overlapping-tile grid on a tight face crop (so the face fills the
@@ -853,11 +853,11 @@ def tiled_depth_facecrop(image, D, grids=((3, 3), (6, 6)), input_size=896,
     return _tzd_norm(out).astype(np.float32)
 
 
-def tiled_depth(image, D, grids=((3, 3), (6, 6)), input_size=896, on_tile=None):
+def tiled_depth(image, D, grids=((3, 3), (6, 6)), input_size=768, on_tile=None):
     """High-res depth by fusing a global pass with two overlapping-tile grids
     (TilingZoeDepth). D(PIL[, input_size])->HxW float. Returns HxW [0,1] (near=large).
-    Each tile is run at the model's full resolution (input_size — raised to 896 so each
-    crop yields ~35% more geometry pixels for a crisper carve) and stitched seamlessly.
+    Each tile is run at the model's full resolution (input_size) so the face fills
+    the receptive field and fine geometry is recovered, then stitched seamlessly.
     `on_tile` is called once per forward pass to drive the progress bar."""
     import inspect
     try:
@@ -873,14 +873,10 @@ def tiled_depth(image, D, grids=((3, 3), (6, 6)), input_size=896, on_tile=None):
     (nx0, ny0), (nx1, ny1) = grids
     coarse = _tzd_grid(im, Dt, global01, nx0, ny0, on_tile=on_tile)
     fine = _tzd_grid(im, Dt, global01, nx1, ny1, on_tile=on_tile)
-    # Fine-grid weight = a de-noised local-contrast (feature-line) map. Tightened from
-    # the old (blur 40, gain 5) to (blur 26, gain 6.5) so the fine tiles win more
-    # decisively ALONG real edges (eyes/lips/jaw/hairline) — sharper feature lines —
-    # while flat areas still take the stable coarse+global form (no tile seams).
     grey = im.mean(axis=2).astype(np.float32)
     diff = cv2.GaussianBlur(grey, (0, 0), 20) - grey
     diff = diff / (np.max(diff) + 1e-12)
-    diff = cv2.GaussianBlur(diff, (0, 0), 26) * 6.5
+    diff = cv2.GaussianBlur(diff, (0, 0), 40) * 5.0
     mask = np.clip(diff, 0, 0.999)
     combined = (mask * fine + (1 - mask) * ((coarse + global01) / 2)) / 2
     return (combined / (np.max(combined) + 1e-12)).astype(np.float32)

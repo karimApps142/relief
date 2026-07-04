@@ -78,7 +78,7 @@ class FullBackend:
         _tile = rc.tiled_depth_facecrop if face_crop else rc.tiled_depth
         if model == "depth-anything":                  # DA-V2-L: crop-friendly, input_size scalable
             if tiling:
-                return _tile(image, self._m.estimate_depth, grids=grids, input_size=896,
+                return _tile(image, self._m.estimate_depth, grids=grids, input_size=768,
                              on_tile=on_tile)
             if on_tile:
                 on_tile()
