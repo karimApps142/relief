@@ -34,20 +34,28 @@ class DepthMapFeature(Feature):
         ParamSpec("face_crop", "bool", True, "Face crop"),
         ParamSpec("mask_background", "bool", True, "Black background",
                   help="Cut out the subject (BiRefNet) and set the background to pure black."),
+        ParamSpec("pure_depth", "bool", True, "Pure depth (raw model output)",
+                  help="Output the depth model's OWN geometry, untouched — no normal fusion, no injected "
+                       "detail, no smoothing/polish, no base seating. Off = the enhanced relief-style "
+                       "heightmap. (Softness here is the depth model itself — raise Tile detail or use "
+                       "DA3 for sharper geometry.)"),
         ParamSpec("normals", "bool", True, "Fuse normal detail",
+                  depends_on={"param": "pure_depth", "value": False},
                   help="Estimate a surface-normal map and fuse its crisp detail (eyes/hair/lips) into the depth."),
         ParamSpec("normal_source", "select", "marigold", "Normal source", control="seg",
-                  depends_on={"param": "normals", "value": True},
+                  depends_on={"param": "pure_depth", "value": False},
                   help="Marigold = general (cleaner background); Sapiens = human-specialist (sharpest faces).",
                   choices=[{"value": "marigold", "label": "Marigold"}, {"value": "sapiens", "label": "Sapiens"}]),
         ParamSpec("normal_gain", "number", 0.7, "Detail strength", 0.0, 1.5, 0.05, control="slider",
-                  depends_on={"param": "normals", "value": True},
+                  depends_on={"param": "pure_depth", "value": False},
                   help="How strongly the normal-derived detail stands out in the depth."),
         ParamSpec("surface_detail", "number", 0.0, "Surface detail", 0.0, 1.5, 0.05, control="slider",
+                  depends_on={"param": "pure_depth", "value": False},
                   help="Inject fine, EDGE-AWARE line detail (hair strands, fabric, feature lines) from the "
                        "photo. Carves only along real lines, leaves flat areas clean. 0 = smooth depth only. "
                        "Try ~0.4 for portraits."),
         ParamSpec("surface_smooth", "number", 0.3, "Surface polish", 0.0, 1.0, 0.05, control="slider",
+                  depends_on={"param": "pure_depth", "value": False},
                   help="Edge-preserving polish that removes grainy noise while keeping grooves and feature "
                        "lines crisp — a clean, neat surface. 0 = off; raise for a cleaner carve."),
         ParamSpec("colormap", "select", "turbo", "Heat-map view", control="seg",
@@ -76,34 +84,42 @@ class DepthMapFeature(Feature):
         depth = be.estimate_depth(image, model=params["depth_model"], tiling=(td != "off"),
                                   grids=_GRIDS.get(td, _GRIDS["medium"]), face_crop=params.get("face_crop", True))
 
-        # 2. optional surface normals (their high-frequency detail gets fused into the depth)
-        use_normals = params.get("normals", True)
-        normal_map = None
-        if use_normals:
-            try:
-                normal_map = np.clip(np.asarray(
-                    be.estimate_normals(image, which=params.get("normal_source", "marigold")), np.float32), 0.0, 1.0)
-            except Exception as e:                       # graceful: depth-only if normals unavailable
-                print(f"[depthmap] normals skipped ({e}) — depth only")
-
-        # 3. subject mask -> black background. Resized to the depth grid so the seat lands.
+        # 2. subject mask -> black background. Resized to the depth grid so the seat lands.
         mask = None
         if params.get("mask_background", True):
             mask = be.remove_background(image)
             if mask.shape[:2] != depth.shape[:2]:
                 mask = cv2.resize(mask, (depth.shape[1], depth.shape[0]))
 
-        # 4. fuse depth (form) + normals (detail), seat on a black plate -> the relief-style
-        #    "black background + grayscale surface" heightmap. base>0 keeps the figure off pure
-        #    black so the silhouette stays crisp; fig_span uses the rest of the range.
-        luma = np.asarray(image.convert("L"), np.float32) / 255.0    # fine-detail source
-        height = rc.tiled_relief_heightmap(
-            depth, mask, invert=params.get("invert", False), base=0.12, fig_span=0.88,
-            bg=(0.0 if mask is not None else None),
-            normal_map=(normal_map if use_normals else None),
-            normal_detail=params.get("normal_gain", 0.7),
-            surface_detail=params.get("surface_detail", 0.0), surface_luma=luma,
-            surface_smooth=params.get("surface_smooth", 0.0))
+        # 3. build the heightmap.
+        normal_map = None
+        if params.get("pure_depth", True):
+            # PURE DEPTH: the depth model's OWN geometry, only normalized to the 16-bit range.
+            # Nothing is added or filtered — no normal fusion, no injected detail, no smoothing/
+            # polish, no base seating. (Tiling still runs the SAME model on crops for real extra
+            # resolution — that's model output, not a filter. Set Tile detail = Off for one raw pass.)
+            d = np.asarray(depth, np.float32)
+            d = (d - float(d.min())) / (float(d.max()) - float(d.min()) + 1e-8)
+            if params.get("invert", False):
+                d = 1.0 - d
+            if mask is not None:
+                d = d * (mask > 0.5).astype(np.float32)   # hard black background, no feather/seat
+            height = d
+        else:
+            # ENHANCED (relief-style): fuse normal detail, seat the figure on a flat black plate.
+            if params.get("normals", True):
+                try:
+                    normal_map = np.clip(np.asarray(be.estimate_normals(
+                        image, which=params.get("normal_source", "marigold")), np.float32), 0.0, 1.0)
+                except Exception as e:                    # graceful: depth-only if normals unavailable
+                    print(f"[depthmap] normals skipped ({e}) — depth only")
+            luma = np.asarray(image.convert("L"), np.float32) / 255.0     # fine-detail source
+            height = rc.tiled_relief_heightmap(
+                depth, mask, invert=params.get("invert", False), base=0.12, fig_span=0.88,
+                bg=(0.0 if mask is not None else None), normal_map=normal_map,
+                normal_detail=params.get("normal_gain", 0.7),
+                surface_detail=params.get("surface_detail", 0.0), surface_luma=luma,
+                surface_smooth=params.get("surface_smooth", 0.0))
         height16 = rc.to_heightmap_16bit(height, normalize=False)
 
         cv2.imwrite(str(out / "depth_16bit.png"), height16)                    # carve-ready
@@ -122,7 +138,7 @@ class DepthMapFeature(Feature):
             arts["depth_heat"] = str(out / "depth_heat.png")
 
         # 5. normal map export — background neutralised when masking (kills the noisy bg)
-        if use_normals and normal_map is not None:
+        if normal_map is not None:
             n = normal_map.copy()
             if mask is not None and mask.shape[:2] == n.shape[:2]:
                 n[mask <= 0.5] = (0.5, 0.5, 1.0)         # flat, camera-facing normal on the background
