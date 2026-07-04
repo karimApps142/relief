@@ -22,17 +22,15 @@ spandrel                 # Face Restore: loads the GFPGAN net (clean loader, Com
 #   pip install --no-deps git+https://github.com/ByteDance-Seed/Depth-Anything-3
 #   pip install omegaconf e3nn typer addict jaxtyping roma plyfile
 #   (do NOT 'pip install xformers' — its latest needs torch>=2.10 and nukes cu121)
-# Text-to-Speech (Hindi / Urdu / English). The base engine is MMS-TTS, which ships INSIDE
-# transformers (above) — so it needs NOTHING extra and can't conflict with the cu121 stack.
-#   • Urdu MAY need a romanizer:   pip install uroman   (only if a run asks for it)
-#   • Nicer WAV I/O (optional):    pip install soundfile librosa   (librosa also = Pitch knob)
-#
-# Real voice DESIGN (description → voice) uses Indic Parler-TTS, which pins transformers==4.46
-# and CANNOT share this venv. Run it ISOLATED — the app auto-uses .venv-tts via tts_worker.py
-# (subprocess) when present, else falls back to MMS. Set up once on the box:
-#     py -m venv F:\relief\.venv-tts
-#     F:\relief\.venv-tts\Scripts\python -m pip install --upgrade pip
-#     F:\relief\.venv-tts\Scripts\python -m pip install torch==2.5.1+cu121 torchaudio==2.5.1+cu121 --extra-index-url https://download.pytorch.org/whl/cu121
-#     F:\relief\.venv-tts\Scripts\python -m pip install "git+https://github.com/huggingface/parler-tts.git" soundfile
-#   (a FRESH venv lets Parler pull its own transformers 4.46 without touching the app.
-#    Put the venv elsewhere? point the app at it with env var TTS_VENV_PY=<...python.exe>.)
+# Text-to-Speech — Qwen3-TTS (Alibaba, open weights): voice DESIGN + CLONING + 9 presets,
+# 10 languages. A 2026 package with loose deps, so it runs IN this venv (no isolation) and is
+# imported lazily in models_tts.py (skipping it leaves the rest of the app unaffected). Once:
+#     pip install -U qwen-tts
+#     pip install soundfile          # WAV output (already present if installed earlier)
+#     # optional speedup: pip install flash-attn --no-build-isolation
+#   Watch that pip does NOT try to replace torch 2.5.1+cu121 — if it does, stop and check.
+#   Models auto-download on first use of each mode (~1.7B each):
+#     Qwen/Qwen3-TTS-12Hz-1.7B-VoiceDesign | -CustomVoice | -Base
+# Hindi & Urdu: Qwen has neither, so they route to MMS-TTS (facebook/mms-tts-hin /
+#   mms-tts-urd-script_arabic) — bundled in transformers, no install. Urdu MAY need
+#   `pip install uroman` (only if a run reports it). One basic voice each; no design/clone.

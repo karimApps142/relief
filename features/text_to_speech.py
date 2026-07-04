@@ -1,103 +1,84 @@
-"""features/text_to_speech.py — Hindi / Urdu / English speech from text.
+"""features/text_to_speech.py — speech from text via Qwen3-TTS (open weights, in-process).
 
-Three modes behind one panel, dispatched to the right engine (see models_tts):
-  • Voice design  — invent a voice from a written description (Indic Parler-TTS)
-  • Preset voice  — a named, reproducible Indic Parler speaker
-  • Voice cloning — copy a voice from an uploaded ~10 s sample (Chatterbox, hi/en)
+Three modes, each mapped to a Qwen3-TTS checkpoint (see models_tts):
+  • Voice design  — describe a voice in words → generate_voice_design (VoiceDesign)
+  • Preset voice  — one of 9 built-in Qwen speakers → generate_custom_voice (CustomVoice)
+  • Voice cloning — copy a voice from an uploaded clip → generate_voice_clone (Base)
 
-`inputs = ["audio"]` gives the panel an OPTIONAL reference-clip uploader (only used by
-cloning) without gating Generate — the server keys the upload as inputs["audio"]. Heavy
-libs are imported lazily inside run(), so the module stays Mac-import-safe.
+`inputs = ["audio"]` gives the panel an optional reference-clip uploader (cloning only)
+without gating Generate; the server keys the upload as inputs["audio"]. qwen-tts is
+imported lazily inside run(), so the module stays Mac-import-safe.
 """
 from pathlib import Path
 
 from .base import Feature, ParamSpec
 
-_LANG_NAME = {"hi": "Hindi", "ur": "Urdu", "en": "English", "auto": ""}
-_CLONE_LANGS = {"hi": "hi", "en": "en", "auto": "en"}      # Chatterbox has no Urdu
-
-
-def _description(mode, params, language):
-    """Build the Indic Parler-TTS caption that steers the voice (design + preset)."""
-    if mode == "preset":
-        base = f"{params.get('speaker') or 'Divya'}'s voice is clear and expressive"
-    else:
-        base = (params.get("voice_description") or "").strip() \
-            or "A clear, natural, expressive voice with a neutral tone"
-    speed = float(params.get("speed") or 1.0)
-    rate = "at a slow pace" if speed < 0.9 else "at a fast pace" if speed > 1.1 else "at a moderate pace"
-    parts = [base, rate]
-    lang = _LANG_NAME.get(language, "")
-    if lang:
-        parts.append(f"speaking in {lang}")
-    parts.append("recorded very close-up with excellent audio quality and almost no background noise")
-    return ", ".join(parts) + "."
+# Qwen3-TTS's 10 languages (full design/cloning) + Hindi/Urdu routed to MMS (basic voice).
+_QWEN_LANGUAGES = ["English", "Chinese", "Japanese", "Korean", "German",
+                   "French", "Russian", "Portuguese", "Spanish", "Italian"]
+_MMS_LANGUAGES = ["Hindi", "Urdu"]
+_LANGUAGES = _QWEN_LANGUAGES + _MMS_LANGUAGES
+_SPEAKERS = [("Ryan", "Ryan · English (m)"), ("Aiden", "Aiden · English (m)"),
+             ("Vivian", "Vivian · Chinese (f)"), ("Serena", "Serena · Chinese (f)"),
+             ("Uncle_Fu", "Uncle Fu · Chinese (m)"), ("Dylan", "Dylan · Beijing (m)"),
+             ("Eric", "Eric · Sichuan (m)"), ("Ono_Anna", "Ono Anna · Japanese (f)"),
+             ("Sohee", "Sohee · Korean (f)")]
 
 
 class TextToSpeechFeature(Feature):
     id = "text2speech"
     name = "Text → Speech"
-    description = "Hindi / Urdu / English speech — design a voice, use a preset, or clone from a sample."
+    description = "Qwen3-TTS — design a voice from a description, use a preset, or clone from a sample."
     inputs = ["audio"]                 # optional reference clip (cloning); does NOT gate Generate
     engine = "local"
     needs_comfy = False
     icon = "speech"
-    est_runtime = "~2–15 s"
-    vram = "~0.5–2 GB"
+    est_runtime = "~3–20 s"
+    vram = "~4–6 GB"
     output_kinds = ["Speech WAV"]
     guide = [
         {"h": "Engine",
-         "b": "Runs on MMS-TTS (Meta), bundled in transformers — Hindi, Urdu & English work "
-              "today with one clean fixed voice per language. Type in Devanagari (Hindi) or "
-              "Nastaʿlīq (Urdu); the script sets the language."},
-        {"h": "Reshaping the voice now",
-         "b": "MMS has one voice per language and ignores the written description. Use Pitch "
-              "(+ lighter/higher, − deeper) and Speed to actually change how it sounds."},
-        {"h": "Real voice design (optional)",
-         "b": "Set up the isolated Parler venv (.venv-tts — see requirements-gpu.txt) and the "
-              "written description then truly drives gender/pitch/pace/emotion for Hindi/Urdu/"
-              "English. The app routes design to it automatically once the venv exists."},
+         "b": "Qwen3-TTS (Alibaba, open weights) for 10 languages with full design + cloning: "
+              "English, Chinese, Japanese, Korean, German, French, Russian, Portuguese, Spanish, Italian."},
+        {"h": "Hindi & Urdu",
+         "b": "Qwen3-TTS has no Hindi/Urdu, so those route to MMS-TTS (also on this box) — one clean "
+              "fixed voice each. Type Hindi in Devanagari, Urdu in Nastaʿlīq. Design / cloning / preset "
+              "don't apply to these two (MMS has a single voice)."},
+        {"h": "Voice design",
+         "b": "Describe the voice in plain words (gender, age, tone, emotion, pace, accent) and "
+              "Qwen invents it. e.g. 'a warm, calm middle-aged man, speaking slowly and gently'."},
         {"h": "Voice cloning",
-         "b": "Cloning needs the isolated Chatterbox engine (torch 2.6 / numpy<2 — conflicts here), "
-              "so it's not active yet. Hindi & English only when enabled; Urdu has no open cloner."},
-        {"h": "Urdu note",
-         "b": "The Urdu MMS voice may need a one-time 'pip install uroman' on the box (romanizer). "
-              "If a run reports it, install that and retry."},
+         "b": "Switch Mode to Voice cloning, upload a clean ~5–15 s clip of one speaker, and "
+              "(recommended) paste its transcript in Reference transcript for a closer match."},
+        {"h": "First run",
+         "b": "Each mode downloads its Qwen3-TTS checkpoint once (~1.7B). One is kept in VRAM at "
+              "a time; switching mode reloads. Needs 'pip install -U qwen-tts' on the box."},
     ]
     params = [
         ParamSpec("text", "text", "", "Text",
-                  placeholder="Type Hindi, Urdu, or English text to speak…"),
+                  placeholder="Type what you want spoken…"),
         ParamSpec("mode", "select", "design", "Mode", control="seg",
-                  help="Design = invent a voice · Clone = copy a sampled voice · Preset = a named voice.",
+                  help="Design = invent a voice from a description · Clone = copy a sampled voice · "
+                       "Preset = a built-in Qwen speaker.",
                   choices=[{"value": "design", "label": "Voice design"},
                            {"value": "clone", "label": "Voice cloning"},
                            {"value": "preset", "label": "Preset voice"}]),
-        ParamSpec("language", "select", "hi", "Language", control="seg",
-                  help="Hindi & Urdu are the focus. Cloning supports Hindi/English (use Design for Urdu).",
-                  choices=[{"value": "hi", "label": "Hindi"}, {"value": "ur", "label": "Urdu"},
-                           {"value": "en", "label": "English"}, {"value": "auto", "label": "Auto"}]),
-        ParamSpec("voice_description", "text", "", "Voice description",
+        ParamSpec("language", "select", "English", "Language",
+                  help="Language of the text you typed.",
+                  choices=[{"value": l, "label": l} for l in _LANGUAGES]),
+        ParamSpec("instruct", "text", "", "Voice description",
                   depends_on={"param": "mode", "value": "design"},
-                  placeholder="A warm, calm female voice, clear and expressive, close-up studio recording.",
-                  help="Drives the voice ONLY with the isolated Parler engine (.venv-tts). With the "
-                       "built-in MMS voice, use Pitch + Speed below to reshape it."),
-        ParamSpec("pitch", "number", 0.0, "Pitch", -6.0, 6.0, 0.5, control="slider", suffix=" st",
-                  help="Shift the voice up/down in semitones (MMS engine). + = lighter/higher, "
-                       "− = deeper. Ignored once the Parler design engine is set up."),
-        ParamSpec("speaker", "select", "Divya", "Preset voice",
+                  placeholder="A warm, calm middle-aged man, clear and expressive, speaking gently.",
+                  help="Describe the voice: gender, age, tone, emotion, pace, accent. Qwen turns "
+                       "this into a voice — change it and the voice changes."),
+        ParamSpec("speaker", "select", "Ryan", "Preset voice",
                   depends_on={"param": "mode", "value": "preset"},
-                  help="Named Indic Parler voices — most reliable for Hindi. For Urdu, prefer Voice design.",
-                  choices=[{"value": "Divya", "label": "Divya (f)"}, {"value": "Rohit", "label": "Rohit (m)"},
-                           {"value": "Aman", "label": "Aman (m)"}, {"value": "Rani", "label": "Rani (f)"},
-                           {"value": "Sunita", "label": "Sunita (f)"}, {"value": "Karan", "label": "Karan (m)"}]),
-        ParamSpec("speed", "number", 1.0, "Speed", 0.7, 1.3, 0.05, control="slider", suffix="×",
-                  help="Speaking pace (MMS engine): >1 faster, <1 slower."),
-        ParamSpec("exaggeration", "number", 0.5, "Expressiveness", 0.25, 1.0, 0.05, control="slider",
-                  group="advanced", depends_on={"param": "mode", "value": "clone"},
-                  help="Chatterbox emotion intensity. 0.5 = natural; higher = more dramatic."),
-        ParamSpec("cfg_weight", "number", 0.5, "Pace / guidance", 0.2, 1.0, 0.05, control="slider",
-                  group="advanced", depends_on={"param": "mode", "value": "clone"},
-                  help="Lower = slower, more deliberate delivery; higher = snappier."),
+                  help="One of Qwen3-TTS's 9 built-in speakers.",
+                  choices=[{"value": v, "label": lbl} for v, lbl in _SPEAKERS]),
+        ParamSpec("ref_text", "text", "", "Reference transcript",
+                  depends_on={"param": "mode", "value": "clone"},
+                  placeholder="Exact words spoken in the uploaded clip (optional, improves accuracy).",
+                  help="Transcript of the reference audio. Optional but recommended for a closer clone."),
         ParamSpec("seed", "number", 0, "Seed", 0, 2_147_483_647, 1, control="stepper",
                   group="advanced", help="0 = random each run."),
     ]
@@ -108,26 +89,26 @@ class TextToSpeechFeature(Feature):
         if not text:
             raise ValueError("Enter some text to speak.")
         mode = params.get("mode", "design")
-        language = params.get("language", "hi")
+        language = params.get("language", "English")
         seed = int(params.get("seed") or 0)
 
-        if mode == "clone":
+        if language in _MMS_LANGUAGES:
+            # Qwen3-TTS has no Hindi/Urdu → MMS single voice (design/clone/preset don't apply)
+            audio, sr = models_tts.synthesize_mms(text, "hi" if language == "Hindi" else "ur")
+        elif mode == "clone":
             ref = inputs.get("audio") or inputs.get("image")
             if not ref:
-                raise ValueError("Voice cloning needs a reference clip — upload a clean ~10 s WAV/MP3, "
-                                 "or switch Mode to Voice design.")
-            lang = _CLONE_LANGS.get(language)
-            if lang is None:
-                raise ValueError(f"Voice cloning doesn't support {_LANG_NAME.get(language, language)} yet "
-                                 "(Chatterbox has no Urdu). Use Mode = Voice design for Urdu.")
-            audio, sr = models_tts.synthesize_clone(
-                text, ref, lang,
-                exaggeration=params.get("exaggeration", 0.5),
-                cfg_weight=params.get("cfg_weight", 0.5), seed=seed)
+                raise ValueError("Voice cloning needs a reference clip — upload a clean ~5–15 s "
+                                 "WAV/MP3, or switch Mode to Voice design.")
+            audio, sr = models_tts.synthesize_clone(text, ref, params.get("ref_text", ""),
+                                                    language=language, seed=seed)
+        elif mode == "preset":
+            audio, sr = models_tts.synthesize_preset(text, params.get("speaker", "Ryan"),
+                                                     language=language, seed=seed)
         else:
-            audio, sr = models_tts.synthesize_design(
-                text, _description(mode, params, language), language=language, seed=seed,
-                speed=float(params.get("speed") or 1.0), pitch=float(params.get("pitch") or 0.0))
+            instruct = (params.get("instruct") or "").strip() \
+                or "A clear, natural, expressive voice with a neutral tone."
+            audio, sr = models_tts.synthesize_design(text, instruct, language=language, seed=seed)
 
         out = Path(out_dir) / "speech.wav"
         models_tts.write_wav(out, audio, sr)
