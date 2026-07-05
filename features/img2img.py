@@ -47,6 +47,10 @@ class Img2ImgFeature(Feature):
         ParamSpec("prompt", "text", "", "Prompt", placeholder="Describe how to transform it…"),
         ParamSpec("denoise", "number", 0.6, "Denoise strength", 0.1, 1.0, 0.05, control="slider",
                   help="Lower stays close to the original; higher reinvents it."),
+        ParamSpec("width", "number", 1024, "Width", 512, 2048, 64, control="slider", suffix=" px",
+                  help="Output is scaled to fit within Width×Height (aspect ratio preserved)."),
+        ParamSpec("height", "number", 1024, "Height", 512, 2048, 64, control="slider", suffix=" px",
+                  help="Output is scaled to fit within Width×Height (aspect ratio preserved)."),
         ParamSpec("quant", "select", "Q4_K_M", "Quantization", control="seg", group="advanced",
                   help="Quality vs VRAM.",
                   choices=[{"value": "Q3_K_M", "label": "Q3"}, {"value": "Q4_K_M", "label": "Q4"},
@@ -54,6 +58,10 @@ class Img2ImgFeature(Feature):
         ParamSpec("steps", "number", 8, "Steps", 4, 20, 1, control="slider", group="advanced"),
         ParamSpec("seed", "number", 0, "Seed", 0, 2_147_483_647, 1, control="stepper", group="advanced",
                   help="0 = random."),
+        ParamSpec("clarity_upscale", "bool", False, "Clarity upscale (Balanced)", control="switch",
+                  group="advanced",
+                  help="After transforming, run Clarity Upscale (Balanced) on the result — adds fine "
+                       "detail and 2× size. Needs the Clarity models installed (see the Clarity tab)."),
         ParamSpec("loras", "lora", [], "LoRAs", control="lora", group="advanced",
                   help="Stack one or more custom Krea-2 LoRAs, each with its own strength. "
                        "Drop a .safetensors file to add it to the list."),
@@ -61,12 +69,31 @@ class Img2ImgFeature(Feature):
 
     def run(self, inputs, params, out_dir):
         import random
+        from PIL import Image
         client = ComfyUIClient()
-        name = client.upload_image(inputs["image"])
+        out_dir = Path(out_dir)
+
+        # scale the source to fit within Width×Height (aspect preserved), snapped to /16 for the
+        # VAE — this sets the img2img working/output resolution (like text2img's width/height).
+        src = Image.open(inputs["image"]).convert("RGB")
+        W, H = int(params.get("width", 1024)), int(params.get("height", 1024))
+        f = min(W / src.width, H / src.height)
+        nw = max(64, int(round(src.width * f)) // 16 * 16)
+        nh = max(64, int(round(src.height * f)) // 16 * 16)
+        tmp = out_dir / "img2img_input.png"
+        src.resize((nw, nh), Image.LANCZOS).save(tmp)
+        name = client.upload_image(str(tmp))
+
         seed = int(params.get("seed") or 0) or random.randint(1, 2_147_483_647)
         graph = _build_graph(name, params.get("prompt", ""), params["denoise"],
                              params["steps"], seed, f"krea2_turbo-{params['quant']}.gguf",
                              loras=params.get("loras"))
-        out = Path(out_dir) / "img2img.png"
+        out = out_dir / "img2img.png"
         out.write_bytes(client.generate(graph))
+
+        # optional finishing pass: reuse the Clarity feature (Balanced preset) on the result.
+        if params.get("clarity_upscale"):
+            from .clarity import ClarityFeature
+            cf = ClarityFeature()
+            return cf.run({"image": str(out)}, cf.coerce({}), out_dir)   # SD1.5 tile-CN detail upscale
         return {"image": str(out)}
