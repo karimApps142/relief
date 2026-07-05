@@ -188,9 +188,9 @@ class ClarityFeature(Feature):
                   help="Blank works fine — a hint like 'portrait of a woman' sharpens results."),
         ParamSpec("scale", "number", 2, "Scale", 1, 4, 0.5, control="slider", suffix="×",
                   help="Diffusion enlargement. Above 2× runs in multiple ≤2× passes for cleaner detail."),
-        ParamSpec("final_upscale", "bool", True, "Final 4×-UltraSharp", control="switch",
+        ParamSpec("final_upscale", "bool", False, "Final 4×-UltraSharp", control="switch",
                   help="Run 4×-UltraSharp on the finished image for extra crispness. "
-                       "Multiplies the final size by 4 (so Scale 2× → 8× total). Off to keep Scale."),
+                       "Multiplies the final size by 4 (so Scale 2× → 8× total). On to add it."),
         ParamSpec("creativity", "number", 0.35, "Creativity", 0.1, 1.0, 0.05, control="slider",
                   help="Denoise — higher invents more new detail; lower stays faithful to the source."),
         ParamSpec("resemblance", "number", 0.6, "Resemblance", 0.0, 2.0, 0.05, control="slider",
@@ -247,7 +247,7 @@ class ClarityFeature(Feature):
         name = client.upload_image(str(base))
 
         scale = float(params["scale"])
-        final_up = bool(params.get("final_upscale", True))
+        final_up = bool(params.get("final_upscale", False))
         passes = _calc_passes(scale)
 
         # predict the final long edge → clamp it if Scale × final pass would blow past the cap

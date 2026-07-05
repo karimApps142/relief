@@ -10,6 +10,7 @@ const STROKE: Record<string, string[]> = {
   chevronLeft: ['m15 18-6-6 6-6'],
   chevronDown: ['m6 9 6 6 6-6'],
   expand: ['M8 3H5a2 2 0 0 0-2 2v3', 'M16 3h3a2 2 0 0 1 2 2v3', 'M21 16v3a2 2 0 0 1-2 2h-3', 'M8 21H5a2 2 0 0 1-2-2v-3'],
+  plus: ['M12 5v14M5 12h14'],
   upload: ['M12 13v8M8 17l4-4 4 4', 'M20 16.7A5 5 0 0 0 18 7h-1.3A8 8 0 1 0 4 15.3'],
   warning: ['M12 9v4M12 17h.01', 'M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z'],
   check: ['M20 6 9 17l-5-5'],

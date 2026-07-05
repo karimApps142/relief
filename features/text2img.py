@@ -20,10 +20,10 @@ from ._comfy import ComfyUIClient
 from . import _lora
 
 
-def _build_graph(prompt, width, height, steps, seed, gguf, lora=None, lora_strength=0.8):
+def _build_graph(prompt, width, height, steps, seed, gguf, loras=None):
     """Minimal API-format graph for the Krea-2-Turbo GGUF path (from the official
-    Vantage workflow, with the UI-only rgthree helper nodes dropped). An optional custom
-    LoRA is spliced onto the model line via LoraLoaderModelOnly when one is selected."""
+    Vantage workflow, with the UI-only rgthree helper nodes dropped). Any custom LoRAs are
+    chained onto the model line via LoraLoaderModelOnly nodes (each with its own strength)."""
     graph = {
         "16": {"class_type": "UnetLoaderGGUF", "inputs": {"unet_name": gguf}},
         "18": {"class_type": "CLIPLoader", "inputs": {
@@ -41,7 +41,7 @@ def _build_graph(prompt, width, height, steps, seed, gguf, lora=None, lora_stren
         "3":  {"class_type": "VAEDecode", "inputs": {"samples": ["2", 0], "vae": ["4", 0]}},
         "22": {"class_type": "SaveImage", "inputs": {"filename_prefix": "krea2/i", "images": ["3", 0]}},
     }
-    graph["2"]["inputs"]["model"] = _lora.model_ref_with_lora(graph, ["16", 0], lora, lora_strength)
+    graph["2"]["inputs"]["model"] = _lora.model_ref_with_loras(graph, ["16", 0], loras)
     return graph
 
 
@@ -68,10 +68,9 @@ class Text2ImgFeature(Feature):
                   help="Turbo is tuned for 8 steps."),
         ParamSpec("seed", "number", 0, "Seed", 0, 2_147_483_647, 1, control="stepper", group="advanced",
                   help="0 = random each run."),
-        ParamSpec("lora", "select", "none", "LoRA", control="lora", group="advanced",
-                  help="Optional custom Krea-2 LoRA. Pick one, or drop a .safetensors file to add it."),
-        ParamSpec("lora_strength", "number", 0.8, "LoRA strength", 0.0, 1.5, 0.05, control="slider",
-                  group="hidden", help="How strongly the LoRA is applied (1.0 = full)."),
+        ParamSpec("loras", "lora", [], "LoRAs", control="lora", group="advanced",
+                  help="Stack one or more custom Krea-2 LoRAs, each with its own strength. "
+                       "Drop a .safetensors file to add it to the list."),
     ]
 
     def run(self, inputs, params, out_dir):
@@ -80,7 +79,7 @@ class Text2ImgFeature(Feature):
                              width=params["width"], height=params["height"],
                              steps=params["steps"], seed=seed,
                              gguf=f"krea2_turbo-{params['quant']}.gguf",
-                             lora=params.get("lora"), lora_strength=params.get("lora_strength", 0.8))
+                             loras=params.get("loras"))
         png = ComfyUIClient().generate(graph)
         out = Path(out_dir) / "text2img.png"
         out.write_bytes(png)

@@ -287,7 +287,7 @@ export default function Results({ s }: { s: Studio }) {
   const grid = (f.id === 'relief' || f.id === 'depthmap') ? 'repeat(2, minmax(0,1fr))' : 'minmax(0, 520px)'
   // Upscalers compare against the source: swap the plain image card for a before/after wipe
   // when we still hold the uploaded input (a fresh run; not a re-opened history item).
-  const compareArt = (f.id === 'upscale' || f.id === 'clarity') && s.preview
+  const compareArt = (f.id === 'upscale' || f.id === 'clarity' || f.id === 'img2img') && s.preview
     ? arts.find(([, url]) => kindOf(url) === 'image') : null
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 18, animation: 'rs-rise .3s var(--hf-ease-out)' }}>

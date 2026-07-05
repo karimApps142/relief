@@ -10,7 +10,7 @@ from ._comfy import ComfyUIClient
 from . import _lora
 
 
-def _build_graph(image_name, prompt, denoise, steps, seed, gguf, lora=None, lora_strength=0.8):
+def _build_graph(image_name, prompt, denoise, steps, seed, gguf, loras=None):
     graph = {
         "16": {"class_type": "UnetLoaderGGUF", "inputs": {"unet_name": gguf}},
         "18": {"class_type": "CLIPLoader", "inputs": {
@@ -28,7 +28,7 @@ def _build_graph(image_name, prompt, denoise, steps, seed, gguf, lora=None, lora
         "3":  {"class_type": "VAEDecode", "inputs": {"samples": ["2", 0], "vae": ["4", 0]}},
         "22": {"class_type": "SaveImage", "inputs": {"filename_prefix": "krea2/i2i", "images": ["3", 0]}},
     }
-    graph["2"]["inputs"]["model"] = _lora.model_ref_with_lora(graph, ["16", 0], lora, lora_strength)
+    graph["2"]["inputs"]["model"] = _lora.model_ref_with_loras(graph, ["16", 0], loras)
     return graph
 
 
@@ -54,10 +54,9 @@ class Img2ImgFeature(Feature):
         ParamSpec("steps", "number", 8, "Steps", 4, 20, 1, control="slider", group="advanced"),
         ParamSpec("seed", "number", 0, "Seed", 0, 2_147_483_647, 1, control="stepper", group="advanced",
                   help="0 = random."),
-        ParamSpec("lora", "select", "none", "LoRA", control="lora", group="advanced",
-                  help="Optional custom Krea-2 LoRA. Pick one, or drop a .safetensors file to add it."),
-        ParamSpec("lora_strength", "number", 0.8, "LoRA strength", 0.0, 1.5, 0.05, control="slider",
-                  group="hidden", help="How strongly the LoRA is applied (1.0 = full)."),
+        ParamSpec("loras", "lora", [], "LoRAs", control="lora", group="advanced",
+                  help="Stack one or more custom Krea-2 LoRAs, each with its own strength. "
+                       "Drop a .safetensors file to add it to the list."),
     ]
 
     def run(self, inputs, params, out_dir):
@@ -67,7 +66,7 @@ class Img2ImgFeature(Feature):
         seed = int(params.get("seed") or 0) or random.randint(1, 2_147_483_647)
         graph = _build_graph(name, params.get("prompt", ""), params["denoise"],
                              params["steps"], seed, f"krea2_turbo-{params['quant']}.gguf",
-                             lora=params.get("lora"), lora_strength=params.get("lora_strength", 0.8))
+                             loras=params.get("loras"))
         out = Path(out_dir) / "img2img.png"
         out.write_bytes(client.generate(graph))
         return {"image": str(out)}

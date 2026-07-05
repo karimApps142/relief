@@ -145,19 +145,24 @@ const fmtSpeed = (bps: number) =>
 // Self-contained LoRA control: a dropdown of drop-in LoRAs, a drag-drop/click uploader
 // (POST /api/loras), and a strength slider shown once a LoRA is picked. Reads/writes the
 // feature's `lora` + `lora_strength` params directly, so no per-feature wiring is needed.
+type LoraEntry = { name: string; strength: number }
+
 function LoraField({ s }: { s: Studio }) {
-  const [loras, setLoras] = useState<string[]>([])
+  const [pool, setPool] = useState<string[]>([])          // available .safetensors files
   const [busy, setBusy] = useState(false)
   const [prog, setProg] = useState<UploadProgress | null>(null)
   const [drag, setDrag] = useState(false)
   const [err, setErr] = useState('')
-  const value: string = s.values.lora ?? 'none'
-  const strength = Number(s.values.lora_strength ?? 0.8)
+  const stack: LoraEntry[] = Array.isArray(s.values.loras) ? s.values.loras : []
 
-  useEffect(() => { getLoras().then(setLoras) }, [])
+  useEffect(() => { getLoras().then(setPool) }, [])
 
-  const options = [{ value: 'none', label: 'None (base model)' },
-    ...loras.map((l) => ({ value: l, label: loraLabel(l) }))]
+  const setStack = (next: LoraEntry[]) => s.setVal('loras', next)
+  const addRow = (name?: string) => setStack([...stack, { name: name ?? pool[0] ?? '', strength: 0.8 }])
+  const updateRow = (i: number, patch: Partial<LoraEntry>) =>
+    setStack(stack.map((e, idx) => (idx === i ? { ...e, ...patch } : e)))
+  const removeRow = (i: number) => setStack(stack.filter((_, idx) => idx !== i))
+  const opts = pool.map((l) => ({ value: l, label: loraLabel(l) }))
 
   const handleFile = async (file?: File | null) => {
     if (!file) return
@@ -165,24 +170,48 @@ function LoraField({ s }: { s: Studio }) {
     setErr(''); setBusy(true); setProg({ loaded: 0, total: file.size, pct: 0, speed: 0 })
     try {
       const { saved, loras: list } = await uploadLora(file, setProg)
-      setLoras(list); s.setVal('lora', saved)
+      setPool(list); setStack([...stack, { name: saved, strength: 0.8 }])   // auto-add to the stack
       s.addToast('success', `LoRA added · ${loraLabel(saved)}`)
     } catch (e: any) {
       setErr(e.message || 'upload failed'); s.addToast('danger', 'LoRA upload failed')
     } finally { setBusy(false); setProg(null) }
   }
 
+  const iconBtn: React.CSSProperties = { display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 9, border: '1px solid var(--hf-border)', background: 'var(--hf-surface-1)', color: 'var(--hf-text-secondary)', cursor: 'pointer' }
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 9 }}>
-      <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 10 }}>
-        <span style={{ font: '600 13px var(--hf-font-sans)', color: 'var(--hf-text-secondary)' }}>LoRA</span>
-        {value !== 'none' && (
-          <span style={{ font: '500 12px var(--hf-font-mono)', color: 'var(--hf-text-primary)', background: 'var(--hf-fill-soft)', padding: '2px 8px', borderRadius: 7 }}>{strength.toFixed(2)}×</span>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
+        <span style={{ font: '600 13px var(--hf-font-sans)', color: 'var(--hf-text-secondary)' }}>LoRAs</span>
+        {stack.length > 0 && (
+          <span style={{ font: '500 11px var(--hf-font-mono)', color: 'var(--hf-text-primary)', background: 'var(--hf-fill-soft)', padding: '2px 8px', borderRadius: 7 }}>{stack.length} stacked</span>
         )}
       </div>
-      <Select options={options} value={value} onChange={(v) => s.setVal('lora', v)} />
 
-      {/* drag-drop / click to add a .safetensors LoRA — no manual file copying */}
+      {/* the LoRA stack — one row per LoRA: file · strength · remove (chained on the model line) */}
+      {stack.map((e, i) => (
+        <div key={i} style={{ display: 'flex', flexDirection: 'column', gap: 7, padding: '10px 11px', border: '1px solid var(--hf-border)', borderRadius: 11, background: 'var(--hf-surface-2)' }}>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <Select options={opts.length ? opts : [{ value: '', label: '— upload a LoRA below —' }]} value={e.name} onChange={(v) => updateRow(i, { name: v })} />
+            </div>
+            <button onClick={() => removeRow(i)} title="Remove LoRA" style={{ ...iconBtn, width: 34, height: 34, flexShrink: 0 }}>
+              <Icon name="x" size={14} sw={2.2} />
+            </button>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <div style={{ flex: 1 }}><Slider value={e.strength} min={0} max={1.5} step={0.05} onChange={(v) => updateRow(i, { strength: v })} /></div>
+            <span style={{ font: '500 11.5px var(--hf-font-mono)', color: 'var(--hf-text-primary)', minWidth: 36, textAlign: 'right' }}>{e.strength.toFixed(2)}×</span>
+          </div>
+        </div>
+      ))}
+
+      <button onClick={() => addRow()} disabled={!pool.length}
+        style={{ height: 34, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7, borderRadius: 10, border: '1px solid var(--hf-border)', background: 'var(--hf-surface-1)', color: pool.length ? 'var(--hf-text-secondary)' : 'var(--hf-text-tertiary)', font: '600 12.5px var(--hf-font-sans)', cursor: pool.length ? 'pointer' : 'not-allowed', opacity: pool.length ? 1 : 0.6 }}>
+        <Icon name="plus" size={14} sw={2.2} /> Add LoRA
+      </button>
+
+      {/* drag-drop / click to add a .safetensors LoRA — uploads it and appends it to the stack */}
       <label
         onDragOver={(e) => { e.preventDefault(); setDrag(true) }}
         onDragLeave={() => setDrag(false)}
@@ -211,15 +240,8 @@ function LoraField({ s }: { s: Studio }) {
         </div>
       )}
       {err && <span style={{ fontSize: 11.5, color: 'var(--hf-danger)' }}>{err}</span>}
-
-      {/* strength — only meaningful once a LoRA is chosen */}
-      {value !== 'none' && (
-        <div style={{ padding: '2px 0 0' }}>
-          <Slider value={strength} min={0} max={1.5} step={0.05} onChange={(v) => s.setVal('lora_strength', v)} />
-        </div>
-      )}
       <span style={{ font: '400 11.5px var(--hf-font-sans)', color: 'var(--hf-text-tertiary)', lineHeight: 1.4 }}>
-        Custom Krea-2 LoRA, applied to the diffusion model. Added files live in ComfyUI/models/loras.
+        Stack custom Krea-2 LoRAs (UNet-only), each with its own strength. Files live in ComfyUI/models/loras.
       </span>
     </div>
   )

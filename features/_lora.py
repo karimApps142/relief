@@ -26,3 +26,34 @@ def model_ref_with_lora(graph, base_model_ref, lora, strength, node_id=_LORA_NOD
                    "strength_model": float(strength)},
     }
     return [node_id, 0]
+
+
+def model_ref_with_loras(graph, base_model_ref, loras):
+    """Stack N model-only LoRAs by CHAINING LoraLoaderModelOnly nodes (each node's model
+    output feeds the next), returning the final patched model ref. `loras` is a list of
+    {"name": <file>, "strength": <float>} (bare strings also accepted, strength 1.0).
+    Entries with a missing / "none" name are skipped. Order is irrelevant — model-only
+    patches are additive deltas that commute. Uses string node ids ("lora0", "lora1", …)
+    so they never collide with the hand-authored numeric ids.
+
+    Only strength_model is meaningful: Krea-2 LoRAs are UNet-only (train_text_encoder=false),
+    so there is no CLIP/text-encoder strength to set. Works over the GGUF UNet because
+    ComfyUI-GGUF keeps it patchable. A LoRA whose keys don't match logs "lora key not
+    loaded" in ComfyUI and is a silent no-op — the image is simply unchanged."""
+    ref = base_model_ref
+    i = 0
+    for item in (loras or []):
+        if isinstance(item, str):
+            name, strength = item, 1.0
+        elif isinstance(item, dict):
+            name, strength = item.get("name"), item.get("strength", 1.0)
+        else:
+            continue
+        if not name or name == "none":
+            continue
+        nid = f"lora{i}"
+        i += 1
+        graph[nid] = {"class_type": "LoraLoaderModelOnly", "inputs": {
+            "model": ref, "lora_name": name, "strength_model": float(strength)}}
+        ref = [nid, 0]
+    return ref

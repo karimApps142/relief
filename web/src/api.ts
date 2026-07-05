@@ -4,7 +4,7 @@
 export type Choice = { value: string; label: string }
 export type ParamSpec = {
   name: string
-  type: 'number' | 'bool' | 'select' | 'text'
+  type: 'number' | 'bool' | 'select' | 'text' | 'lora'
   control: 'slider' | 'stepper' | 'seg' | 'select' | 'switch' | 'textarea' | 'lora'
   default: any
   label: string
