@@ -143,13 +143,35 @@ export const comfyInterrupt = () => post('/api/comfy/interrupt')
 export const getLoras = (): Promise<string[]> =>
   get('/api/loras').then((d) => d.loras || []).catch(() => [])
 
-export async function uploadLora(file: File): Promise<{ saved: string; loras: string[] }> {
-  const fd = new FormData()
-  fd.append('file', file)
-  const r = await fetch('/api/loras', { method: 'POST', body: fd })
-  const data = await r.json().catch(() => ({}))
-  if (!r.ok || data.error || data.detail) throw new Error(data.error || data.detail || `upload failed (${r.status})`)
-  return data
+export type UploadProgress = { loaded: number; total: number; pct: number; speed: number }
+
+// XHR (not fetch) so we get real upload progress: bytes sent + a rolling MB/s.
+export function uploadLora(
+  file: File,
+  onProgress?: (p: UploadProgress) => void,
+): Promise<{ saved: string; loras: string[] }> {
+  return new Promise((resolve, reject) => {
+    const fd = new FormData()
+    fd.append('file', file)
+    const xhr = new XMLHttpRequest()
+    xhr.open('POST', '/api/loras')
+    let lastT = performance.now(), lastLoaded = 0, speed = 0
+    xhr.upload.onprogress = (e) => {
+      if (!e.lengthComputable) return
+      const now = performance.now(), dt = now - lastT
+      if (dt > 150) { speed = ((e.loaded - lastLoaded) / dt) * 1000; lastT = now; lastLoaded = e.loaded }  // bytes/s
+      onProgress?.({ loaded: e.loaded, total: e.total, pct: (e.loaded / e.total) * 100, speed })
+    }
+    xhr.onload = () => {
+      let data: any = {}
+      try { data = JSON.parse(xhr.responseText) } catch { /* non-JSON */ }
+      if (xhr.status >= 200 && xhr.status < 300 && !data.error && !data.detail) resolve(data)
+      else reject(new Error(data.error || data.detail || `upload failed (${xhr.status})`))
+    }
+    xhr.onerror = () => reject(new Error('network error during upload'))
+    xhr.onabort = () => reject(new Error('upload cancelled'))
+    xhr.send(fd)
+  })
 }
 
 export async function runFeature(

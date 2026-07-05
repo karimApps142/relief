@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import type { Studio } from './studio'
-import type { ParamSpec, RunRecord } from './api'
+import type { ParamSpec, RunRecord, UploadProgress } from './api'
 import { choiceList, choiceLabel, getLoras, uploadLora, fmtDur } from './api'
 import { Button, Switch, Slider, Segmented, Select } from './ds'
 import { Icon, featureIcon } from './icons'
@@ -139,6 +139,8 @@ function ParamField({ p, value, onChange }: { p: ParamSpec; value: any; onChange
 }
 
 const loraLabel = (name: string) => name.replace(/\.safetensors$/i, '')
+const fmtSpeed = (bps: number) =>
+  bps >= 1e6 ? `${(bps / 1e6).toFixed(1)} MB/s` : bps >= 1e3 ? `${Math.round(bps / 1e3)} KB/s` : `${Math.round(bps)} B/s`
 
 // Self-contained LoRA control: a dropdown of drop-in LoRAs, a drag-drop/click uploader
 // (POST /api/loras), and a strength slider shown once a LoRA is picked. Reads/writes the
@@ -146,6 +148,7 @@ const loraLabel = (name: string) => name.replace(/\.safetensors$/i, '')
 function LoraField({ s }: { s: Studio }) {
   const [loras, setLoras] = useState<string[]>([])
   const [busy, setBusy] = useState(false)
+  const [prog, setProg] = useState<UploadProgress | null>(null)
   const [drag, setDrag] = useState(false)
   const [err, setErr] = useState('')
   const value: string = s.values.lora ?? 'none'
@@ -159,14 +162,14 @@ function LoraField({ s }: { s: Studio }) {
   const handleFile = async (file?: File | null) => {
     if (!file) return
     if (!/\.safetensors$/i.test(file.name)) { setErr('LoRA must be a .safetensors file'); return }
-    setErr(''); setBusy(true)
+    setErr(''); setBusy(true); setProg({ loaded: 0, total: file.size, pct: 0, speed: 0 })
     try {
-      const { saved, loras: list } = await uploadLora(file)
+      const { saved, loras: list } = await uploadLora(file, setProg)
       setLoras(list); s.setVal('lora', saved)
       s.addToast('success', `LoRA added · ${loraLabel(saved)}`)
     } catch (e: any) {
       setErr(e.message || 'upload failed'); s.addToast('danger', 'LoRA upload failed')
-    } finally { setBusy(false) }
+    } finally { setBusy(false); setProg(null) }
   }
 
   return (
@@ -186,10 +189,27 @@ function LoraField({ s }: { s: Studio }) {
         onDrop={(e) => { e.preventDefault(); setDrag(false); handleFile(e.dataTransfer.files?.[0]) }}
         style={{ border: `1.5px dashed ${drag ? 'var(--hf-action)' : 'var(--hf-border-strong)'}`, background: drag ? 'var(--hf-fill-soft)' : 'var(--hf-surface-1)', borderRadius: 12, padding: '11px 14px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, cursor: busy ? 'wait' : 'pointer', color: 'var(--hf-text-tertiary)' }}>
         <Icon name={busy ? 'clock' : 'upload'} size={16} sw={1.7} />
-        <span style={{ fontSize: 12.5, fontWeight: 500 }}>{busy ? 'Uploading…' : 'Drop a .safetensors LoRA or click to add'}</span>
+        <span style={{ fontSize: 12.5, fontWeight: 500 }}>
+          {busy
+            ? (prog && prog.pct >= 99.5 ? 'Saving…' : prog ? `Uploading ${Math.round(prog.pct)}%` : 'Uploading…')
+            : 'Drop a .safetensors LoRA or click to add'}
+        </span>
         <input type="file" accept=".safetensors" style={{ display: 'none' }} disabled={busy}
           onChange={(e) => handleFile(e.target.files?.[0])} />
       </label>
+
+      {/* real upload progress: bar + bytes + rolling MB/s (XHR upload.onprogress) */}
+      {busy && prog && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+          <div style={{ position: 'relative', height: 6, borderRadius: 99, background: 'var(--hf-fill-strong)', overflow: 'hidden' }}>
+            <div style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: `${prog.pct}%`, borderRadius: 99, background: 'var(--hf-accent)', transition: 'width .15s linear' }} />
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', font: '500 10.5px var(--hf-font-mono)', color: 'var(--hf-text-tertiary)' }}>
+            <span>{(prog.loaded / 1e6).toFixed(1)} / {(prog.total / 1e6).toFixed(1)} MB</span>
+            <span>{prog.speed > 0 && prog.pct < 99.5 ? fmtSpeed(prog.speed) : '…'}</span>
+          </div>
+        </div>
+      )}
       {err && <span style={{ fontSize: 11.5, color: 'var(--hf-danger)' }}>{err}</span>}
 
       {/* strength — only meaningful once a LoRA is chosen */}

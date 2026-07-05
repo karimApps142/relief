@@ -50,4 +50,6 @@ class ReliefFeature(Feature):
         rp = ReliefParams(**{k: v for k, v in params.items() if k in fields})
         rp.colormap = "off"        # heat-map view removed from this feature
         rp.make_preview = False    # 3D render removed — heightmap (16-bit PNG) + STL only
+        rp.surface_smooth = 0.0    # no polish blur — the tiled depth IS the detail; the hidden
+                                   # 0.3 bilateral (sigmaSpace ~5px) was softening the carve
         return generate_relief(inputs["image"], str(out_dir), rp, backend="auto")
