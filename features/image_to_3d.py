@@ -275,7 +275,7 @@ class ImageTo3DFeature(Feature):
     needs_comfy = True
     inputs = ["image"]
     engine = "comfy"
-    icon = "box"
+    icon = "cube"
     est_runtime = "~2–8 min"
     vram = "~8–12 GB"
     output_kinds = ["GLB", "3D preview", "OBJ", "STL", "PLY"]

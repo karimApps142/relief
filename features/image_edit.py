@@ -34,6 +34,7 @@ from pathlib import Path
 
 from .base import Feature, ParamSpec
 from ._comfy import ComfyUIClient
+from . import _lora
 
 _UNET = "qwen-image-edit-2511-Q3_K_M.gguf"
 _CLIP = "qwen_2.5_vl_7b_fp8_scaled.safetensors"
@@ -52,10 +53,11 @@ _PRESETS = {
 }
 
 
-def _build_graph(image_name, prompt, seed, lightning, steps, cfg):
+def _build_graph(image_name, prompt, seed, lightning, steps, cfg, loras=None):
     """Hand-authored 2511 edit graph (single reference image). The FluxKontextMultiReference
     nodes are omitted — the official note says they're only needed for multi-image / third-party
-    repackaged unets, not a single-image edit with the standard loaders."""
+    repackaged unets, not a single-image edit with the standard loaders. Any user LoRAs are
+    chained (model-only) after the Lightning LoRA — order is irrelevant (additive deltas)."""
     g = {
         "1": {"class_type": "UnetLoaderGGUF", "inputs": {"unet_name": _UNET}},
         "2": {"class_type": "CLIPLoader", "inputs": {
@@ -77,6 +79,7 @@ def _build_graph(image_name, prompt, seed, lightning, steps, cfg):
         g["6"] = {"class_type": "LoraLoaderModelOnly", "inputs": {
             "model": ["4", 0], "lora_name": _LIGHTNING, "strength_model": 1.0}}
         model_ref = ["6", 0]
+    model_ref = _lora.model_ref_with_loras(g, model_ref, loras)   # user LoRAs chained after Lightning
     g["12"] = {"class_type": "KSampler", "inputs": {
         "model": model_ref, "positive": ["10", 0], "negative": ["11", 0], "latent_image": ["9", 0],
         "seed": int(seed), "steps": int(steps), "cfg": float(cfg),
@@ -91,7 +94,7 @@ class ImageEditFeature(Feature):
                   "change art style, relight. Bas-relief (CNC) preset feeds the Relief tab.")
     needs_comfy = True
     engine = "comfy"
-    icon = "sparkle"
+    icon = "pencil"
     est_runtime = "~15–45 s"
     vram = "~10–11 GB"
     output_kinds = ["Edited image"]
@@ -117,6 +120,15 @@ class ImageEditFeature(Feature):
                   help="Lightning sweet spot 4–8 (only for Fast; High is fixed at 20)."),
         ParamSpec("seed", "number", 0, "Seed", 0, 2_147_483_647, 1, control="stepper", group="advanced",
                   help="0 = random each run."),
+        ParamSpec("loras", "lora", [], "LoRAs", control="lora", group="advanced",
+                  help="Stack Qwen-Image-Edit LoRAs (e.g. Multiple-Angles, Relight), each with its own "
+                       "strength. Order does NOT change the result — model-only LoRAs are additive weight "
+                       "deltas that combine commutatively; each LoRA's strength scales its effect. Use "
+                       "LoRAs trained for Qwen-Image-Edit — a non-matching one silently does nothing."),
+        ParamSpec("clarity_upscale", "bool", False, "Clarity upscale (Balanced)", control="switch",
+                  group="advanced",
+                  help="After editing, run Clarity Upscale (Balanced) on the result — adds fine detail "
+                       "and 2× size. Needs the Clarity models installed (see the Clarity tab)."),
     ]
 
     def run(self, inputs, params, out_dir):
@@ -134,7 +146,13 @@ class ImageEditFeature(Feature):
         cfg = 1.0 if lightning else 4.0
         seed = int(params.get("seed") or 0) or random.randint(1, 2_147_483_647)
 
-        graph = _build_graph(name, prompt, seed, lightning, steps, cfg)
+        graph = _build_graph(name, prompt, seed, lightning, steps, cfg, loras=params.get("loras"))
         out = Path(out_dir) / "image_edit.png"
         out.write_bytes(client.generate(graph, label="image-edit", max_wait=900))
+
+        # optional finishing pass: reuse the Clarity feature (Balanced preset) on the edited image.
+        if params.get("clarity_upscale"):
+            from .clarity import ClarityFeature
+            cf = ClarityFeature()
+            return cf.run({"image": str(out)}, cf.coerce({}), out_dir)
         return {"image": str(out)}

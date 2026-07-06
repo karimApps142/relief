@@ -146,7 +146,7 @@ class ClarityFeature(Feature):
                   "tile-by-tile under a Tile ControlNet, à la clarity.ai. Not a plain enlarge.")
     needs_comfy = True
     engine = "comfy"
-    icon = "upscale"
+    icon = "sparkle"
     est_runtime = "~20 s – 3 min"
     vram = "~4–8 GB"
     output_kinds = ["Image PNG · detailed"]

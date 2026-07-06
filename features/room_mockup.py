@@ -32,6 +32,36 @@ _MATERIALS = {
 }
 
 
+def _cutout_design(design_path, out_dir):
+    """Remove the CNC design's own background (BiRefNet, via the relief backend) and composite the
+    bare motif onto clean white — so the edit model places ONLY the carving, not its rectangular
+    slab/panel. Frees the local model before the ComfyUI run so it doesn't hold 12 GB VRAM. Returns
+    the cutout path (or the original on any failure — cutout is best-effort)."""
+    import numpy as np
+    import cv2
+    from PIL import Image
+    try:
+        from backends import get_backend
+        img = Image.open(design_path).convert("RGB")
+        mask = np.clip(np.asarray(get_backend("auto").remove_background(img), np.float32), 0.0, 1.0)
+        if mask.shape[:2] != (img.height, img.width):
+            mask = cv2.resize(mask, (img.width, img.height))
+        arr = np.asarray(img, np.float32)
+        comp = (arr * mask[..., None] + 255.0 * (1.0 - mask[..., None])).astype(np.uint8)  # motif on white
+        p = Path(out_dir) / "design_cutout.png"
+        Image.fromarray(comp).save(p)
+        return str(p)
+    except Exception as e:
+        print(f"[room_mockup] design cutout skipped ({e}) — using the design as-is")
+        return design_path
+    finally:
+        try:
+            import models
+            models.unload_all()                              # free BiRefNet before the ComfyUI gen
+        except Exception:
+            pass
+
+
 def _build_graph(room_name, design_name, prompt, seed, lightning, steps, cfg):
     """image1 = FluxKontextImageScale(room) (also the VAEEncode sampling latent); image2 = the
     raw design LoadImage (the edit node scales references internally). Both TextEncode nodes
@@ -71,16 +101,22 @@ class RoomMockupFeature(Feature):
                   "real carved relief with matched lighting (Qwen-Image-Edit).")
     needs_comfy = True
     engine = "comfy"
-    icon = "image"
+    icon = "frame"
     est_runtime = "~20–50 s"
     vram = "~10–11 GB"
     output_kinds = ["Room mockup"]
     inputs = ["image", "image2"]
     input_labels = {"image": "Room photo", "image2": "CNC design"}
     params = [
-        ParamSpec("material", "select", "wood", "Material", control="seg",
-                  help="What the carving is made of — drives its look on the wall.",
-                  choices=[{"value": "wood", "label": "Wood"}, {"value": "marble", "label": "Marble"},
+        ParamSpec("cutout_design", "bool", True, "Cut out design (natural integration)", control="switch",
+                  help="Remove the design's own background first, so ONLY the carved motif is placed on the "
+                       "wall — it reads as integrated art, not a slab stuck on. Off = paste the whole design "
+                       "(with its background/panel) as a mounted panel."),
+        ParamSpec("material", "select", "match", "Material",
+                  help="What the carving is made of. 'Match wall' carves it in the wall's own tone/material "
+                       "for the most natural, built-in look; the rest are distinct art materials.",
+                  choices=[{"value": "match", "label": "Match wall (blend)"},
+                           {"value": "wood", "label": "Wood"}, {"value": "marble", "label": "Marble"},
                            {"value": "stone", "label": "Stone"}, {"value": "bronze", "label": "Bronze"},
                            {"value": "plaster", "label": "Plaster"}, {"value": "gold", "label": "Gold"}]),
         ParamSpec("prompt", "text", "", "Placement / notes (optional)",
@@ -99,16 +135,36 @@ class RoomMockupFeature(Feature):
     def run(self, inputs, params, out_dir):
         if not inputs.get("image2"):
             raise RuntimeError("Room Mockup needs BOTH images — a room photo and a CNC design.")
+        out_dir = Path(out_dir)
+
+        # optionally remove the design's own background BEFORE the edit (runs local BiRefNet, then
+        # frees it) so only the carved motif is composited — not its rectangular slab.
+        cutout = bool(params.get("cutout_design", True))
+        design_path = _cutout_design(inputs["image2"], out_dir) if cutout else inputs["image2"]
+
         client = ComfyUIClient()
         client.free()                                        # clean 12 GB before the ~19 GB edit models
         room = client.upload_image(inputs["image"])
-        design = client.upload_image(inputs["image2"])
+        design = client.upload_image(design_path)
 
-        mat = _MATERIALS.get(params.get("material", "wood"), _MATERIALS["wood"])
+        material = params.get("material", "match")
+        if material == "match":                              # carve in the wall's own tone/material
+            mat_phrase = ("the same material and colour as the wall — tone-matched to the wall's surface "
+                          "and finish, as if the wall itself were carved in relief")
+        else:
+            mat_phrase = _MATERIALS.get(material, _MATERIALS["wood"])   # e.g. "carved wood relief …"
         note = (params.get("prompt") or "").strip()
-        prompt = ("Mount the relief design from the second image onto the wall in the first image as a "
-                  f"real {mat}. Give it genuine carved relief depth with cast shadows and highlights that "
-                  "match the room's lighting and perspective; seamlessly integrated, photorealistic, natural.")
+        if cutout:
+            prompt = (f"Carve ONLY the relief motif from the second image directly into the wall in the "
+                      f"first image, in {mat_phrase}. There must be NO separate panel, board, frame or "
+                      "rectangular background — just the carved motif, its edges blending naturally into the "
+                      "wall, with a soft contact shadow and subtle ambient occlusion where it meets the "
+                      "surface. Genuine relief depth, cast shadows and highlights matching the room's lighting "
+                      "and perspective; seamless, photorealistic, natural.")
+        else:
+            prompt = (f"Mount the relief design from the second image onto the wall in the first image in "
+                      f"{mat_phrase}. Give it genuine carved relief depth with cast shadows and highlights "
+                      "matching the room's lighting and perspective; seamlessly integrated, photorealistic.")
         if note:
             prompt += f" {note}."
 
