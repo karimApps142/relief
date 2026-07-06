@@ -55,7 +55,8 @@ class Feature:
     id: str = ""
     name: str = ""
     description: str = ""
-    inputs: list = ["image"]        # input kinds to collect, e.g. ["image"] | []
+    inputs: list = ["image"]        # input kinds to collect, e.g. ["image"] | ["image","image2"] | []
+    input_labels: dict = {}         # {"image":"Room photo","image2":"CNC design"} — UI upload labels
     params: list = []               # list[ParamSpec]
     needs_comfy: bool = False       # runs on the ComfyUI engine (UI shows the setup gate)
     engine: str = "local"           # 'local' | 'comfy'
@@ -74,6 +75,7 @@ class Feature:
         return {
             "id": self.id, "name": self.name, "description": self.description,
             "inputs": self.inputs, "needs_image": "image" in self.inputs,
+            "needs_image2": "image2" in self.inputs, "input_labels": getattr(self, "input_labels", {}),
             "needs_mesh": "mesh" in self.inputs, "needs_audio": "audio" in self.inputs,
             "needs_comfy": self.needs_comfy, "engine": self.engine,
             "est_runtime": self.est_runtime, "vram": self.vram,

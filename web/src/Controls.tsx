@@ -317,7 +317,7 @@ export default function Controls({ s }: { s: Studio }) {
         {/* image input */}
         {f.needs_image && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            <span style={eyebrow}>Input image</span>
+            <span style={eyebrow}>{f.input_labels?.image || 'Input image'}</span>
             {s.preview ? (
               <div style={{ position: 'relative', borderRadius: 14, overflow: 'hidden', border: '1px solid var(--hf-border)', background: 'var(--hf-surface-inset)', aspectRatio: '16/9' }}>
                 <img src={s.preview} style={{ width: '100%', height: '100%', objectFit: 'contain', display: 'block' }} />
@@ -333,6 +333,30 @@ export default function Controls({ s }: { s: Studio }) {
                 <span style={{ fontSize: 13, fontWeight: 500 }}>Drop an image or click to upload</span>
                 <span style={{ fontSize: 11 }}>PNG · JPG</span>
                 <input type="file" accept="image/*" style={{ display: 'none' }} onChange={(e) => e.target.files?.[0] && s.onUpload(e.target.files[0])} />
+              </label>
+            )}
+          </div>
+        )}
+
+        {/* optional second image (e.g. Room Mockup: the CNC design placed into the room photo) */}
+        {f.needs_image2 && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <span style={eyebrow}>{f.input_labels?.image2 || 'Second image'}</span>
+            {s.preview2 ? (
+              <div style={{ position: 'relative', borderRadius: 14, overflow: 'hidden', border: '1px solid var(--hf-border)', background: 'var(--hf-surface-inset)', aspectRatio: '16/9' }}>
+                <img src={s.preview2} style={{ width: '100%', height: '100%', objectFit: 'contain', display: 'block' }} />
+                <div style={{ position: 'absolute', inset: 0, background: 'var(--hf-grad-scrim)', opacity: 0.5 }} />
+                <div style={{ position: 'absolute', left: 11, bottom: 11, display: 'flex', alignItems: 'center', gap: 6, height: 24, padding: '0 9px', borderRadius: 99, background: 'var(--hf-glass-bg)', backdropFilter: 'blur(18px)', border: '1px solid var(--hf-glass-border)', font: '500 11px var(--hf-font-mono)', color: '#fff' }}>{s.file2?.name}</div>
+                <label style={{ position: 'absolute', right: 11, bottom: 11, height: 28, padding: '0 12px', display: 'flex', alignItems: 'center', borderRadius: 99, background: 'var(--hf-glass-bg)', backdropFilter: 'blur(18px)', border: '1px solid var(--hf-glass-border)', color: '#fff', font: '600 12px var(--hf-font-sans)', cursor: 'pointer' }}>
+                  Replace<input type="file" accept="image/*" style={{ display: 'none' }} onChange={(e) => e.target.files?.[0] && s.onUpload2(e.target.files[0])} />
+                </label>
+              </div>
+            ) : (
+              <label style={{ border: '1.5px dashed var(--hf-border-strong)', background: 'var(--hf-surface-1)', borderRadius: 14, aspectRatio: '16/6.5', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 6, cursor: 'pointer', color: 'var(--hf-text-tertiary)' }}>
+                <Icon name="upload" size={22} sw={1.7} />
+                <span style={{ fontSize: 13, fontWeight: 500 }}>Drop the {(f.input_labels?.image2 || 'second image').toLowerCase()} or click to upload</span>
+                <span style={{ fontSize: 11 }}>PNG · JPG</span>
+                <input type="file" accept="image/*" style={{ display: 'none' }} onChange={(e) => e.target.files?.[0] && s.onUpload2(e.target.files[0])} />
               </label>
             )}
           </div>
@@ -458,9 +482,9 @@ export default function Controls({ s }: { s: Studio }) {
           </Button>
         ) : (
           <Button variant="primary" size="lg" block
-            disabled={(f.needs_image || f.needs_mesh) && !s.file} onClick={s.generate}>Generate</Button>
+            disabled={((f.needs_image || f.needs_mesh) && !s.file) || (f.needs_image2 && !s.file2)} onClick={s.generate}>Generate</Button>
         )}
-        {!s.running && (f.needs_image || f.needs_mesh) && !s.file && <span style={{ fontSize: 11, color: 'var(--hf-text-tertiary)', textAlign: 'center' }}>Upload a {f.needs_mesh ? '3D model' : 'image'} first.</span>}
+        {!s.running && (((f.needs_image || f.needs_mesh) && !s.file) || (f.needs_image2 && !s.file2)) && <span style={{ fontSize: 11, color: 'var(--hf-text-tertiary)', textAlign: 'center' }}>Upload {f.needs_image2 ? 'both images' : `a ${f.needs_mesh ? '3D model' : 'image'}`} first.</span>}
       </div>
     </section>
   )

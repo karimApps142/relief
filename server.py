@@ -195,6 +195,8 @@ def _model_label(feat, coerced):
             return coerced.get("model_name", "")
         if feat.id == "clarity":
             return "Clarity · " + coerced.get("checkpoint", "").replace(".safetensors", "")
+        if feat.id in ("image_edit", "room_mockup"):
+            return "Qwen-Image-Edit-2511 Q3"
         return "Krea-2-Turbo " + coerced.get("quant", "Q4_K_M")
     return _DEPTH_LABEL.get(coerced.get("depth_model"), coerced.get("depth_model", ""))
 
@@ -225,7 +227,8 @@ def _build_meta(feat, coerced, artifacts, duration):
 
 
 @app.post("/api/features/{fid}/run")
-async def run_feature(fid: str, file: UploadFile = File(None), params: str = Form("{}")):
+async def run_feature(fid: str, file: UploadFile = File(None),
+                      file2: UploadFile = File(None), params: str = Form("{}")):
     feat = REGISTRY.get(fid)
     if feat is None:
         raise HTTPException(404, f"unknown feature: {fid}")
@@ -247,6 +250,10 @@ async def run_feature(fid: str, file: UploadFile = File(None), params: str = For
         kind = feat.inputs[0] if getattr(feat, "inputs", None) else "image"
         inputs[kind] = str(dst)
         inputs.setdefault("image", str(dst))
+    if file2 is not None:                                  # second image (e.g. Room Mockup design)
+        dst2 = out_dir / f"input2_{_safe_name(file2.filename)}"
+        dst2.write_bytes(await file2.read())
+        inputs["image2"] = str(dst2)
 
     coerced = feat.coerce(raw)
 

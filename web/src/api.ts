@@ -25,6 +25,8 @@ export type FeatureSchema = {
   description: string
   inputs: string[]
   needs_image: boolean
+  needs_image2?: boolean
+  input_labels?: Record<string, string>
   needs_mesh?: boolean
   needs_audio?: boolean
   needs_comfy: boolean
@@ -108,6 +110,7 @@ export type ComfyStatus = {
   relight_models?: Record<string, boolean>
   hunyuan3d_models?: Record<string, boolean>
   clarity_models?: Record<string, boolean>
+  qwen_edit_models?: Record<string, boolean>
   nodes?: Record<string, boolean>
   busy: boolean
   action: string | null
@@ -179,9 +182,11 @@ export async function runFeature(
   file: File | null,
   params: Record<string, any>,
   signal?: AbortSignal,
+  file2?: File | null,
 ): Promise<RunRecord> {
   const fd = new FormData()
   if (file) fd.append('file', file)
+  if (file2) fd.append('file2', file2)
   fd.append('params', JSON.stringify(params))
   const r = await fetch(`/api/features/${id}/run`, { method: 'POST', body: fd, signal })
   const data = await r.json().catch(() => ({}))

@@ -102,6 +102,18 @@ UPSCALE_MODELS = {
     "upscaler · RealESRGAN x4plus (~64 MB)":
         ("lllyasviel/Annotators", "RealESRGAN_x4plus.pth", "upscale_models"),
 }
+# QWEN EDIT = the Qwen-Image-Edit-2511 instruction-editing bundle (Image Edit feature). A GGUF
+# unet (Q3 so it fits a 12 GB card) + the 7B Qwen2.5-VL text encoder + a 4-step Lightning LoRA
+# for speed. The qwen_image VAE is REUSED from MODELS. Runs on native ComfyUI-GGUF (no custom
+# node). NOT part of the engine gate, so it never blocks the other image features.
+QWEN_EDIT_MODELS = {
+    "image-edit · Qwen-Image-Edit-2511 Q3_K_M (~9.7 GB)":
+        ("unsloth/Qwen-Image-Edit-2511-GGUF", "qwen-image-edit-2511-Q3_K_M.gguf", "unet"),
+    "image-edit · Qwen2.5-VL 7B text encoder fp8 (~9 GB)":
+        ("Comfy-Org/Qwen-Image_ComfyUI", "split_files/text_encoders/qwen_2.5_vl_7b_fp8_scaled.safetensors", "text_encoders"),
+    "image-edit · Lightning 4-step LoRA (~0.85 GB)":
+        ("lightx2v/Qwen-Image-Edit-2511-Lightning", "Qwen-Image-Edit-2511-Lightning-4steps-V1.0-bf16.safetensors", "loras"),
+}
 
 LORA_DIR = COMFY_DIR / "models" / "loras"                 # user-supplied custom LoRAs land here
 
@@ -169,6 +181,7 @@ def status():
         "hunyuan3d_models": {label: _path_ok(_dest(sub, p)) for label, (_, p, sub) in HUNYUAN3D_MODELS.items()},
         "clarity_models": {label: _path_ok(_dest(sub, p)) for label, (_, p, sub) in CLARITY_MODELS.items()},
         "upscale_models": {label: _path_ok(_dest(sub, p)) for label, (_, p, sub) in UPSCALE_MODELS.items()},
+        "qwen_edit_models": {label: _path_ok(_dest(sub, p)) for label, (_, p, sub) in QWEN_EDIT_MODELS.items()},
         "nodes": _nodes_status(),
         "busy": _task["running"],
         "action": _task["action"],
@@ -342,7 +355,8 @@ def install_rasterizer():
 
 
 def _download(labels):
-    all_models = {**MODELS, **RELIGHT_MODELS, **HUNYUAN3D_MODELS, **CLARITY_MODELS, **UPSCALE_MODELS}  # gate uses MODELS; download grabs all
+    all_models = {**MODELS, **RELIGHT_MODELS, **HUNYUAN3D_MODELS, **CLARITY_MODELS,
+                  **UPSCALE_MODELS, **QWEN_EDIT_MODELS}  # gate uses MODELS; download grabs all
     items = all_models if not labels else {k: all_models[k] for k in labels if k in all_models}
     failures = []
     for label, (repo, path_in_repo, sub) in items.items():

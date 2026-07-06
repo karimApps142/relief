@@ -24,6 +24,8 @@ export function useStudio() {
   const [values, setValues] = useState<Record<string, Record<string, any>>>({})
   const [files, setFiles] = useState<Record<string, File | null>>({})
   const [previews, setPreviews] = useState<Record<string, string>>({})
+  const [files2, setFiles2] = useState<Record<string, File | null>>({})   // optional 2nd image (e.g. Room Mockup design)
+  const [previews2, setPreviews2] = useState<Record<string, string>>({})
   const [advancedOpen, setAdvancedOpen] = useState(false)
   const [historyOpen, setHistoryOpen] = useState(false)
   const [sysOpen, setSysOpen] = useState(false)
@@ -104,6 +106,7 @@ export function useStudio() {
     const f = active
     if (!f || running) return
     if (f.needs_image && !files[f.id]) return
+    if (f.needs_image2 && !files2[f.id]) return
     const myId = ++runId.current
     t0.current = performance.now()
     setError(''); setRecord(null); setProgress(null); setElapsed(0); setRunState('submitting')
@@ -111,7 +114,7 @@ export function useStudio() {
     setTimeout(() => { if (runId.current === myId) setRunState((s) => (s === 'submitting' ? 'running' : s)) }, 700)
     const ac = new AbortController(); abortRef.current = ac
     try {
-      const rec = await runFeature(f.id, files[f.id] || null, values[f.id] || {}, ac.signal)
+      const rec = await runFeature(f.id, files[f.id] || null, values[f.id] || {}, ac.signal, files2[f.id] || null)
       if (runId.current !== myId) return        // cancelled/superseded → drop this result
       setRecord(rec); setRunState('result')
       addToast('success', `${f.name} complete · ${fmtDur(rec.meta.duration_s)}`)
@@ -120,7 +123,7 @@ export function useStudio() {
       if (runId.current !== myId) return         // cancelled → ignore (cancel already reset)
       setError(e.message || String(e)); setRunState('error'); addToast('danger', `${f.name} failed`)
     }
-  }, [active, running, files, values, addToast, refreshJobs, refreshSystem])
+  }, [active, running, files, files2, values, addToast, refreshJobs, refreshSystem])
 
   const cancel = useCallback(() => {
     runId.current++                              // invalidate the in-flight run
@@ -148,6 +151,14 @@ export function useStudio() {
     })
   }, [activeId])
 
+  const onUpload2 = useCallback((file: File) => {          // the second image (design in Room Mockup)
+    setFiles2((s) => ({ ...s, [activeId]: file }))
+    setPreviews2((s) => {
+      if (s[activeId]) URL.revokeObjectURL(s[activeId])
+      return { ...s, [activeId]: URL.createObjectURL(file) }
+    })
+  }, [activeId])
+
   const downloadWeights = useCallback(() => {
     modelsDownload().then(() => { refreshModels(); addToast('info', 'Downloading depth weights…') }).catch(() => {})
   }, [refreshModels, addToast])
@@ -166,10 +177,11 @@ export function useStudio() {
   return {
     features, active, activeId, values: values[activeId] || {}, allValues: values,
     file: files[activeId] || null, preview: previews[activeId] || '',
+    file2: files2[activeId] || null, preview2: previews2[activeId] || '',
     advancedOpen, setAdvancedOpen, historyOpen, setHistoryOpen, sysOpen, setSysOpen,
     runState, record, error, progress, elapsed, running,
     comfy, models, system, jobs, toasts, bootErr,
-    selectFeature, setVal, onUpload, generate, cancel, downloadWeights, doComfy, rerun, addToast,
+    selectFeature, setVal, onUpload, onUpload2, generate, cancel, downloadWeights, doComfy, rerun, addToast,
   }
 }
 

@@ -52,9 +52,11 @@ export function ComfyWizard({ s }: { s: Studio }) {
   const isRelight = f.id === 'relight' || f.id === 'portrait'
   const isImage3d = f.id === 'image3d'
   const isClarity = f.id === 'clarity'
+  const isImageEdit = f.id === 'image_edit' || f.id === 'room_mockup'
   const models = isRelight ? Object.entries(c.relight_models || {})
     : isImage3d ? Object.entries(c.hunyuan3d_models || {})
     : isClarity ? Object.entries(c.clarity_models || {})
+    : isImageEdit ? Object.entries(c.qwen_edit_models || {})
     : Object.entries(c.models)
   const allM = models.length > 0 && models.every(([, b]) => b)
   const nodeKey = isRelight ? 'iclight' : isImage3d ? 'hy3dwrap' : isClarity ? 'usdu' : 'gguf'
@@ -69,6 +71,7 @@ export function ComfyWizard({ s }: { s: Studio }) {
       desc: isRelight ? 'Fetch the relight models (~3.7 GB).'
         : isImage3d ? 'Fetch the Hunyuan3D shape model (~4.9 GB). Paint models auto-download on first run.'
         : isClarity ? 'Fetch the clarity models — Tile ControlNet + photoreal checkpoint + 4 detail LoRAs (~3.5 GB).'
+        : isImageEdit ? 'Fetch the Qwen-Image-Edit-2511 models — Q3 unet + 7B text encoder + Lightning LoRA (~19 GB). Needs a recent ComfyUI.'
         : 'Fetch the 4 model files (~11.7 GB total).',
       done: allM, available: c.installed && !allM, btn: 'Download', showModels: true },
     c.running
