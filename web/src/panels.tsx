@@ -52,7 +52,7 @@ export function ComfyWizard({ s }: { s: Studio }) {
   const isRelight = f.id === 'relight' || f.id === 'portrait'
   const isImage3d = f.id === 'image3d'
   const isClarity = f.id === 'clarity'
-  const isImageEdit = f.id === 'image_edit' || f.id === 'room_mockup'
+  const isImageEdit = f.id === 'image_edit' || f.id === 'room_mockup' || f.id === 'apply_texture'
   const models = isRelight ? Object.entries(c.relight_models || {})
     : isImage3d ? Object.entries(c.hunyuan3d_models || {})
     : isClarity ? Object.entries(c.clarity_models || {})

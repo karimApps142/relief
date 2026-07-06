@@ -50,6 +50,11 @@ _PRESETS = {
     "marble": "turn into a smooth carved white marble sculpture, polished stone, soft studio lighting",
     "bronze": "turn into a cast bronze sculpture, patinated metal, museum lighting",
     "lineart": "convert into a clean engraved line relief, shallow carving, high contrast, flat background",
+    # texture-free smooth sculpt → ideal input for depth/relief/STL (no baked texture or shadows to
+    # confuse depth; even lighting so the geometry reads, not lighting-as-geometry).
+    "sculpt3d": ("convert into a smooth, texture-free 3D sculpt — clean matte sculpted clay forms in a "
+                 "single uniform neutral material with NO surface texture, pattern or colour detail, soft "
+                 "even studio lighting and no harsh shadows, smooth rounded volumes with clearly separated shapes"),
 }
 
 
@@ -110,7 +115,8 @@ class ImageEditFeature(Feature):
                            {"value": "basrelief", "label": "Bas-relief (CNC)"},
                            {"value": "marble", "label": "Marble sculpt"},
                            {"value": "bronze", "label": "Bronze sculpt"},
-                           {"value": "lineart", "label": "Engraved line relief"}]),
+                           {"value": "lineart", "label": "Engraved line relief"},
+                           {"value": "sculpt3d", "label": "Smooth 3D Sculpt"}]),
         ParamSpec("quality", "select", "fast", "Quality", control="seg", group="advanced",
                   help="Fast = 4-step Lightning (recommended, fits 12 GB). High = 20-step, cfg 4, slower.",
                   choices=[{"value": "fast", "label": "Fast · 4-step"},

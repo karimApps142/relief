@@ -13,6 +13,7 @@ const STROKE: Record<string, string[]> = {
   plus: ['M12 5v14M5 12h14'],
   pencil: ['M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z'],
   frame: ['M22 6H2', 'M22 18H2', 'M6 2v20', 'M18 2v20'],
+  texture: ['M4 4h6v6H4z', 'M14 4h6v6h-6z', 'M4 14h6v6H4z', 'M14 14h6v6h-6z'],
   upload: ['M12 13v8M8 17l4-4 4 4', 'M20 16.7A5 5 0 0 0 18 7h-1.3A8 8 0 1 0 4 15.3'],
   warning: ['M12 9v4M12 17h.01', 'M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z'],
   check: ['M20 6 9 17l-5-5'],

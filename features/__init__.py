@@ -17,6 +17,7 @@ from .text2img import Text2ImgFeature
 from .img2img import Img2ImgFeature
 from .image_edit import ImageEditFeature
 from .room_mockup import RoomMockupFeature
+from .apply_texture import ApplyTextureFeature
 from .upscale import UpscaleFeature
 from .clarity import ClarityFeature
 from .relight import RelightFeature
@@ -40,6 +41,7 @@ register(Text2ImgFeature())          # Krea-2-Turbo GGUF via ComfyUI (:8188)
 register(Img2ImgFeature())           # Krea-2-Turbo img2img via ComfyUI
 register(ImageEditFeature())         # Qwen-Image-Edit-2511 (GGUF Q3) instruction editing
 register(RoomMockupFeature())        # place a CNC design into a room photo (Qwen-Edit multi-image)
+register(ApplyTextureFeature())      # wrap a texture photo onto an object (Qwen-Edit multi-image)
 register(UpscaleFeature())           # ESRGAN upscale via ComfyUI
 register(ClarityFeature())           # Clarity-style creative upscale (SD1.5 + Tile ControlNet + USDU)
 register(RelightFeature())           # IC-Light relight/delight via ComfyUI

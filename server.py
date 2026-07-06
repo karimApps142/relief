@@ -195,7 +195,7 @@ def _model_label(feat, coerced):
             return coerced.get("model_name", "")
         if feat.id == "clarity":
             return "Clarity · " + coerced.get("checkpoint", "").replace(".safetensors", "")
-        if feat.id in ("image_edit", "room_mockup"):
+        if feat.id in ("image_edit", "room_mockup", "apply_texture"):
             return "Qwen-Image-Edit-2511 Q3"
         return "Krea-2-Turbo " + coerced.get("quant", "Q4_K_M")
     return _DEPTH_LABEL.get(coerced.get("depth_model"), coerced.get("depth_model", ""))
