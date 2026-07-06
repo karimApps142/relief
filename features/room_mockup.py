@@ -32,6 +32,19 @@ _MATERIALS = {
 }
 
 
+# design-detail steer: prompt terms + how the Clarity finishing pass should behave. 'clean'
+# fixes over-elaborated / noisy carvings; it also makes Clarity faithful so it sharpens without
+# inventing extra micro-texture (the main source of a 'messy' look).
+_DETAIL = {
+    "clean": {"terms": (" The carving must be CLEAN and clearly defined — smooth clear forms, crisp "
+                        "well-separated elements, uncluttered and elegant, with no messy or noisy micro-texture."),
+              "clarity": {"creativity": 0.2, "resemblance": 0.9}},
+    "balanced": {"terms": "", "clarity": {}},
+    "ornate": {"terms": " Make the carving intricate, richly detailed and ornate.",
+               "clarity": {"creativity": 0.45}},
+}
+
+
 def _cutout_design(design_path, out_dir):
     """Remove the CNC design's own background (BiRefNet, via the relief backend) and composite the
     bare motif onto clean white — so the edit model places ONLY the carving, not its rectangular
@@ -119,6 +132,12 @@ class RoomMockupFeature(Feature):
                            {"value": "wood", "label": "Wood"}, {"value": "marble", "label": "Marble"},
                            {"value": "stone", "label": "Stone"}, {"value": "bronze", "label": "Bronze"},
                            {"value": "plaster", "label": "Plaster"}, {"value": "gold", "label": "Gold"}]),
+        ParamSpec("detail", "select", "balanced", "Design detail", control="seg",
+                  help="Clean = crisp, well-defined, uncluttered carving — use this when it comes out "
+                       "messy/noisy. Ornate = more intricate. Also tunes the Clarity pass so it sharpens "
+                       "without inventing extra texture.",
+                  choices=[{"value": "clean", "label": "Clean"}, {"value": "balanced", "label": "Balanced"},
+                           {"value": "ornate", "label": "Ornate"}]),
         ParamSpec("prompt", "text", "", "Placement / notes (optional)",
                   placeholder="e.g. 'centered on the wall above the sofa, large'",
                   help="Where and how big to place it. Blank = the model picks a natural spot."),
@@ -130,6 +149,10 @@ class RoomMockupFeature(Feature):
                   help="Lightning sweet spot 4–8 (Fast only)."),
         ParamSpec("seed", "number", 0, "Seed", 0, 2_147_483_647, 1, control="stepper", group="advanced",
                   help="0 = random. Retry a few seeds if the placement/perspective isn't right."),
+        ParamSpec("clarity_upscale", "bool", True, "Clarity upscale (Balanced)", control="switch",
+                  group="advanced",
+                  help="After the mockup, run Clarity Upscale (Balanced) on the result — sharpens the whole "
+                       "render and 2× size. Off to skip. Needs the Clarity models installed."),
     ]
 
     def run(self, inputs, params, out_dir):
@@ -165,6 +188,8 @@ class RoomMockupFeature(Feature):
             prompt = (f"Mount the relief design from the second image onto the wall in the first image in "
                       f"{mat_phrase}. Give it genuine carved relief depth with cast shadows and highlights "
                       "matching the room's lighting and perspective; seamlessly integrated, photorealistic.")
+        detail = _DETAIL.get(params.get("detail", "balanced"), _DETAIL["balanced"])
+        prompt += detail["terms"]                            # steer clean vs ornate
         if note:
             prompt += f" {note}."
 
@@ -176,4 +201,11 @@ class RoomMockupFeature(Feature):
         graph = _build_graph(room, design, prompt, seed, lightning, steps, cfg)
         out = Path(out_dir) / "room_mockup.png"
         out.write_bytes(client.generate(graph, label="room-mockup", max_wait=900))
+
+        # optional finishing pass: reuse the Clarity feature to sharpen. 'Clean' makes it faithful
+        # (low creativity) so it crisps the render instead of adding invented micro-texture.
+        if params.get("clarity_upscale", True):
+            from .clarity import ClarityFeature
+            cf = ClarityFeature()
+            return cf.run({"image": str(out)}, cf.coerce(detail["clarity"]), out_dir)
         return {"image": str(out)}

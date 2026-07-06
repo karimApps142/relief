@@ -125,10 +125,10 @@ class ImageEditFeature(Feature):
                        "strength. Order does NOT change the result — model-only LoRAs are additive weight "
                        "deltas that combine commutatively; each LoRA's strength scales its effect. Use "
                        "LoRAs trained for Qwen-Image-Edit — a non-matching one silently does nothing."),
-        ParamSpec("clarity_upscale", "bool", False, "Clarity upscale (Balanced)", control="switch",
+        ParamSpec("clarity_upscale", "bool", True, "Clarity upscale (Balanced)", control="switch",
                   group="advanced",
                   help="After editing, run Clarity Upscale (Balanced) on the result — adds fine detail "
-                       "and 2× size. Needs the Clarity models installed (see the Clarity tab)."),
+                       "and 2× size. Off to skip. Needs the Clarity models installed (see the Clarity tab)."),
     ]
 
     def run(self, inputs, params, out_dir):
