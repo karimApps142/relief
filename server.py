@@ -134,15 +134,18 @@ def loras_delete(name: str):
 @app.get("/api/progress")
 def progress():
     """Unified live progress: ComfyUI sampler steps OR relief phase stepper, whichever
-    is active (one workflow runs at a time)."""
+    is active (one workflow runs at a time). `preview` (a mid-run intermediate image, e.g.
+    the 2.5D-Relief depth map) rides ALL branches — including inactive, because there's a
+    real gap between the local stage stopping and ComfyUI's first progress tick."""
     from features._comfy import get_progress
+    pv = relief_progress.preview_url()
     cp = get_progress()
     if cp.get("active"):
-        return {"active": True, "engine": "comfy", **cp}
+        return {"active": True, "engine": "comfy", **cp, "preview": pv}
     rp = relief_progress.get()
     if rp.get("active"):
-        return {"active": True, "engine": "local", **rp}
-    return {"active": False, "engine": None}
+        return {"active": True, "engine": "local", **rp, "preview": pv}
+    return {"active": False, "engine": None, "preview": pv}
 
 
 @app.get("/api/system")
@@ -195,7 +198,7 @@ def _model_label(feat, coerced):
             return coerced.get("model_name", "")
         if feat.id == "clarity":
             return "Clarity · " + coerced.get("checkpoint", "").replace(".safetensors", "")
-        if feat.id in ("image_edit", "room_mockup", "apply_texture"):
+        if feat.id in ("image_edit", "room_mockup", "apply_texture", "relief_ai"):
             return "Qwen-Image-Edit-2511 Q3"
         return "Krea-2-Turbo " + coerced.get("quant", "Q4_K_M")
     return _DEPTH_LABEL.get(coerced.get("depth_model"), coerced.get("depth_model", ""))
@@ -256,6 +259,7 @@ async def run_feature(fid: str, file: UploadFile = File(None),
         inputs["image2"] = str(dst2)
 
     coerced = feat.coerce(raw)
+    relief_progress.set_preview(None)                      # clear any stale mid-run preview
 
     def _execute():
         # Runs in a worker thread (run_in_threadpool) so the event loop stays free to

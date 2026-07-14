@@ -13,7 +13,7 @@ function kindOf(url: string): 'glb' | 'image' | 'audio' | 'mesh' {
   if (/\.(wav|mp3|flac|ogg|m4a)$/.test(u)) return 'audio'
   return 'mesh'
 }
-const ARTLABEL: Record<string, string> = { heightmap: 'Heightmap', preview3d: '3D preview', stl: 'STL mesh', image: 'Image', depth_16bit: 'Depth (16-bit)', depth_preview: 'Depth preview', normal: 'Normal map', relief_heat: 'Heat map', depth_heat: 'Heat map', heat3d: '3D heat map', audio: 'Speech' }
+const ARTLABEL: Record<string, string> = { heightmap: 'Heightmap', preview3d: '3D preview', stl: 'STL mesh', image: 'Image', depth_16bit: 'Depth (16-bit)', depth_preview: 'Depth preview', normal: 'Normal map', relief_heat: 'Heat map', depth_heat: 'Heat map', heat3d: '3D heat map', audio: 'Speech', depth_map: 'Depth map', relief_16bit: 'Relief (16-bit)' }
 
 function ArtifactCard({ name, url }: { name: string; url: string }) {
   const kind = kindOf(url)
@@ -253,6 +253,19 @@ export default function Results({ s }: { s: Studio }) {
           ))}
         </div>
 
+        {/* mid-run intermediate (e.g. the 2.5D-Relief depth map) — real progress the user can see */}
+        {p?.preview && (
+          <div style={{ border: '1px solid var(--hf-border)', borderRadius: 16, overflow: 'hidden', background: 'var(--hf-surface-1)', boxShadow: 'var(--hf-sheen-top)' }}>
+            <div style={{ background: 'var(--hf-surface-inset)', maxHeight: 340, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <img src={p.preview} style={{ maxWidth: '100%', maxHeight: 340, objectFit: 'contain', display: 'block' }} />
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 14px', borderTop: '1px solid var(--hf-border-subtle)' }}>
+              <span style={{ width: 7, height: 7, borderRadius: 99, background: 'var(--hf-live)', animation: 'rs-pulse 1.6s var(--hf-ease-out) infinite' }} />
+              <span style={{ font: '600 12px var(--hf-font-sans)', color: 'var(--hf-text-secondary)' }}>Depth map ready — generating the AI relief…</span>
+            </div>
+          </div>
+        )}
+
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
           <span style={{ font: '400 11.5px var(--hf-font-mono)', color: 'var(--hf-text-tertiary)' }}>{f.id} · {p?.engine || f.engine}</span>
           <button onClick={s.cancel} style={{ height: 34, padding: '0 14px', borderRadius: 10, border: '1px solid var(--hf-danger)', background: 'var(--hf-danger-dim)', color: 'var(--hf-danger)', font: '600 13px var(--hf-font-sans)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 7 }}><Icon name="x" size={14} sw={2.4} />Cancel</button>
@@ -284,7 +297,7 @@ export default function Results({ s }: { s: Studio }) {
     { k: 'Seed', v: meta.seed != null ? String(meta.seed) : '—' },
     { k: 'Model', v: meta.model || '—' },
   ]
-  const grid = (f.id === 'relief' || f.id === 'depthmap') ? 'repeat(2, minmax(0,1fr))' : 'minmax(0, 520px)'
+  const grid = (f.id === 'relief' || f.id === 'depthmap' || f.id === 'relief_ai') ? 'repeat(2, minmax(0,1fr))' : 'minmax(0, 520px)'
   // Upscalers compare against the source: swap the plain image card for a before/after wipe
   // when we still hold the uploaded input (a fresh run; not a re-opened history item).
   const compareArt = (f.id === 'upscale' || f.id === 'clarity' || f.id === 'img2img' || f.id === 'image_edit' || f.id === 'room_mockup' || f.id === 'apply_texture') && s.preview

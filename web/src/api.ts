@@ -75,6 +75,7 @@ export type Progress = {
   tiles_total?: number
   tiles_done?: number
   elapsed?: number
+  preview?: string | null   // mid-run intermediate image (e.g. the 2.5D-Relief depth map)
 }
 
 export type SystemInfo = {

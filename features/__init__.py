@@ -10,6 +10,7 @@ from .relief import ReliefFeature
 from .portrait_relief import PortraitReliefFeature
 from .cutout import CutoutFeature
 from .depthmap import DepthMapFeature
+from .relief_ai import ReliefAIFeature
 from .face_restore import FaceRestoreFeature
 from .mesh_relief import MeshReliefFeature
 from .image_to_3d import ImageTo3DFeature
@@ -34,6 +35,7 @@ register(ReliefFeature())            # local (Sapiens/DA-V2/DA3 depth tiling + n
 register(PortraitReliefFeature())    # Pro pipeline: delight (ComfyUI) → upscale → relief (local)
 register(CutoutFeature())            # local background removal (BiRefNet)
 register(DepthMapFeature())          # local depth + normal map export
+register(ReliefAIFeature())          # photo → depth (live preview) → Qwen-Edit CNC height map
 register(FaceRestoreFeature())       # local face restoration (GFPGAN via spandrel+facexlib)
 register(MeshReliefFeature())        # local 3D mesh → orthographic heightmap relief
 register(ImageTo3DFeature())         # image → textured 3D model (Hunyuan3D wrapper via ComfyUI)

@@ -25,7 +25,7 @@ export default function App() {
       const m = Object.values(comfy.clarity_models || {})
       return !!comfy.nodes?.usdu && m.length > 0 && m.every(Boolean)
     }
-    if (active?.id === 'image_edit' || active?.id === 'room_mockup' || active?.id === 'apply_texture') {
+    if (active?.id === 'image_edit' || active?.id === 'room_mockup' || active?.id === 'apply_texture' || active?.id === 'relief_ai') {
       const m = Object.values(comfy.qwen_edit_models || {})
       return !!comfy.nodes?.gguf && m.length > 0 && m.every(Boolean)
     }

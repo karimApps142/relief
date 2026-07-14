@@ -12,6 +12,8 @@ import threading
 _lock = threading.Lock()
 _state = {"active": False, "feature": "relief", "phases": [], "phase_idx": 0,
           "tiles_total": 0, "tiles_done": 0, "node": "", "started": 0.0}
+_preview = None       # artifact URL of a mid-run intermediate image (e.g. the depth map the
+                      # 2.5D-Relief pipeline shows while the AI stage runs); None = nothing to show
 
 # the depth+tiling phase (index 0) owns this share of the bar; the quick finishing
 # phases (heightmap / STL / preview) split the remainder. Keeps the bar honest.
@@ -61,3 +63,18 @@ def phase(idx):
 def stop():
     with _lock:
         _state.update(active=False, phase_idx=len(_state["phases"]))
+
+
+def set_preview(url):
+    """Publish (or clear, with None) a mid-run intermediate image the UI should show while the
+    run continues — e.g. the generated depth map before the AI-relief stage. The URL must point
+    at an already-written artifact (/api/jobs/<job>/<name>): the <img> src is constant, so a 404
+    on a half-written file would never retry."""
+    global _preview
+    with _lock:
+        _preview = url
+
+
+def preview_url():
+    with _lock:
+        return _preview
