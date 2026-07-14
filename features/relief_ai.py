@@ -68,24 +68,6 @@ def _count_passes(tile_detail, grids, face_crop):
     return 1 + g(a, b) + g(c, d) + (1 if face_crop else 0)
 
 
-def _tweak_depth(depth01, detail_boost, local_contrast):
-    """Apply the user's detail tweaks to a 0–1 depth map: CLAHE lifts faint depth separations,
-    then a gamma lift brightens dark/recessed areas (gamma < 1 → hidden details rise toward
-    white). Both are monotone in their sliders; 0 = untouched."""
-    import cv2
-    d = np.clip(depth01, 0.0, 1.0).astype(np.float32)
-    lc = float(local_contrast or 0)
-    if lc > 0:
-        h16 = (d * 65535.0).astype(np.uint16)
-        tiles = (max(2, d.shape[1] // 96), max(2, d.shape[0] // 96))
-        clahe = cv2.createCLAHE(clipLimit=1.0 + 3.0 * lc, tileGridSize=tiles)
-        d = clahe.apply(h16).astype(np.float32) / 65535.0
-    boost = float(detail_boost or 0)
-    if boost > 0:
-        d = np.power(d, 1.0 - 0.45 * boost)              # gamma < 1 brightens recessed areas
-    return np.clip(d, 0.0, 1.0)
-
-
 def _build_graph(depth_name, photo_name, prompt, seed, lightning, steps, cfg):
     """The verified 2-image Qwen-Image-Edit-2511 topology (see room_mockup): image1 = the depth
     map (style/relief reference AND the sampling latent via FluxKontextImageScale → VAEEncode,
@@ -160,48 +142,60 @@ class ReliefAIFeature(Feature):
     ]
 
     def run(self, inputs, params, out_dir):
-        from backends import get_backend
-        from pipeline import _GRIDS
+        import subprocess
+        import sys as _sys
+        import model_manager
         import relief_progress
+        from pipeline import _GRIDS
         out_dir = Path(out_dir)
+        repo_root = Path(__file__).resolve().parent.parent
 
         client = ComfyUIClient()
-        client.free()                                     # a prior Qwen run can hold ~10 GB → free
-                                                          # ComfyUI BEFORE loading local depth models
-        be = get_backend("auto")
-        if getattr(be, "name", "") == "lite":
+        client.free()
+
+        # Lite guard WITHOUT importing torch (models_present only checks the HF cache) — so the
+        # server process never initialises a CUDA context that would compete with the Qwen stage.
+        if not model_manager.models_present():
             raise RuntimeError("2.5D Relief (AI) needs the GPU depth models — open the Relief tab "
                                "and click Download models (~2.3 GB) first.")
 
-        # ---- stage 1: local depth map (live-published to the canvas) ----
         td = params.get("tile_detail", "medium")
         grids = _GRIDS.get(td, _GRIDS["medium"])
+        boost = float(params.get("detail_boost", 0.3) or 0)
+        lc = float(params.get("local_contrast", 0.2) or 0)
+        depth_path = out_dir / "depth_map.png"
         relief_progress.start(["Depth map", "AI relief"],
                               tiles_total=_count_passes(td, grids, face_crop=True))
         try:
-            image = Image.open(inputs["image"]).convert("RGB")
-            depth = be.estimate_depth(image, model="depth-anything", tiling=(td != "off"),
-                                      grids=grids, face_crop=True,
-                                      on_tile=relief_progress.tick_tile)
-            d = np.asarray(depth, np.float32)
-            lo, hi = np.percentile(d, [1, 99])            # spike-safe normalize; white = highest
-            d = np.clip((d - lo) / (hi - lo + 1e-8), 0.0, 1.0)
-            d = _tweak_depth(d, params.get("detail_boost", 0.3), params.get("local_contrast", 0.2))
-
-            depth_path = out_dir / "depth_map.png"        # 8-bit RGB: ComfyUI LoadImage chokes on
-            d8 = (d * 255.0 + 0.5).astype(np.uint8)       # 16-bit ('I;16' clips to white)
-            Image.fromarray(d8, "L").convert("RGB").save(depth_path)
-            # publish only AFTER the file is fully written — the <img> src is constant, so a 404
-            # on a half-written file would never retry.
+            # ---- stage 1: depth in a SUBPROCESS. Its CUDA context frees on exit, so the full
+            #      12 GB is available for the Qwen stage (see depth_worker.py). Stdout drives the
+            #      per-tile bar. ----
+            proc = subprocess.Popen(
+                [_sys.executable, str(repo_root / "depth_worker.py"),
+                 "--image", str(inputs["image"]), "--out", str(depth_path),
+                 "--tile", td, "--boost", str(boost), "--contrast", str(lc)],
+                cwd=str(repo_root), stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                text=True, bufsize=1)
+            tail = []
+            for line in proc.stdout:                      # TILE per pass → tick; keep other lines
+                line = line.strip()
+                if line == "TILE":
+                    relief_progress.tick_tile()
+                elif line and line != "DONE":
+                    tail.append(line); del tail[:-20]
+            proc.wait()
+            if proc.returncode == 2:
+                raise RuntimeError("2.5D Relief (AI) needs the GPU depth models — download them "
+                                   "from the Relief tab first.")
+            if proc.returncode != 0 or not depth_path.exists():
+                raise RuntimeError("Depth stage failed: "
+                                   + (" | ".join(tail[-6:]) or f"exit {proc.returncode}"))
+            # publish only AFTER the file is written — the <img> src is constant, so a 404 on a
+            # half-written file would never retry.
             relief_progress.set_preview(f"/api/jobs/{out_dir.name}/depth_map.png")
 
             # ---- stage 2: Qwen-Image-Edit refines depth+photo into the CNC height map ----
             relief_progress.phase(1)
-            try:
-                import models
-                models.unload_all()                       # free the depth model for ComfyUI
-            except Exception:
-                pass
             relief_progress.stop()                        # comfy progress takes over from here
             client.free()
 
