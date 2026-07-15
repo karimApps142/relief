@@ -54,7 +54,8 @@
       "Bash(curl -s \"https://huggingface.co/api/models/jingheya/Lotus-2\")",
       "Bash(python3 -m json.tool)",
       "Bash(curl -s \"https://huggingface.co/jingheya/Lotus-2/raw/main/README.md\")",
-      "Bash(curl -s \"https://huggingface.co/api/models/numz/SeedVR2_comfyUI/tree/main\")"
+      "Bash(curl -s \"https://huggingface.co/api/models/numz/SeedVR2_comfyUI/tree/main\")",
+      "Bash(./.venv/bin/python -m py_compile comfy_manager.py)"
     ]
   }
 }

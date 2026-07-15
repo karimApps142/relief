@@ -486,13 +486,22 @@ def start():
     except Exception:
         pass
     logfile = COMFY_DIR / "comfy.log"
-    _log(f"starting ComfyUI ({sys.executable} main.py --listen {_HOST} --port {_PORT}) …")
+    try:                                                  # keep the LAST session's log so a crash
+        if logfile.exists():                              # (which forces a restart) isn't lost
+            os.replace(logfile, logfile.with_suffix(".log.prev"))
+    except OSError:
+        pass
+    # --lowvram streams model weights from (ample) system RAM so VRAM is free for activations —
+    # required on a 12 GB card for the 2-image Qwen-Edit graphs (Room Mockup / Apply Texture /
+    # 2.5D Relief), whose longer token sequence OOM-crashes ComfyUI in NORMAL_VRAM on old torch.
+    # Set COMFYUI_VRAM=normal (or =novram) to override.
+    _mode = os.environ.get("COMFYUI_VRAM", "lowvram").strip().lower()
+    vram = [f"--{_mode}"] if _mode in ("lowvram", "novram", "normalvram", "highvram") else []
+    args = [sys.executable, "-u", "main.py", "--listen", _HOST, "--port", _PORT, *vram]
+    _log(f"starting ComfyUI ({' '.join(args[1:])}) …")
     _logfh = open(logfile, "wb")                          # real file → tqdm.flush() is safe
     env = {**os.environ, "PYTHONUNBUFFERED": "1", "PYTHONIOENCODING": "utf-8"}
-    _proc = subprocess.Popen(
-        [sys.executable, "-u", "main.py", "--listen", _HOST, "--port", _PORT],
-        cwd=str(COMFY_DIR), stdout=_logfh, stderr=subprocess.STDOUT, env=env,
-    )
+    _proc = subprocess.Popen(args, cwd=str(COMFY_DIR), stdout=_logfh, stderr=subprocess.STDOUT, env=env)
     threading.Thread(target=_tail_log, args=(logfile, _proc), daemon=True).start()
     for _ in range(120):                                  # up to 60s: torch + custom nodes load
         if is_running():
