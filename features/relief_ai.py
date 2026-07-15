@@ -29,30 +29,26 @@ from .base import Feature, ParamSpec
 from ._comfy import ComfyUIClient
 from .image_edit import _UNET, _CLIP, _VAE, _LIGHTNING
 
-# The user's CNC bas-relief height-map prompt, verbatim. image1 = depth map, image2 = photo.
-_PROMPT = """Image 1 is the style reference. Match its carving style, relief depth, surface quality, edge treatment, ornamentation, and overall CNC craftsmanship as closely as possible.
+# Prompt matched to THIS pipeline's two inputs: image1 = the generated DEPTH MAP, image2 = the
+# original PHOTO. (The original style-transfer prompt assumed image1 was an example carving, so it
+# told the model to copy a non-existent "carving style" from a smooth depth map and it just
+# reproduced the photo.) Goal: depth hierarchy from image1 + real detail from image2 → height map.
+_PROMPT = """You are given two inputs of the SAME subject:
+- Image 1 is a grayscale DEPTH MAP: white = closest / highest, black = farthest / deepest.
+- Image 2 is the original PHOTO, which carries the true shapes and fine detail.
 
-Image 2 is the content reference. Preserve its subject, pose, proportions, anatomy, composition, and decorative elements, but recreate it entirely in the style of Image 1.
+TASK: produce a clean, professional CNC bas-relief GRAYSCALE HEIGHT MAP of the subject. The output MUST be a grayscale height map — never the photo, a painting, a colored image, or a flat copy of either input.
 
-Generate a professional CNC bas-relief grayscale height map, not a painting, illustration, or photograph.
+Use Image 1's depth to set a smooth, correct front-to-back height hierarchy, and use Image 2 to recover the subject's real shapes and details (eyes, eyelids, nostrils, lips, hair, mane, leaves, flowers, ornaments), giving each clear depth separation using grayscale ONLY.
 
-Requirements
-Perfectly smooth, CNC-ready surfaces.
-Clean, polished relief with crisp edges and smooth depth transitions.
-Preserve all intentional sculpted details while keeping surfaces mathematically smooth.
-Do not add or invent any extra details.
-Strictly follow the reference style.
-No surface noise, grain, bumps, orange-peel texture, AI micro-texture, scratches, procedural texture, fabric texture, skin pores, sharpening artifacts, scan artifacts, or random high-frequency details.
-No lighting, shadows, reflections, ambient occlusion, or color information.
-Height Map Rules
-Use only grayscale.
-White (#FFFFFF) = highest relief (closest to the camera).
-Black (#000000) = deepest areas (farthest from the camera).
-All gray values must represent only physical height.
-Small details such as eyes, eyelids, nostrils, lips, hair, mane, leaves, flowers, and ornaments must have clear depth separation using grayscale only, making them prominent without adding texture.
-Maintain a smooth, logical front-to-back depth hierarchy across the entire relief.
+Height-map rules:
+- Grayscale only. White (#FFFFFF) = highest relief, black (#000000) = deepest. Every gray value represents physical height and nothing else.
+- Perfectly smooth, machinable, CNC-ready surfaces; crisp edges and smooth depth transitions.
+- Preserve all real sculpted detail while keeping surfaces mathematically smooth. Do NOT add or invent detail.
+- NO color, lighting, shadows, reflections, or ambient occlusion. NO surface noise, grain, bumps, orange-peel, fabric texture, skin pores, procedural/AI micro-texture, scratches, or random high-frequency detail.
+- Do NOT return the original photo or a near-copy of the input — it must be a true grayscale height map.
 
-Final output: A production-quality CNC bas-relief height map with 95–100% style fidelity to Image 1, the content of Image 2, perfectly smooth machinable surfaces, and zero unwanted texture or noise."""
+Final output: a production-quality grayscale CNC bas-relief height map of the subject, perfectly smooth machinable surfaces, with zero unwanted texture or noise."""
 
 _BOOST_LINE = ("\nGive hidden and recessed details clearly brighter height values so they stay "
                "visible and prominent in the relief.")
