@@ -272,7 +272,15 @@ export default function Controls({ s }: { s: Studio }) {
   }, [f?.id, s.record, dims])
 
   if (!f) return null
-  const visible = (p: ParamSpec) => !p.depends_on || s.values[p.depends_on.param] === p.depends_on.value
+  // s.values only holds params the user has actually TOUCHED, so an untouched param reads
+  // undefined — comparing that straight against depends_on.value hid the dependent field
+  // until you poked the controller (undefined === false is false). Fall back to the schema
+  // default so the first render matches what the backend would actually run with.
+  const effective = (name: string) => {
+    const v = s.values[name]
+    return v === undefined ? f.params.find((x) => x.name === name)?.default : v
+  }
+  const visible = (p: ParamSpec) => !p.depends_on || effective(p.depends_on.param) === p.depends_on.value
   const basic = f.params.filter((p) => p.group === 'basic' && visible(p))
   const advanced = f.params.filter((p) => p.group === 'advanced' && visible(p))
 

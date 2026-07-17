@@ -42,6 +42,12 @@ ESSENTIALS_GIT = "https://github.com/cubiq/ComfyUI_essentials"
 # Clarity-style creative upscale: ssitu's Ultimate SD Upscale node (tiled SD img2img).
 # Has a git submodule (Coyote-A/ultimate-upscale) — clone with --recurse-submodules.
 USDU_GIT = "https://github.com/ssitu/ComfyUI_UltimateSDUpscale"
+# Krea-2 style reference (Image → Image "Style reference" mode): ostris's node pair —
+# TextEncodeKrea2OstrisEdit (encodes prompt + reference images through the Krea-2 Qwen3-VL
+# encoder, and with a VAE attached also feeds them in as reference latents) and
+# Krea2OstrisEditModelPatch, which is MANDATORY: stock Krea-2 in ComfyUI silently ignores
+# reference latents. No extra pip deps.
+KREA2EDIT_GIT = "https://github.com/ostris/ComfyUI-Krea2-Ostris-Edit"
 
 # label -> (hf_repo, path_within_repo, dest_subdir_under_ComfyUI/models)
 # path_within_repo may contain a subfolder; only the basename lands in dest.
@@ -114,6 +120,15 @@ QWEN_EDIT_MODELS = {
     "image-edit · Lightning 4-step LoRA (~0.85 GB)":
         ("lightx2v/Qwen-Image-Edit-2511-Lightning", "Qwen-Image-Edit-2511-Lightning-4steps-V1.0-bf16.safetensors", "loras"),
 }
+# KREA2 EDIT = ostris's style-reference LoRA for Krea-2-Turbo (Image → Image "Style reference").
+# Cheap: it REUSES the Krea core's unet + encoder + VAE, so this 457 MB LoRA is the only weight.
+# The qwen3vl_4b_fp8_scaled encoder already in MODELS carries the Qwen3-VL VISION tensors the
+# node requires to encode references (verified: 315 model.visual.* tensors) — a text-only
+# encoder would fail. Also needs the ComfyUI-Krea2-Ostris-Edit node. NOT part of the engine gate.
+KREA2_EDIT_MODELS = {
+    "krea2-edit · Ostris style-reference LoRA (~457 MB)":
+        ("ostris/krea2_turbo_style_reference", "krea2_style_reference.safetensors", "loras"),
+}
 
 LORA_DIR = COMFY_DIR / "models" / "loras"                 # user-supplied custom LoRAs land here
 
@@ -166,7 +181,8 @@ def _nodes_status():
             "iclight": (cn / "ComfyUI-IC-Light").exists(),
             "hy3dwrap": (cn / "ComfyUI-Hunyuan3DWrapper").exists(),
             "essentials": (cn / "ComfyUI_essentials").exists(),
-            "usdu": (cn / "ComfyUI_UltimateSDUpscale").exists()}
+            "usdu": (cn / "ComfyUI_UltimateSDUpscale").exists(),
+            "krea2edit": (cn / "ComfyUI-Krea2-Ostris-Edit").exists()}
 
 
 def status():
@@ -182,6 +198,7 @@ def status():
         "clarity_models": {label: _path_ok(_dest(sub, p)) for label, (_, p, sub) in CLARITY_MODELS.items()},
         "upscale_models": {label: _path_ok(_dest(sub, p)) for label, (_, p, sub) in UPSCALE_MODELS.items()},
         "qwen_edit_models": {label: _path_ok(_dest(sub, p)) for label, (_, p, sub) in QWEN_EDIT_MODELS.items()},
+        "krea2_edit_models": {label: _path_ok(_dest(sub, p)) for label, (_, p, sub) in KREA2_EDIT_MODELS.items()},
         "nodes": _nodes_status(),
         "busy": _task["running"],
         "action": _task["action"],
@@ -267,6 +284,11 @@ def _install():
         if not usdu.exists():
             _log("cloning ComfyUI_UltimateSDUpscale (clarity creative upscale)")
             _run(["git", "clone", "--depth", "1", "--recurse-submodules", USDU_GIT, str(usdu)])
+        # Krea-2 style reference (img2img): ostris's edit nodes. README: no extra dependencies.
+        k2e = COMFY_DIR / "custom_nodes" / "ComfyUI-Krea2-Ostris-Edit"
+        if not k2e.exists():
+            _log("cloning ComfyUI-Krea2-Ostris-Edit (Krea-2 style reference)")
+            _run(["git", "clone", "--depth", "1", KREA2EDIT_GIT, str(k2e)])
         _log("installing ComfyUI requirements (this can take a few minutes)…")
         _run([py, "-m", "pip", "install", "-r", str(COMFY_DIR / "requirements.txt")])
         _run([py, "-m", "pip", "install", "-r", str(gguf / "requirements.txt")])
@@ -356,7 +378,8 @@ def install_rasterizer():
 
 def _download(labels):
     all_models = {**MODELS, **RELIGHT_MODELS, **HUNYUAN3D_MODELS, **CLARITY_MODELS,
-                  **UPSCALE_MODELS, **QWEN_EDIT_MODELS}  # gate uses MODELS; download grabs all
+                  **UPSCALE_MODELS, **QWEN_EDIT_MODELS,
+                  **KREA2_EDIT_MODELS}                   # gate uses MODELS; download grabs all
     items = all_models if not labels else {k: all_models[k] for k in labels if k in all_models}
     failures = []
     for label, (repo, path_in_repo, sub) in items.items():
