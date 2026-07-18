@@ -281,6 +281,8 @@ export default function Controls({ s }: { s: Studio }) {
     return v === undefined ? f.params.find((x) => x.name === name)?.default : v
   }
   const visible = (p: ParamSpec) => !p.depends_on || effective(p.depends_on.param) === p.depends_on.value
+  const k2eModels = Object.values(s.comfy?.krea2_edit_models || {})
+  const krea2EditReady = !!s.comfy?.nodes?.krea2edit && k2eModels.length > 0 && k2eModels.every(Boolean)
   const basic = f.params.filter((p) => p.group === 'basic' && visible(p))
   const advanced = f.params.filter((p) => p.group === 'advanced' && visible(p))
 
@@ -444,6 +446,27 @@ export default function Controls({ s }: { s: Studio }) {
             ? <LoraField key={p.name} s={s} />
             : <ParamField key={p.name} p={p} value={s.values[p.name]} onChange={(v) => onParam(p, v)} />)}
         </div>
+
+        {/* Style reference add-on gate (img2img). The ComfyUI setup wizard only appears when
+            the engine ISN'T ready — for img2img it always is — so this add-on needs its own
+            in-place installer, or the switch would just fail at generate time. */}
+        {f.id === 'img2img' && effective('style_ref') === true && !krea2EditReady && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: '11px 14px', border: '1px solid var(--hf-warning)', borderRadius: 12, background: 'var(--hf-surface-1)' }}>
+            <span style={{ font: '600 12px var(--hf-font-sans)', color: 'var(--hf-text-secondary)' }}>Style reference needs a one-time setup</span>
+            <span style={{ font: '400 11px var(--hf-font-sans)', color: 'var(--hf-text-tertiary)' }}>
+              Adds the Krea-2 Ostris Edit node + style-reference LoRA (~457 MB), then reloads the engine.
+            </span>
+            <Button size="sm" variant="primary" disabled={!!s.comfy?.busy}
+              onClick={() => s.doComfy('krea2edit')}>
+              {s.comfy?.busy && s.comfy?.action === 'krea2_edit' ? 'Installing…' : 'Install style reference'}
+            </Button>
+            {s.comfy?.busy && s.comfy?.action === 'krea2_edit' && !!s.comfy?.log?.length && (
+              <span style={{ font: '400 11px var(--hf-font-mono)', color: 'var(--hf-text-tertiary)', wordBreak: 'break-all' }}>
+                {s.comfy.log[s.comfy.log.length - 1]}
+              </span>
+            )}
+          </div>
+        )}
 
         {/* final STL size (relief) */}
         {f.id === 'relief' && (

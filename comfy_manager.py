@@ -319,6 +319,54 @@ def _align_torchaudio(py):
 
 
 # -------------------------------------------------------------------------- downloads
+def krea2_edit_ready():
+    """Both halves of the Krea-2 style-reference add-on present? (node + LoRA)"""
+    node = (COMFY_DIR / "custom_nodes" / "ComfyUI-Krea2-Ostris-Edit").exists()
+    return node and all(_path_ok(_dest(sub, p)) for _, p, sub in KREA2_EDIT_MODELS.values())
+
+
+def install_krea2_edit_async():
+    if not _begin("krea2_edit"):
+        return False
+    threading.Thread(target=_install_krea2_edit, daemon=True).start()
+    return True
+
+
+def _install_krea2_edit():
+    """One-click provisioning for Image → Image 'Style reference'. Needed as its own task
+    because the ComfyUI setup wizard only renders when the engine ISN'T ready — for img2img
+    it always is (gguf node + Krea core), so this add-on could never be reached from there.
+    Clones the node, fetches the LoRA, then reloads ComfyUI so the new node registers
+    (custom nodes are imported once at boot — without the reload the graph still fails)."""
+    try:
+        k2e = COMFY_DIR / "custom_nodes" / "ComfyUI-Krea2-Ostris-Edit"
+        if not k2e.exists():
+            if not is_installed():
+                raise RuntimeError("ComfyUI is not installed yet — set up the image engine first.")
+            _log("cloning ComfyUI-Krea2-Ostris-Edit …")
+            _run(["git", "clone", "--depth", "1", KREA2EDIT_GIT, str(k2e)])
+        else:
+            _log("✓ Krea-2 Ostris Edit node already present")
+        for label, (repo, path_in_repo, sub) in KREA2_EDIT_MODELS.items():
+            dest_dir = COMFY_DIR / "models" / sub
+            dest_dir.mkdir(parents=True, exist_ok=True)
+            target = dest_dir / path_in_repo.rsplit("/", 1)[-1]
+            if _path_ok(target):
+                _log(f"✓ {label} — already present")
+                continue
+            _log(f"downloading {label} …")
+            _http_download(f"https://huggingface.co/{repo}/resolve/main/{path_in_repo}", target, label)
+            _log(f"✓ {label} -> {target}")
+        if is_running():
+            _log("reloading ComfyUI so the new node registers …")
+            restart()
+        _log("✓ Style reference ready")
+        _end()
+    except Exception as e:
+        _log(f"ERROR: {e}")
+        _end(str(e))
+
+
 def download_async(labels=None):
     if not _begin("download"):
         return False

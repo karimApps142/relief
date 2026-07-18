@@ -112,6 +112,7 @@ export type ComfyStatus = {
   hunyuan3d_models?: Record<string, boolean>
   clarity_models?: Record<string, boolean>
   qwen_edit_models?: Record<string, boolean>
+  krea2_edit_models?: Record<string, boolean>
   nodes?: Record<string, boolean>
   busy: boolean
   action: string | null
@@ -139,6 +140,7 @@ export const modelsDownload = () => post('/api/models/download')
 export const getComfyStatus = (): Promise<ComfyStatus> => get('/api/comfy/status')
 export const comfyInstall = () => post('/api/comfy/install')
 export const comfyDownload = () => post('/api/comfy/download')
+export const comfyInstallKrea2Edit = () => post('/api/comfy/install-krea2-edit')
 export const comfyStart = () => post('/api/comfy/start')
 export const comfyRestart = () => post('/api/comfy/restart')
 export const comfyInterrupt = () => post('/api/comfy/interrupt')

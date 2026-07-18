@@ -85,6 +85,13 @@ def comfy_download():
     return {"started": comfy_manager.download_async(), **comfy_manager.status()}
 
 
+@app.post("/api/comfy/install-krea2-edit")
+def comfy_install_krea2_edit():
+    """Add-on installer for Image → Image 'Style reference' (ostris node + LoRA). Separate
+    from /install because the setup wizard is unreachable once the engine is ready."""
+    return {"started": comfy_manager.install_krea2_edit_async(), **comfy_manager.status()}
+
+
 @app.post("/api/comfy/start")
 def comfy_start():
     return comfy_manager.start()

@@ -96,14 +96,16 @@ def _style_preflight():
     """Fail fast with a fixable message. Without this the run dies deep inside ComfyUI as an
     opaque validation error ('node type not found' / 'value_not_in_list')."""
     from comfy_manager import COMFY_DIR
+    missing = []
     if not (COMFY_DIR / "custom_nodes" / _STYLE_NODE).exists():
-        raise RuntimeError(
-            "Style reference needs the Krea-2 Ostris Edit custom node. Click 'Install ComfyUI' "
-            "in the setup panel below (it only clones what's missing), then restart the engine.")
+        missing.append("the Krea-2 Ostris Edit node")
     if not (COMFY_DIR / "models" / "loras" / _STYLE_LORA).exists():
+        missing.append(f"{_STYLE_LORA} (~457 MB)")
+    if missing:
         raise RuntimeError(
-            f"Style reference needs {_STYLE_LORA} (~457 MB). Click 'Download models' in the "
-            "setup panel below.")
+            "Style reference is missing " + " and ".join(missing) +
+            ". Click 'Install style reference' next to the Style reference switch — it installs "
+            "both and reloads the engine. (The ComfyUI setup panel does not cover this add-on.)")
 
 
 class Img2ImgFeature(Feature):

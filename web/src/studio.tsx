@@ -6,6 +6,7 @@ import {
   FeatureSchema, RunRecord, Progress, SystemInfo, ModelsStatus, ComfyStatus,
   getFeatures, getProgress, getSystem, getJobs, getModelsStatus, modelsDownload,
   getComfyStatus, comfyInstall, comfyDownload, comfyStart, comfyRestart, comfyInterrupt,
+  comfyInstallKrea2Edit,
   runFeature, fmtDur,
 } from './api'
 
@@ -163,9 +164,9 @@ export function useStudio() {
     modelsDownload().then(() => { refreshModels(); addToast('info', 'Downloading depth weights…') }).catch(() => {})
   }, [refreshModels, addToast])
 
-  const doComfy = useCallback((which: 'install' | 'download' | 'start' | 'restart') => {
+  const doComfy = useCallback((which: 'install' | 'download' | 'start' | 'restart' | 'krea2edit') => {
     const fn = which === 'install' ? comfyInstall : which === 'download' ? comfyDownload
-      : which === 'restart' ? comfyRestart : comfyStart
+      : which === 'restart' ? comfyRestart : which === 'krea2edit' ? comfyInstallKrea2Edit : comfyStart
     fn().then(refreshComfy).catch(() => {})
   }, [refreshComfy])
 
