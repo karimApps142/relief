@@ -24,6 +24,7 @@ Locations are env-configurable:
 """
 import os
 import sys
+import glob
 import time
 import json
 import shutil
@@ -34,8 +35,14 @@ import urllib.request
 from pathlib import Path
 
 _ROOT = Path(__file__).resolve().parent
+_WIN = os.name == "nt"
 LLAMA_DIR = Path(os.environ.get("LLAMA_CPP_DIR", _ROOT.parent / "llama.cpp-prism")).resolve()
-MODELS_DIR = Path(os.environ.get("LLM_MODELS_DIR", LLAMA_DIR / "models")).resolve()
+# Weights live BESIDE the llama.cpp checkout, never inside it. `git clone` refuses to write
+# into a non-empty directory, so weights sitting in LLAMA_DIR/models made the build fail with
+# "destination path already exists" — and the obvious user fix (delete the folder) would throw
+# away a ~11 GB download. _migrate_legacy_models() relocates anything left in the old spot.
+MODELS_DIR = Path(os.environ.get("LLM_MODELS_DIR", _ROOT.parent / "llm-models")).resolve()
+_LEGACY_MODELS_DIR = LLAMA_DIR / "models"
 # NOT llama.cpp's default 8080 — that port is heavily contested (Docker Desktop binds it,
 # among many others) and a foreign service answering there used to read as "model loaded".
 LLM_URL = os.environ.get("LLM_URL", "127.0.0.1:8899")
@@ -153,17 +160,91 @@ def models_status():
     return {k: _path_ok(model_path(k)) for k in MODELS}
 
 
+def _migrate_legacy_models():
+    """Move weights out of the old LLAMA_DIR/models into MODELS_DIR.
+
+    Called from status()/download/start so it runs the moment the UI is opened. Same-volume
+    moves are instant renames, so a 7 GB file is never re-downloaded and never copied. Purely
+    additive: a file already present at the destination is left alone, never overwritten.
+    """
+    try:
+        if _LEGACY_MODELS_DIR.resolve() == MODELS_DIR.resolve() or not _LEGACY_MODELS_DIR.is_dir():
+            return
+    except OSError:
+        return
+    for spec in MODELS.values():
+        old, new = _LEGACY_MODELS_DIR / spec["file"], MODELS_DIR / spec["file"]
+        if not _path_ok(old) or _path_ok(new):
+            continue
+        try:
+            MODELS_DIR.mkdir(parents=True, exist_ok=True)
+            try:
+                os.replace(old, new)                      # same volume: instant rename
+            except OSError:
+                shutil.move(str(old), str(new))           # crosses volumes: real copy
+            _log(f"moved {spec['file']} out of the llama.cpp checkout -> {new}")
+        except Exception as e:
+            _log(f"! could not relocate {spec['file']}: {e} (it is still at {old})")
+
+
+def _find(exe, *candidates):
+    """Locate a build tool. PATH first, then well-known install locations — a server started
+    before the tool was installed (or launched outside a developer shell) has a stale PATH,
+    and we would otherwise report a tool as missing when it is sitting right there."""
+    found = shutil.which(exe)
+    if found:
+        return found
+    for pattern in candidates:
+        for hit in sorted(glob.glob(pattern), reverse=True):   # newest versioned dir wins
+            if Path(hit).exists():
+                return hit
+    return None
+
+
+def cmake_bin():
+    return _find("cmake", r"C:\Program Files\CMake\bin\cmake.exe",
+                 r"C:\Program Files (x86)\CMake\bin\cmake.exe",
+                 "/opt/homebrew/bin/cmake", "/usr/local/bin/cmake")
+
+
+def git_bin():
+    return _find("git", r"C:\Program Files\Git\cmd\git.exe",
+                 "/opt/homebrew/bin/git", "/usr/bin/git")
+
+
+def nvcc_bin():
+    return _find("nvcc", r"C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v*\bin\nvcc.exe",
+                 "/usr/local/cuda*/bin/nvcc")
+
+
+def _has_compiler():
+    """On Windows, cl.exe is only on PATH inside a Developer Command Prompt — but CMake finds
+    MSVC through the registry/vswhere regardless, so the presence of a Visual Studio install
+    is the honest signal. Reporting 'no compiler' for a working box would be a false alarm."""
+    if _WIN:
+        return bool(shutil.which("cl") or
+                    _find("vswhere", r"C:\Program Files (x86)\Microsoft Visual Studio\Installer\vswhere.exe"))
+    return bool(shutil.which("cc") or shutil.which("clang") or shutil.which("gcc"))
+
+
 def toolchain():
-    """Which build prerequisites are on PATH. Surfaced in the UI *before* the user starts
-    a 20-minute build, because a missing compiler otherwise fails deep in cmake output."""
-    return {"git": bool(shutil.which("git")), "cmake": bool(shutil.which("cmake")),
-            "nvcc": bool(shutil.which("nvcc")),
-            "compiler": bool(shutil.which("cl") or shutil.which("cc") or shutil.which("gcc"))}
+    """Which build prerequisites are available. Surfaced in the UI *before* the user starts
+    a long build, because a missing tool otherwise fails deep in cmake output.
+
+    `gpu` describes the acceleration the build would get: CUDA where nvcc is present, Metal on
+    macOS (always available, no toolkit needed), otherwise CPU-only.
+    """
+    cuda = bool(nvcc_bin())
+    return {"git": bool(git_bin()), "cmake": bool(cmake_bin()),
+            "nvcc": cuda, "compiler": _has_compiler(),
+            "gpu": "cuda" if cuda else "metal" if sys.platform == "darwin" else "cpu"}
 
 
 def status():
+    _migrate_legacy_models()      # polled by the UI, so a stale layout self-heals on open
     return {
         "built": is_built(),
+        "models_dir": str(MODELS_DIR),
         "running": is_running() if is_built() else False,
         "dir": str(LLAMA_DIR),
         "url": LLM_URL,
@@ -218,46 +299,69 @@ def install_async():
     return True
 
 
+def _ensure_repo(git):
+    """Get the fork's source into LLAMA_DIR, whatever state that directory is in.
+
+    A plain `git clone` fails on a non-empty destination, which is exactly what an earlier
+    weight download left behind. So a non-empty, non-repo directory is populated in place via
+    init + fetch instead — it never deletes anything the user already has on disk.
+    """
+    LLAMA_DIR.parent.mkdir(parents=True, exist_ok=True)
+    if (LLAMA_DIR / "CMakeLists.txt").exists():
+        _log("✓ fork already cloned — pulling latest")
+        try:
+            _run([git, "pull", "--ff-only"], cwd=str(LLAMA_DIR))
+        except Exception as e:
+            _log(f"  (pull skipped: {e})")
+        return
+    if not LLAMA_DIR.exists() or not any(LLAMA_DIR.iterdir()):
+        _log(f"cloning the PrismML llama.cpp fork -> {LLAMA_DIR}")
+        _run([git, "clone", "--depth", "1", LLAMA_GIT, str(LLAMA_DIR)])
+        return
+    _log(f"{LLAMA_DIR} already has files in it — fetching the source in place "
+         "(nothing existing is deleted)")
+    if not (LLAMA_DIR / ".git").exists():
+        _run([git, "init"], cwd=str(LLAMA_DIR))
+        _run([git, "remote", "add", "origin", LLAMA_GIT], cwd=str(LLAMA_DIR))
+    _run([git, "fetch", "--depth", "1", "origin", "HEAD"], cwd=str(LLAMA_DIR))
+    _run([git, "reset", "--hard", "FETCH_HEAD"], cwd=str(LLAMA_DIR))
+
+
 def _install():
-    """Clone + cmake-build the PrismML llama.cpp fork. CUDA if nvcc is present, CPU
-    otherwise (which still runs, just slowly — worth building rather than hard-failing)."""
+    """Clone + cmake-build the PrismML llama.cpp fork. CUDA if nvcc is present, Metal on
+    macOS, CPU otherwise (which still runs, just slowly — better than hard-failing)."""
     try:
+        _migrate_legacy_models()          # get weights out of the clone target first
         tc = toolchain()
+        git, cmake = git_bin(), cmake_bin()
         missing = [n for n in ("git", "cmake") if not tc[n]]
         if missing:
             raise RuntimeError(
-                f"{' and '.join(missing)} not found on PATH. Install them first — "
-                "Git: https://git-scm.com/download/win · CMake: https://cmake.org/download/ "
-                "(tick 'Add to PATH'), then reopen the terminal and retry.")
+                f"{' and '.join(missing)} not found. Install "
+                + (" and ".join(missing)) +
+                " — Git: https://git-scm.com/download/win · CMake: https://cmake.org/download/ "
+                "(tick 'Add CMake to the system PATH'), then RESTART this server so it picks "
+                "up the new PATH, and retry.")
         if not tc["compiler"]:
-            _log("! No C++ compiler on PATH. On Windows install 'Visual Studio Build Tools' "
-                 "with the 'Desktop development with C++' workload, then run this from a "
-                 "'x64 Native Tools Command Prompt'. Attempting the build anyway…")
+            _log("! No C++ compiler found. On Windows install 'Visual Studio Build Tools' with "
+                 "the 'Desktop development with C++' workload. Attempting the build anyway…")
 
-        LLAMA_DIR.parent.mkdir(parents=True, exist_ok=True)
-        if not (LLAMA_DIR / "CMakeLists.txt").exists():
-            _log(f"cloning the PrismML llama.cpp fork -> {LLAMA_DIR}")
-            _run(["git", "clone", "--depth", "1", LLAMA_GIT, str(LLAMA_DIR)])
-        else:
-            _log("✓ fork already cloned — pulling latest")
-            try:
-                _run(["git", "pull", "--ff-only"], cwd=str(LLAMA_DIR))
-            except Exception as e:
-                _log(f"  (pull skipped: {e})")
+        _ensure_repo(git)
 
-        cuda = tc["nvcc"]
-        _log("configuring cmake " + ("WITH CUDA (nvcc found)" if cuda else
-                                     "for CPU — nvcc not on PATH, so no GPU offload"))
+        gpu = tc["gpu"]
+        _log({"cuda": "configuring cmake WITH CUDA (nvcc found) — full GPU offload",
+              "metal": "configuring cmake with Metal (macOS GPU; no CUDA toolkit needed)",
+              "cpu": "configuring cmake for CPU — no CUDA toolkit found, so no GPU offload"}[gpu])
         # LLAMA_CURL=OFF: recent llama.cpp hard-requires libcurl at configure time, which
         # is not present on a stock Windows box. We download weights ourselves anyway.
-        cfg = ["cmake", "-B", "build", "-DLLAMA_CURL=OFF", "-DLLAMA_BUILD_TESTS=OFF",
+        cfg = [cmake, "-B", "build", "-DLLAMA_CURL=OFF", "-DLLAMA_BUILD_TESTS=OFF",
                "-DLLAMA_BUILD_EXAMPLES=OFF", "-DLLAMA_BUILD_SERVER=ON"]
-        if cuda:
+        if gpu == "cuda":
             cfg.append("-DGGML_CUDA=ON")
         _run(cfg, cwd=str(LLAMA_DIR))
 
         _log("building llama-server (this takes 10–30 minutes the first time)…")
-        _run(["cmake", "--build", "build", "--config", "Release", "--target", "llama-server",
+        _run([cmake, "--build", "build", "--config", "Release", "--target", "llama-server",
               "-j", str(max(2, (os.cpu_count() or 4) - 1))], cwd=str(LLAMA_DIR))
 
         if not is_built():
@@ -282,6 +386,7 @@ def _reset_progress():
 
 
 def _download(keys):
+    _migrate_legacy_models()          # never re-download something we already have
     wanted = [k for k in (keys or list(MODELS)) if k in MODELS]
     failures = []
     MODELS_DIR.mkdir(parents=True, exist_ok=True)
@@ -384,6 +489,7 @@ def start(model_key=None, ctx=None):
     already the one being served we no-op; switching models restarts the process, since
     only one 27B model fits in VRAM at a time."""
     global _proc, _logfh
+    _migrate_legacy_models()
     key = model_key or _loaded[0] or DEFAULT_MODEL
     if key not in MODELS:
         return {"ok": False, "error": f"unknown model: {key}"}

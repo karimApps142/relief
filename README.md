@@ -77,7 +77,7 @@ Open the **Chat** tab in the icon rail. It walks through a one-time setup:
 Sampling defaults are Prism's published benchmark settings (temp 0.7 · top-p 0.95 · top-k 20) and
 are adjustable, along with the system prompt, in the settings drawer.
 
-Environment overrides: `LLAMA_CPP_DIR` (default `<repo-parent>/llama.cpp-prism`), `LLM_MODELS_DIR`,
+Environment overrides: `LLAMA_CPP_DIR` (default `<repo-parent>/llama.cpp-prism`), `LLM_MODELS_DIR` (default `<repo-parent>/llm-models`),
 `LLM_URL` (default `127.0.0.1:8899`), `LLM_CTX` (default `8192`).
 
 ## Docs

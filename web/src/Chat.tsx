@@ -124,11 +124,17 @@ function ChatSetup({ c }: { c: ChatState }) {
           </div>
           {!llm.built && (
             <div style={{ marginTop: 12, display: 'flex', flexWrap: 'wrap', gap: 7 }}>
-              {(['git', 'cmake', 'compiler', 'nvcc'] as const).map((k) => (
+              {/* required tools only — GPU support is reported separately, since its absence
+                  makes the build slower rather than impossible. */}
+              {(['git', 'cmake', 'compiler'] as const).map((k) => (
                 <span key={k} style={{ display: 'flex', alignItems: 'center', gap: 5, height: 26, padding: '0 9px', borderRadius: 99, border: '1px solid var(--hf-border)', font: '500 11.5px var(--hf-font-mono)', color: tc[k] ? 'var(--hf-accent)' : 'var(--hf-text-tertiary)' }}>
                   <Icon name={tc[k] ? 'check' : 'x'} size={11} sw={2.4} />{k}
                 </span>
               ))}
+              <span style={{ display: 'flex', alignItems: 'center', gap: 5, height: 26, padding: '0 9px', borderRadius: 99, border: '1px solid var(--hf-border)', font: '500 11.5px var(--hf-font-mono)', color: tc.gpu === 'cpu' ? 'var(--hf-text-tertiary)' : 'var(--hf-accent)' }}>
+                <Icon name={tc.gpu === 'cpu' ? 'x' : 'check'} size={11} sw={2.4} />
+                {tc.gpu === 'cuda' ? 'cuda gpu' : tc.gpu === 'metal' ? 'metal gpu' : 'cpu only'}
+              </span>
             </div>
           )}
           {/* only while it still matters — a finished build makes the toolchain moot */}
@@ -137,9 +143,17 @@ function ChatSetup({ c }: { c: ChatState }) {
               {missing.join(' and ')} {missing.length > 1 ? 'are' : 'is'} not on PATH — install {missing.length > 1 ? 'them' : 'it'} first, then reopen the terminal.
             </p>
           )}
-          {!llm.built && !tc.nvcc && (
+          {!llm.built && tc.gpu === 'cpu' && (
             <p style={{ margin: '9px 0 0', font: '400 12.5px/1.6 var(--hf-font-sans)', color: 'var(--hf-text-tertiary)' }}>
-              No CUDA toolkit detected — the build will fall back to CPU, which works but is much slower.
+              No CUDA toolkit found, so the build would be <strong>CPU-only</strong> — it works, but a 27B
+              model will answer slowly. For full GPU speed install the{' '}
+              <a href="https://developer.nvidia.com/cuda-downloads" target="_blank" rel="noreferrer noopener"
+                style={{ color: 'var(--hf-info)' }}>CUDA Toolkit</a>, then restart the server so it is picked up.
+            </p>
+          )}
+          {!llm.built && tc.gpu === 'metal' && (
+            <p style={{ margin: '9px 0 0', font: '400 12.5px/1.6 var(--hf-font-sans)', color: 'var(--hf-text-tertiary)' }}>
+              Will build with <strong>Metal</strong> GPU acceleration — no CUDA toolkit needed on macOS.
             </p>
           )}
           {llm.action === 'install' && <LogPanel lines={llm.log} />}
@@ -161,6 +175,12 @@ function ChatSetup({ c }: { c: ChatState }) {
             ))}
           </div>
           {(llm.action === 'download' || llm.action === 'start') && <LogPanel lines={llm.log} />}
+          {anyModel && (
+            <p style={{ margin: '13px 0 0', font: '400 11.5px/1.6 var(--hf-font-sans)', color: 'var(--hf-text-tertiary)', wordBreak: 'break-all' }}>
+              Weights are stored in <code style={{ font: '500 11px var(--hf-font-mono)' }}>{llm.models_dir}</code> — kept
+              outside the llama.cpp folder, so rebuilding or updating the engine never touches them.
+            </p>
+          )}
         </div>
 
         {llm.error && (

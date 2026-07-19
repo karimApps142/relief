@@ -143,8 +143,9 @@ export type LlmStatus = {
   ctx: number
   catalog: LlmModel[]
   models: Record<string, boolean>
+  models_dir: string
   progress: LlmProgress
-  toolchain: { git: boolean; cmake: boolean; nvcc: boolean; compiler: boolean }
+  toolchain: { git: boolean; cmake: boolean; nvcc: boolean; compiler: boolean; gpu: 'cuda' | 'metal' | 'cpu' }
   defaults: LlmSampling & { system_prompt: string }
   busy: boolean
   action: string | null
