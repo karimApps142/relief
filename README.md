@@ -84,6 +84,13 @@ are adjustable, along with the system prompt, in the settings drawer.
 Environment overrides: `LLAMA_CPP_DIR` (default `<repo-parent>/llama.cpp-prism`), `LLM_MODELS_DIR` (default `<repo-parent>/llm-models`),
 `LLM_URL` (default `127.0.0.1:8899`), `LLM_CTX` (default `8192`).
 
+**Slow downloads?** Weights and engine are fetched as 8 concurrent byte ranges, because a single
+TCP stream to a distant CDN is usually latency-bound rather than bandwidth-bound (GitHub Releases
+is much worse for this than HuggingFace's CDN). Raise `LLM_DOWNLOAD_SEGMENTS` to 16 on a very
+high-latency link, or set it to `1` to disable parallel fetching if a proxy or firewall objects.
+Any failure falls back to a single stream automatically, and a dropped segment resumes rather
+than restarting.
+
 ## Docs
 
 - **Image engine (Krea/ComfyUI) plan + in-app management:** [`docs/TEXT2IMG_KREA_PLAN.md`](docs/TEXT2IMG_KREA_PLAN.md)

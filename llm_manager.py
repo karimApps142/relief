@@ -579,21 +579,56 @@ def _download(keys):
         _end()
 
 
+_UA = {"User-Agent": "relief-llm-manager"}
+# A single TCP stream to a distant CDN is often latency-bound rather than bandwidth-bound —
+# GitHub Releases in particular can crawl on long-haul routes while HuggingFace's CDN is
+# fine. Fetching byte ranges concurrently recovers the lost throughput. Tunable/disable-able
+# (LLM_DOWNLOAD_SEGMENTS=1) if a proxy or firewall dislikes parallel range requests.
+_SEGMENTS = max(1, int(os.environ.get("LLM_DOWNLOAD_SEGMENTS", "8")))
+_SEGMENT_MIN = 32 << 20                                   # below this, splitting isn't worth it
+
+
+def _probe(url):
+    """(total_size, supports_range). A 1-byte range request answers both in one round trip."""
+    req = urllib.request.Request(url, headers={**_UA, "Range": "bytes=0-0"})
+    try:
+        with urllib.request.urlopen(req, timeout=30) as r:
+            if r.status == 206:
+                # Content-Range: bytes 0-0/261776213
+                return int(r.headers.get("Content-Range", "").rsplit("/", 1)[-1]), True
+            return int(r.headers.get("Content-Length") or 0), False
+    except Exception:
+        return 0, False
+
+
 def _http_download(url, target, label):
-    """Stream an HF resolve URL straight to `target` (atomic via a .part temp), logging
-    throttled progress so a multi-GB fetch never looks frozen. Deliberately NOT
-    huggingface_hub: comfy_manager learned the hard way that the HF cache's symlink /
-    hardlink dance corrupts on Windows."""
-    req = urllib.request.Request(url, headers={"User-Agent": "relief-llm-manager"})
-    tmp = target.with_name(target.name + ".part")
+    """Download to `target` atomically via a .part temp, in parallel byte ranges where the
+    server allows it. Deliberately NOT huggingface_hub: comfy_manager learned the hard way
+    that the HF cache's symlink/hardlink dance corrupts on Windows."""
     try:                                                  # clear any stale/broken target
         target.unlink()
     except OSError:
         pass
-    with urllib.request.urlopen(req, timeout=60) as r:    # follows HF's 302 to the CDN
-        total = int(r.headers.get("Content-Length") or 0)
+    total, ranged = _probe(url)
+    if total:
+        _progress["total"] = total                        # exact, replaces the catalog estimate
+    if ranged and _SEGMENTS > 1 and total >= _SEGMENT_MIN:
+        try:
+            _parallel_download(url, target, label, total)
+            return
+        except Exception as e:                            # any trouble → plain single stream
+            _log(f"   {label}: parallel fetch failed ({e}); retrying as one stream")
+    _stream_download(url, target, label, total)
+
+
+def _stream_download(url, target, label, total=0):
+    """Single-connection download — the fallback, and the path for small files."""
+    req = urllib.request.Request(url, headers=_UA)
+    tmp = target.with_name(target.name + ".part")
+    with urllib.request.urlopen(req, timeout=60) as r:    # follows the 302 to the CDN
+        total = int(r.headers.get("Content-Length") or 0) or total
         if total:
-            _progress["total"] = total                    # exact, replaces the catalog estimate
+            _progress["total"] = total
         done = last = 0
         step = max(total // 20, 64 << 20) if total else 0   # log ~every 5% (min 64 MB)
         with open(tmp, "wb") as f:
@@ -609,6 +644,79 @@ def _http_download(url, target, label):
                     last = done
                     _log(f"   {label}: {done / 1e9:.2f}/{total / 1e9:.2f} GB ({100 * done // total}%)")
     os.replace(tmp, target)                               # atomic; no partial/broken target
+    _progress["percent"] = 100
+
+
+def _parallel_download(url, target, label, total, attempts=3):
+    """Fetch `total` bytes as _SEGMENTS concurrent ranges into one preallocated file.
+
+    Each worker owns a disjoint byte range and its own file handle, so the writes never
+    interleave. A segment that dies mid-flight is retried from the point it reached rather
+    than from zero, which matters on the flaky long-haul links this exists to help.
+    """
+    tmp = target.with_name(target.name + ".part")
+    with open(tmp, "wb") as f:                            # preallocate so seeks are valid
+        f.truncate(total)
+
+    span = total // _SEGMENTS
+    bounds = [(i * span, (total - 1) if i == _SEGMENTS - 1 else (i + 1) * span - 1)
+              for i in range(_SEGMENTS)]
+    done = [0]
+    lock = threading.Lock()
+    errors = []
+    last_log = [0]
+
+    def bump(n):
+        with lock:
+            done[0] += n
+            _progress["done"] = done[0]
+            _progress["percent"] = 100 * done[0] // total
+            step = max(total // 20, 32 << 20)
+            if done[0] - last_log[0] >= step:
+                last_log[0] = done[0]
+                _log(f"   {label}: {done[0] / 1e9:.2f}/{total / 1e9:.2f} GB "
+                     f"({100 * done[0] // total}%, {_SEGMENTS} streams)")
+
+    def worker(start, end):
+        pos = start
+        for attempt in range(attempts):
+            if pos > end:
+                return
+            try:
+                req = urllib.request.Request(
+                    url, headers={**_UA, "Range": f"bytes={pos}-{end}"})
+                with urllib.request.urlopen(req, timeout=60) as r:
+                    if r.status != 206:
+                        raise RuntimeError("server ignored the range request")
+                    with open(tmp, "r+b") as f:
+                        f.seek(pos)
+                        while True:
+                            chunk = r.read(1 << 20)
+                            if not chunk:
+                                break
+                            f.write(chunk)
+                            pos += len(chunk)
+                            bump(len(chunk))
+                if pos > end:
+                    return
+                raise RuntimeError(f"stream ended early at {pos} of {end}")
+            except Exception as e:
+                if attempt == attempts - 1:
+                    errors.append(e)
+                    return
+                time.sleep(1.5 * (attempt + 1))           # brief backoff, then resume
+
+    threads = [threading.Thread(target=worker, args=b, daemon=True) for b in bounds]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+    if errors:
+        raise errors[0]
+    written = os.path.getsize(tmp)
+    if written != total:                                  # never publish a short file
+        raise RuntimeError(f"expected {total} bytes, wrote {written}")
+    os.replace(tmp, target)
     _progress["percent"] = 100
 
 
