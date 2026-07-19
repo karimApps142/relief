@@ -26,7 +26,7 @@ def get_backend(name=None):
 class LiteBackend:
     name = "lite"
 
-    def remove_background(self, image: Image.Image) -> np.ndarray:
+    def remove_background(self, image: Image.Image, model=None) -> np.ndarray:
         # no real segmentation in lite mode: whole image is foreground
         return np.ones((image.height, image.width), np.float32)
 
@@ -62,8 +62,11 @@ class FullBackend:
         import models                               # <-- lazy: only imported here
         self._m = models
 
-    def remove_background(self, image):
-        return self._m.remove_background(image)
+    def remove_background(self, image, model=None):
+        # model=None keeps the historical default (classic BiRefNet) for the relief/mockup
+        # callers that don't expose a picker; the Cutout feature passes one explicitly.
+        return self._m.remove_background(image, model) if model \
+            else self._m.remove_background(image)
 
     def estimate_normals(self, image, which="sapiens", **_):
         if which == "sapiens":                        # human-specialist, sharpest faces/hair

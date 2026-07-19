@@ -89,7 +89,7 @@ export type SystemInfo = {
   temp: number
   power: number
   disk_free: number | null
-  resident: 'relief' | 'image' | 'idle'
+  resident: 'relief' | 'image' | 'llm' | 'idle'
   model_loaded: string
 }
 
@@ -121,12 +121,46 @@ export type ComfyStatus = {
   done: boolean
 }
 
+// ---- Chat LLM (Bonsai / llama.cpp) ----
+export type LlmModel = {
+  key: string
+  label: string
+  repo: string
+  file: string
+  size_gb: number
+  tag: string
+  blurb: string
+}
+export type LlmSampling = { temperature: number; top_p: number; top_k: number; max_tokens: number }
+/** Live byte counter for an in-flight weight download (key is null when idle). */
+export type LlmProgress = { key: string | null; label: string | null; done: number; total: number; percent: number }
+export type LlmStatus = {
+  built: boolean
+  running: boolean
+  dir: string
+  url: string
+  loaded: string | null
+  ctx: number
+  catalog: LlmModel[]
+  models: Record<string, boolean>
+  progress: LlmProgress
+  toolchain: { git: boolean; cmake: boolean; nvcc: boolean; compiler: boolean }
+  defaults: LlmSampling & { system_prompt: string }
+  busy: boolean
+  action: string | null
+  log: string[]
+  error: string | null
+  done: boolean
+}
+
 const j = async (r: Response) => {
   if (!r.ok) throw new Error(`${r.url} → ${r.status}`)
   return r.json()
 }
 const get = (p: string) => fetch(p).then(j)
 const post = (p: string) => fetch(p, { method: 'POST' }).then(j)
+const postJson = (p: string, body: unknown) =>
+  fetch(p, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }).then(j)
 
 export const getFeatures = (): Promise<FeatureSchema[]> => get('/api/features')
 export const getProgress = (): Promise<Progress> => get('/api/progress')
@@ -144,6 +178,71 @@ export const comfyInstallKrea2Edit = () => post('/api/comfy/install-krea2-edit')
 export const comfyStart = () => post('/api/comfy/start')
 export const comfyRestart = () => post('/api/comfy/restart')
 export const comfyInterrupt = () => post('/api/comfy/interrupt')
+
+export const getLlmStatus = (): Promise<LlmStatus> => get('/api/llm/status')
+export const llmInstall = () => post('/api/llm/install')
+export const llmDownload = (models?: string[]) => postJson('/api/llm/download', { models })
+export const llmStart = (model: string, ctx?: number) => postJson('/api/llm/start', { model, ctx })
+export const llmStop = () => post('/api/llm/stop')
+
+export type ChatMessage = { role: 'system' | 'user' | 'assistant'; content: string }
+export type ChatDelta = { content?: string; reasoning?: string }
+/** llama.cpp reports real timings on the final chunk — surfaced as the tok/s footer. */
+export type ChatTimings = { predicted_n: number; predicted_per_second: number }
+
+/**
+ * Stream a completion, invoking `onDelta` per token chunk.
+ *
+ * SSE is read off `fetch`'s ReadableStream rather than via EventSource because
+ * EventSource cannot issue a POST (and the message history has to go in a body).
+ * Aborting the signal drops the socket, which is what stops generation server-side.
+ */
+export async function streamChat(
+  messages: ChatMessage[],
+  params: Partial<LlmSampling>,
+  onDelta: (d: ChatDelta) => void,
+  signal: AbortSignal,
+): Promise<ChatTimings | null> {
+  const r = await fetch('/api/llm/chat', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ messages, params }),
+    signal,
+  })
+  if (!r.ok || !r.body) {
+    const detail = await r.json().catch(() => ({}))
+    throw new Error(detail.detail || detail.error || `chat failed (${r.status})`)
+  }
+  const reader = r.body.getReader()
+  const decoder = new TextDecoder()
+  let buffer = ''
+  let timings: ChatTimings | null = null
+
+  for (;;) {
+    const { done, value } = await reader.read()
+    if (done) break
+    buffer += decoder.decode(value, { stream: true })
+    // SSE frames are newline-delimited; keep the trailing partial line in the buffer.
+    const lines = buffer.split('\n')
+    buffer = lines.pop() ?? ''
+    for (const line of lines) {
+      if (!line.startsWith('data:')) continue
+      const data = line.slice(5).trim()
+      if (!data || data === '[DONE]') continue
+      let chunk: any
+      try { chunk = JSON.parse(data) } catch { continue }   // ignore keep-alive/partial frames
+      if (chunk.error) throw new Error(chunk.error)
+      if (chunk.timings) timings = chunk.timings
+      const delta = chunk.choices?.[0]?.delta
+      if (!delta) continue
+      // Thinking models emit reasoning either in its own field (newer llama.cpp) or
+      // inline as <think> tags in content — the caller handles the inline case.
+      if (delta.reasoning_content) onDelta({ reasoning: delta.reasoning_content })
+      if (delta.content) onDelta({ content: delta.content })
+    }
+  }
+  return timings
+}
 
 // Custom LoRAs: list the drop-in files, and upload a new .safetensors (drag-drop).
 export const getLoras = (): Promise<string[]> =>

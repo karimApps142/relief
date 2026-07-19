@@ -1,12 +1,17 @@
+import { useState } from 'react'
 import { useStudio } from './studio'
 import { Icon, featureIcon } from './icons'
 import Controls from './Controls'
 import Results from './Results'
+import Chat from './Chat'
 import { LiteBanner, ComfyWizard, HistoryPanel, SystemPanel, Toasts } from './panels'
 
 export default function App() {
   const s = useStudio()
   const { active, comfy, models, system } = s
+  // Chat is a section, not a feature: it is a stateful conversation rather than a one-shot
+  // job, so it sits outside REGISTRY and owns its own layout instead of Controls/Results.
+  const [section, setSection] = useState<'studio' | 'chat'>('studio')
 
   // Feature-aware engine readiness: relight needs the IC-Light node + relight models; image3d
   // needs the Hunyuan3D wrapper node + its shape checkpoint; clarity needs the Ultimate SD
@@ -38,9 +43,9 @@ export default function App() {
   const vramColor = vramPct >= 90 ? 'var(--hf-danger)' : vramPct >= 75 ? 'var(--hf-warning)' : 'var(--hf-accent)'
 
   const railBtn = (id: string, icon: string, title: string, dot?: boolean) => {
-    const on = s.activeId === id
+    const on = section === 'studio' && s.activeId === id
     return (
-      <button key={id} onClick={() => s.selectFeature(id)} title={title} className="rs-hover"
+      <button key={id} onClick={() => { setSection('studio'); s.selectFeature(id) }} title={title} className="rs-hover"
         style={{ position: 'relative', width: 46, height: 46, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 13, border: 'none', cursor: 'pointer',
           background: on ? 'var(--hf-fill-medium)' : 'transparent', color: on ? 'var(--hf-text-primary)' : 'var(--hf-text-secondary)' }}>
         <Icon name={icon} size={20} />
@@ -62,6 +67,12 @@ export default function App() {
         <span title="Relief Studio · local" style={{ width: 38, height: 38, borderRadius: 11, background: 'var(--hf-white)', color: 'var(--hf-text-inverse)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}><Icon name="logo" size={20} /></span>
         <div style={{ width: 26, height: 1, background: 'var(--hf-border)', margin: '9px 0 7px' }} />
         {s.features.map((f) => railBtn(f.id, featureIcon(f.icon), f.name, f.id === 'relief' && !!models && !models.installed))}
+        <div style={{ width: 26, height: 1, background: 'var(--hf-border)', margin: '8px 0 7px' }} />
+        <button onClick={() => setSection('chat')} title="Chat — local LLM" className="rs-hover"
+          style={{ width: 46, height: 46, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 13, border: 'none', cursor: 'pointer',
+            background: section === 'chat' ? 'var(--hf-fill-medium)' : 'transparent', color: section === 'chat' ? 'var(--hf-text-primary)' : 'var(--hf-text-secondary)' }}>
+          <Icon name="chat" size={20} />
+        </button>
         <div style={{ flex: 1 }} />
         <button onClick={() => s.setSysOpen(true)} title={system ? `VRAM ${system.vram_used} / ${system.vram_total} GB` : 'System'} className="rs-hover"
           style={{ width: 46, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 5, padding: '8px 0', borderRadius: 13, border: 'none', background: 'transparent', cursor: 'pointer' }}>
@@ -80,7 +91,7 @@ export default function App() {
           <div style={{ display: 'flex', alignItems: 'center', gap: 9, minWidth: 0 }}>
             <span style={{ font: '700 14.5px var(--hf-font-sans)', letterSpacing: '-.01em' }}>Relief Studio</span>
             <span style={{ color: 'var(--hf-text-tertiary)', flexShrink: 0, display: 'flex' }}><Icon name="chevronRight" size={14} sw={2} /></span>
-            <span style={{ font: '600 14px var(--hf-font-sans)', color: 'var(--hf-text-secondary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{active?.name || '…'}</span>
+            <span style={{ font: '600 14px var(--hf-font-sans)', color: 'var(--hf-text-secondary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{section === 'chat' ? 'Chat' : active?.name || '…'}</span>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
             {pill(reliefDot, 'Depth weights')}
@@ -92,13 +103,14 @@ export default function App() {
           </div>
         </header>
 
-        <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', overflow: 'auto' }}>
+        <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', overflow: section === 'chat' ? 'hidden' : 'auto' }}>
           {s.bootErr && (
             <div style={{ margin: '16px 26px', borderRadius: 12, border: '1px solid var(--hf-danger)', background: 'var(--hf-danger-dim)', padding: '14px 16px', font: '500 13px var(--hf-font-sans)', color: 'var(--hf-danger)' }}>
               Can’t reach the API ({s.bootErr}). Is the server running on :8000?
             </div>
           )}
-          {active && (showComfyGate ? (
+          {section === 'chat' && <Chat />}
+          {section === 'studio' && active && (showComfyGate ? (
             <ComfyWizard s={s} />
           ) : (
             <div style={{ flex: 1, minHeight: 0, display: 'grid', gridTemplateColumns: '420px 1fr' }}>
@@ -109,7 +121,7 @@ export default function App() {
               </section>
             </div>
           ))}
-          {!active && !s.bootErr && <div style={{ padding: 26, fontSize: 13, color: 'var(--hf-text-tertiary)' }}>Loading features…</div>}
+          {section === 'studio' && !active && !s.bootErr && <div style={{ padding: 26, fontSize: 13, color: 'var(--hf-text-tertiary)' }}>Loading features…</div>}
         </div>
       </div>
 

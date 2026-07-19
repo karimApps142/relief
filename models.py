@@ -28,11 +28,25 @@ def unload_all():
 
 
 # ---------- Stage 0: background removal (BiRefNet, MIT) ----------
+# Two interchangeable checkpoints — same architecture, same preprocessing, so they differ
+# only by repo id. Lucida is a BiRefNet_HR fine-tune (MIT) that the author benchmarks as
+# stronger on camouflage, glass/transparency, text & logos and illustrations; both are
+# trained for 1024x1024 input, which is what remove_background feeds.
+BG_MODELS = {
+    "lucida":   "egeorcun/lucida",
+    "birefnet": "ZhengPeng7/BiRefNet",
+}
+DEFAULT_BG_MODEL = "lucida"
+
+
 @functools.lru_cache(maxsize=1)
-def _birefnet():
+def _birefnet(repo: str = "ZhengPeng7/BiRefNet"):
+    """maxsize=1 on purpose: switching models evicts the previous one instead of holding
+    two ~0.9 GB nets on the 12 GB card. Keyed by repo so the cache can't serve the wrong
+    checkpoint after a switch."""
     from transformers import AutoModelForImageSegmentation
     m = AutoModelForImageSegmentation.from_pretrained(
-        "ZhengPeng7/BiRefNet", trust_remote_code=True
+        repo, trust_remote_code=True
     ).to(DEVICE)
     # transformers >=5 loads the checkpoint in its native fp16; remove_background
     # feeds an fp32 tensor, so force fp32 to avoid "Input type (float) and bias
@@ -41,9 +55,12 @@ def _birefnet():
     return m.float().eval()
 
 
-def remove_background(image: Image.Image) -> np.ndarray:
-    """Return a soft foreground mask HxW in [0,1]."""
+def remove_background(image: Image.Image, model: str = "birefnet") -> np.ndarray:
+    """Return a soft foreground mask HxW in [0,1]. `model` is a BG_MODELS key; unknown
+    values fall back to the classic BiRefNet rather than raising, so an old saved run
+    can always be re-run."""
     from torchvision import transforms
+    repo = BG_MODELS.get(model, BG_MODELS["birefnet"])
     tf = transforms.Compose([
         transforms.Resize((1024, 1024)),
         transforms.ToTensor(),
@@ -51,7 +68,7 @@ def remove_background(image: Image.Image) -> np.ndarray:
     ])
     x = tf(image).unsqueeze(0).to(DEVICE)
     with torch.no_grad():
-        pred = _birefnet()(x)[-1].sigmoid().cpu()[0, 0].numpy()
+        pred = _birefnet(repo)(x)[-1].sigmoid().cpu()[0, 0].numpy()
     return cv2.resize(pred, image.size)  # back to (W,H)
 
 

@@ -169,7 +169,7 @@ export function SystemPanel({ s }: { s: Studio }) {
   const gpu = sys ? [
     { k: 'Utilization', v: `${sys.util}%` }, { k: 'Temp', v: `${sys.temp}°C` }, { k: 'Power', v: `${sys.power} W` },
     { k: 'Loaded', v: sys.model_loaded }, { k: 'Disk free', v: sys.disk_free != null ? `${sys.disk_free} GB` : '—' },
-    { k: 'Resident', v: ({ relief: 'Relief', image: 'Image', idle: 'Idle' } as any)[resident] },
+    { k: 'Resident', v: ({ relief: 'Relief', image: 'Image', llm: 'Chat', idle: 'Idle' } as any)[resident] },
   ] : []
   const weights = s.models?.models ? Object.entries(s.models.models) : []
   const cmodels = s.comfy ? [...Object.entries(s.comfy.models), ...Object.entries(s.comfy.hunyuan3d_models || {}), ...Object.entries(s.comfy.clarity_models || {})] : []
@@ -190,13 +190,13 @@ export function SystemPanel({ s }: { s: Studio }) {
             <div style={{ height: 10, borderRadius: 99, background: 'var(--hf-fill-strong)', overflow: 'hidden' }}>
               <div style={{ height: '100%', borderRadius: 99, width: `${sys?.vram_percent || 0}%`, background: vramColor, transition: 'width .25s var(--hf-ease-out)' }} />
             </div>
-            <p style={{ margin: '11px 0 0', font: '400 11.5px var(--hf-font-sans)', color: 'var(--hf-text-tertiary)', lineHeight: 1.5 }}>Relief and the image engine can't be resident at once — relief models unload before an image run.</p>
+            <p style={{ margin: '11px 0 0', font: '400 11.5px var(--hf-font-sans)', color: 'var(--hf-text-tertiary)', lineHeight: 1.5 }}>Only one engine is resident at a time — relief, the image engine, and the chat model each unload the others before they run.</p>
           </div>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: 9 }}>
             <span style={eyebrow}>Resident engine</span>
             <div style={{ display: 'flex', gap: 7 }}>
-              {[{ id: 'relief', label: 'Relief' }, { id: 'image', label: 'Image' }, { id: 'idle', label: 'Idle' }].map((e) => { const on = resident === e.id; return (
+              {[{ id: 'relief', label: 'Relief' }, { id: 'image', label: 'Image' }, { id: 'llm', label: 'Chat' }, { id: 'idle', label: 'Idle' }].map((e) => { const on = resident === e.id; return (
                 <div key={e.id} style={{ flex: 1, textAlign: 'center', padding: '11px 6px', borderRadius: 11, border: `1px solid ${on ? 'var(--hf-border-strong)' : 'var(--hf-border)'}`, background: on ? 'var(--hf-fill-medium)' : 'transparent', color: on ? 'var(--hf-text-primary)' : 'var(--hf-text-tertiary)', font: '600 12.5px var(--hf-font-sans)' }}>{e.label}</div>
               ) })}
             </div>

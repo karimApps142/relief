@@ -6,6 +6,9 @@ A local, GPU-backed AI studio with a schema-driven React UI. Modular features:
   (and a 3D preview), ready for CNC carving / 3D printing. Depth-driven (monocular depth + tiling).
 - **Text → Image**, **Image → Image**, **Upscale** — backed by **Krea-2-Turbo (GGUF)** running in
   a ComfyUI engine that the app installs, downloads, and launches for you (you never open ComfyUI).
+- **Chat** — a ChatGPT-style conversation with **Bonsai 27B** (Prism ML's ternary / 1-bit
+  quantization of Qwen3.6-27B) running locally via llama.cpp. Streaming replies, markdown + code
+  blocks, collapsible thought process, and per-thread history. See below.
 
 Everything runs privately on your own machine. The server (`server.py`) serves both the API and the
 prebuilt React UI on one port.
@@ -49,6 +52,33 @@ python3 -m venv .venv
 # Mac (lite/dev):   .venv/bin/pip install -r requirements.txt
 # GPU box (full):   .venv\Scripts\python.exe -m pip install -r requirements-gpu.txt
 ```
+
+## Chat (Bonsai 27B, local LLM)
+
+Open the **Chat** tab in the icon rail. It walks through a one-time setup:
+
+1. **Build llama.cpp (PrismML fork).** These GGUFs declare a custom `dspark` architecture with
+   `Q2_0_g128` ternary kernels, so **stock llama.cpp and `llama-cpp-python` cannot load them** —
+   the fork must be compiled. The button clones and builds it; the panel shows a live log and a
+   preflight for `git` / `cmake` / a C++ compiler / `nvcc`.
+   On Windows this needs **CMake** and **Visual Studio Build Tools** ("Desktop development with
+   C++"); with the CUDA toolkit present it builds a GPU binary, otherwise it falls back to CPU.
+2. **Download a model** (this does *not* wait for the build — it can run in parallel):
+
+   | Model | File | Size | Notes |
+   | :--- | :--- | ---: | :--- |
+   | Ternary Bonsai 27B · Q2_0 | `Ternary-Bonsai-27B-Q2_0.gguf` | 7.17 GB | ~1.71 bits/weight, ~95% of FP16 quality |
+   | Bonsai 27B · Q1_0 | `Bonsai-27B-Q1_0.gguf` | 3.80 GB | the 1-bit companion — lighter, lower quality |
+
+3. **Load into VRAM.** Only one model is resident at a time; loading one unloads the depth models
+   and stops ComfyUI, because a 27B model and a Krea checkpoint do not co-exist on a 12 GB card.
+   "Unload · free VRAM" in the settings drawer hands the GPU back to the image features.
+
+Sampling defaults are Prism's published benchmark settings (temp 0.7 · top-p 0.95 · top-k 20) and
+are adjustable, along with the system prompt, in the settings drawer.
+
+Environment overrides: `LLAMA_CPP_DIR` (default `<repo-parent>/llama.cpp-prism`), `LLM_MODELS_DIR`,
+`LLM_URL` (default `127.0.0.1:8899`), `LLM_CTX` (default `8192`).
 
 ## Docs
 

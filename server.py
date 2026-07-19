@@ -25,8 +25,8 @@ def _safe_name(name):
     base = re.sub(r'[<>:"/\\|?*\x00-\x1f]', "_", base).strip(" .")
     return (base or "upload")[:120]
 
-from fastapi import FastAPI, UploadFile, File, Form, HTTPException
-from fastapi.responses import JSONResponse, FileResponse
+from fastapi import FastAPI, UploadFile, File, Form, HTTPException, Body
+from fastapi.responses import JSONResponse, FileResponse, StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.concurrency import run_in_threadpool
@@ -34,6 +34,7 @@ from fastapi.concurrency import run_in_threadpool
 from features import REGISTRY
 import model_manager
 import comfy_manager
+import llm_manager
 import system_info
 import relief_progress
 
@@ -113,6 +114,61 @@ def comfy_progress():
     """Live generation progress (sampler steps) for the in-flight ComfyUI job."""
     from features._comfy import get_progress
     return get_progress()
+
+
+# ---- Chat LLM: build the PrismML llama.cpp fork, fetch weights, serve + stream ----
+@app.get("/api/llm/status")
+def llm_status():
+    return llm_manager.status()
+
+
+@app.post("/api/llm/install")
+def llm_install():
+    """Clone + build the PrismML llama.cpp fork (background). Required: the Bonsai GGUFs
+    use a custom `dspark` architecture that stock llama.cpp cannot load."""
+    return {"started": llm_manager.install_async(), **llm_manager.status()}
+
+
+@app.post("/api/llm/download")
+def llm_download(payload: dict = Body(default={})):
+    """Download the selected chat weights (background). Body: {"models": ["ternary-q2"]};
+    omit to fetch every model in the catalog."""
+    return {"started": llm_manager.download_async(payload.get("models")), **llm_manager.status()}
+
+
+@app.post("/api/llm/start")
+def llm_start(payload: dict = Body(default={})):
+    """Load a model into llama-server. Body: {"model": "ternary-q2", "ctx": 8192}."""
+    return {"started": llm_manager.start_async(payload.get("model"), payload.get("ctx")),
+            **llm_manager.status()}
+
+
+@app.post("/api/llm/stop")
+def llm_stop():
+    """Unload the model and free the VRAM for the image/relief engines."""
+    return {"stopped": llm_manager.stop(), **llm_manager.status()}
+
+
+@app.post("/api/llm/chat")
+def llm_chat(payload: dict = Body(...)):
+    """Stream a chat completion as SSE, proxied from llama-server.
+
+    The body is {"messages": [{role, content}, …], "params": {temperature, top_p, top_k,
+    max_tokens}}. Kept as a raw passthrough of llama-server's OpenAI-format chunks so the
+    client owns the token assembly — and so a client disconnect closes the upstream socket,
+    which is what makes the UI's Stop button actually halt generation on the GPU.
+    """
+    messages = payload.get("messages") or []
+    if not isinstance(messages, list) or not messages:
+        raise HTTPException(400, "messages must be a non-empty list")
+    if not llm_manager.is_running():
+        raise HTTPException(409, "no model is loaded — start one from the Chat panel first")
+    return StreamingResponse(
+        llm_manager.chat_stream(messages, payload.get("params")),
+        media_type="text/event-stream",
+        # SSE through a proxy needs both: no buffering, no transform.
+        headers={"Cache-Control": "no-cache, no-transform", "X-Accel-Buffering": "no"},
+    )
 
 
 # ---- Custom LoRAs: list / drag-drop upload / remove (drop-in, no restart) ----

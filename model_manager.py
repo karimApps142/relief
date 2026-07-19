@@ -15,6 +15,10 @@ HF_REPOS = {                                    # everything the relief stack ca
     "birefnet":         "ZhengPeng7/BiRefNet",
     "depth_anything":   "depth-anything/Depth-Anything-V2-Large-hf",
     "marigold_normals": "prs-eth/marigold-normals-v1-1",
+    # Cutout's default background-removal model (BiRefNet_HR fine-tune, ~885 MB). NOT core:
+    # it must never gate lite→full, or existing boxes would drop back to lite after an
+    # update. transformers fetches it on first use if it isn't cached.
+    "lucida":           "egeorcun/lucida",
 }
 # CORE = the minimum for full-quality depth relief; this is what gates lite→full.
 CORE_REPOS = {k: HF_REPOS[k] for k in ("birefnet", "depth_anything")}
