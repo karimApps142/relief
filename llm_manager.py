@@ -119,10 +119,11 @@ def _path_ok(path):
 
 
 def server_bin():
-    """Locate llama-server across the layouts cmake produces (MSVC nests a per-config
-    dir; the Ninja/Make generators don't). Returns None until the build has produced it."""
-    exe = ".exe" if os.name == "nt" else ""
-    for rel in (f"build/bin/Release/llama-server{exe}", f"build/bin/llama-server{exe}",
+    """Locate llama-server: the extracted prebuilt release first, then the layouts cmake
+    produces (MSVC nests a per-config dir; Ninja/Make don't). None until one exists."""
+    exe = ".exe" if _WIN else ""
+    for rel in (f"bin/llama-server{exe}",                       # prebuilt release
+                f"build/bin/Release/llama-server{exe}", f"build/bin/llama-server{exe}",
                 f"build/Release/llama-server{exe}", f"build/llama-server{exe}"):
         p = LLAMA_DIR / rel
         if p.exists():
@@ -235,9 +236,14 @@ def toolchain():
     macOS (always available, no toolkit needed), otherwise CPU-only.
     """
     cuda = bool(nvcc_bin())
+    nvidia = _has_nvidia()
+    # What the PREBUILT engine would give us — that path needs only a driver, not a toolkit,
+    # so an RTX box with no CUDA Toolkit still reports full GPU acceleration here.
+    prebuilt_gpu = "cuda" if nvidia else "metal" if sys.platform == "darwin" else "cpu"
     return {"git": bool(git_bin()), "cmake": bool(cmake_bin()),
-            "nvcc": cuda, "compiler": _has_compiler(),
-            "gpu": "cuda" if cuda else "metal" if sys.platform == "darwin" else "cpu"}
+            "nvcc": cuda, "compiler": _has_compiler(), "nvidia": nvidia,
+            "gpu": "cuda" if cuda else "metal" if sys.platform == "darwin" else "cpu",
+            "prebuilt_gpu": prebuilt_gpu}
 
 
 def status():
@@ -291,7 +297,166 @@ def _run(cmd, cwd=None):
         raise RuntimeError(f"`{cmd[0]} …` exited {p.returncode}")
 
 
-# --------------------------------------------------------------------------- install
+# ----------------------------------------------------------------- prebuilt install
+# The preferred path. Prism publishes per-platform binaries of their fork, including a
+# Windows CUDA build plus a `cudart-` pack carrying the CUDA runtime DLLs — so a GPU-ready
+# engine needs NO CMake, NO Visual Studio and NO CUDA Toolkit, just ~650 MB of downloads.
+RELEASES_API = "https://api.github.com/repos/PrismML-Eng/llama.cpp/releases/latest"
+BIN_DIR = LLAMA_DIR / "bin"
+
+
+_nvidia = []                                   # cached: hardware does not change at runtime
+
+
+def _has_nvidia():
+    """An NVIDIA GPU usable for inference. nvidia-smi ships with the DRIVER, so this is true
+    on a normal gaming box — unlike nvcc, which only exists with the (huge) CUDA Toolkit.
+    Cached because status() is polled every 1.5 s and this shells out."""
+    if _nvidia:
+        return _nvidia[0]
+    ok = False
+    if shutil.which("nvidia-smi"):
+        try:
+            ok = subprocess.run(["nvidia-smi"], capture_output=True, timeout=6).returncode == 0
+        except Exception:
+            ok = False
+    _nvidia.append(ok)
+    return ok
+
+
+def _pick_assets(names):
+    """Release asset names to install for this platform, in download order."""
+    def find(*subs, exclude=()):
+        # prefer Prism's own build over any vanilla passthrough asset of the same shape
+        for n in sorted(names, key=lambda x: ("prism" not in x, x)):
+            if all(s in n for s in subs) and not any(e in n for e in exclude):
+                return n
+        return None
+
+    if _WIN:
+        if _has_nvidia():
+            main = find("bin-win-cuda", "x64.zip", exclude=("cudart",))
+            if main:
+                # the runtime pack is what removes the CUDA Toolkit requirement
+                return [a for a in (main, find("cudart-", "win-cuda", "x64.zip")) if a]
+        return [a for a in [find("bin-win-cpu-x64.zip")] if a]
+    if sys.platform == "darwin":
+        import platform
+        arch = "arm64" if platform.machine() in ("arm64", "aarch64") else "x64"
+        return [a for a in [find(f"bin-macos-{arch}.tar.gz", exclude=("kleidiai",))] if a]
+    if _has_nvidia():
+        cuda = find("bin-linux-cuda-12.4", "x64.tar.gz")
+        if cuda:
+            return [cuda]
+    return [a for a in [find("bin-ubuntu-x64.tar.gz")] if a]
+
+
+def _safe_extract(archive, dest):
+    """Extract a release archive, rejecting entries that escape `dest` (zip-slip)."""
+    dest.mkdir(parents=True, exist_ok=True)
+    root = dest.resolve()
+
+    def ok(name):
+        return not os.path.isabs(name) and (root / name).resolve().is_relative_to(root)
+
+    if archive.suffix == ".zip":
+        import zipfile
+        with zipfile.ZipFile(archive) as z:
+            members = [n for n in z.namelist() if ok(n)]
+            z.extractall(dest, members=members)
+    else:
+        import tarfile
+        with tarfile.open(archive) as t:
+            members = [m for m in t.getmembers() if ok(m.name)]
+            try:
+                t.extractall(dest, members=members, filter="data")   # py>=3.12
+            except TypeError:
+                t.extractall(dest, members=members)
+
+
+def _flatten_to_bin(staged):
+    """Move the directory that actually contains llama-server into BIN_DIR.
+
+    Windows zips put the binaries at the archive root; the tarballs nest them under
+    build/bin/. Locating the executable and taking its whole folder handles both, and keeps
+    the DLLs/shared libs next to it — llama-server will not start without them.
+    """
+    exe = ".exe" if _WIN else ""
+    hits = list(staged.rglob(f"llama-server{exe}"))
+    if not hits:
+        raise RuntimeError("the release archive did not contain llama-server — asset layout changed?")
+    src = hits[0].parent
+    BIN_DIR.mkdir(parents=True, exist_ok=True)
+    for item in src.iterdir():
+        target = BIN_DIR / item.name
+        if target.exists():
+            if target.is_dir():
+                shutil.rmtree(target, ignore_errors=True)
+            else:
+                target.unlink()
+        shutil.move(str(item), str(target))
+    if not _WIN:                                       # tar keeps the bit; zip does not
+        for f in BIN_DIR.iterdir():
+            if f.is_file():
+                try:
+                    f.chmod(f.stat().st_mode | 0o111)
+                except OSError:
+                    pass
+
+
+def install_prebuilt_async():
+    if not _begin("install"):
+        return False
+    threading.Thread(target=_install_prebuilt, daemon=True).start()
+    return True
+
+
+def _install_prebuilt():
+    """Download + extract Prism's prebuilt llama.cpp for this platform. No toolchain."""
+    try:
+        _migrate_legacy_models()
+        _log("looking up the latest PrismML llama.cpp release …")
+        req = urllib.request.Request(RELEASES_API, headers={
+            "User-Agent": "relief-llm-manager", "Accept": "application/vnd.github+json"})
+        with urllib.request.urlopen(req, timeout=30) as r:
+            rel = json.loads(r.read().decode())
+        assets = {a["name"]: a["browser_download_url"] for a in rel.get("assets", [])}
+        wanted = _pick_assets(list(assets))
+        if not wanted:
+            raise RuntimeError(
+                f"release {rel.get('tag_name')} has no prebuilt binary for this platform — "
+                "use 'Build from source' instead.")
+        _log(f"release {rel.get('tag_name')} · installing: {', '.join(wanted)}")
+        if _WIN and not _has_nvidia():
+            _log("! no NVIDIA GPU detected — installing the CPU build (much slower)")
+
+        staged = LLAMA_DIR / "_staged"
+        shutil.rmtree(staged, ignore_errors=True)
+        staged.mkdir(parents=True, exist_ok=True)
+        try:
+            for name in wanted:
+                archive = staged / name
+                _progress.update(key="engine", label=name, done=0, total=0, percent=0)
+                _log(f"downloading {name} …")
+                _http_download(assets[name], archive, name)
+                _log(f"extracting {name} …")
+                _safe_extract(archive, staged)
+                archive.unlink(missing_ok=True)
+            _flatten_to_bin(staged)
+        finally:
+            _reset_progress()
+            shutil.rmtree(staged, ignore_errors=True)
+
+        if not is_built():
+            raise RuntimeError("install finished but llama-server is still missing — see the log")
+        _log(f"✓ engine ready -> {server_bin()}")
+        _end()
+    except Exception as e:
+        _log(f"ERROR: {e}")
+        _end(str(e))
+
+
+# --------------------------------------------------------- install (build from source)
 def install_async():
     if not _begin("install"):
         return False

@@ -7,7 +7,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import {
   ChatMessage, ChatTimings, LlmStatus, LlmSampling,
-  getLlmStatus, llmInstall, llmDownload, llmStart, llmStop, streamChat,
+  getLlmStatus, llmInstall, llmInstallPrebuilt, llmDownload, llmStart, llmStop, streamChat,
 } from './api'
 
 export type Msg = {
@@ -212,7 +212,8 @@ export function useChat() {
   }, [streaming, thread, run])
 
   // ---- engine actions ----
-  const install = useCallback(() => { llmInstall().then(refreshLlm).catch(() => {}) }, [refreshLlm])
+  const install = useCallback(() => { llmInstallPrebuilt().then(refreshLlm).catch(() => {}) }, [refreshLlm])
+  const installFromSource = useCallback(() => { llmInstall().then(refreshLlm).catch(() => {}) }, [refreshLlm])
   const download = useCallback((keys?: string[]) => { llmDownload(keys).then(refreshLlm).catch(() => {}) }, [refreshLlm])
   const loadModel = useCallback((key: string) => { llmStart(key).then(refreshLlm).catch(() => {}) }, [refreshLlm])
   const unload = useCallback(() => { llmStop().then(refreshLlm).catch(() => {}) }, [refreshLlm])
@@ -227,7 +228,7 @@ export function useChat() {
     sampling, setSampling, systemPrompt, setSystemPrompt, resetSampling,
     settingsOpen, setSettingsOpen, sidebarOpen, setSidebarOpen,
     setThreadId, newThread, deleteThread, send, stop, regenerate,
-    install, download, loadModel, unload, refreshLlm,
+    install, installFromSource, download, loadModel, unload, refreshLlm,
   }
 }
 

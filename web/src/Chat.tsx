@@ -1,7 +1,7 @@
 // The Chat section — a full-height conversational UI over the local Bonsai model.
 //
 // Layout: thread sidebar · message thread (centred, max 780px) · sticky composer.
-// Before a model can answer there are three setup stages (build the engine, download
+// Before a model can answer there are three setup stages (install the engine, download
 // weights, load them into VRAM); ChatSetup below renders whichever one is outstanding,
 // mirroring how ComfyWizard gates the ComfyUI-backed features.
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
@@ -80,7 +80,7 @@ function ModelCard({ m, present, loaded, busy, canLoad, progress, onDownload, on
               : <Button size="sm" onClick={onLoad} disabled={busy || !canLoad}>Load into VRAM</Button>}
           {present && !loaded && !canLoad && (
             <span style={{ alignSelf: 'center', font: '500 11.5px var(--hf-font-sans)', color: 'var(--hf-text-tertiary)' }}>
-              Downloaded — build the engine to load it
+              Downloaded — install the engine to load it
             </span>
           )}
         </div>
@@ -95,6 +95,7 @@ function ChatSetup({ c }: { c: ChatState }) {
   const tc = llm.toolchain
   const anyModel = Object.values(llm.models).some(Boolean)
   const missing = (['git', 'cmake'] as const).filter((k) => !tc[k])
+  const installing = llm.busy && llm.action === 'install'
 
   return (
     <div style={{ flex: 1, minHeight: 0, overflow: 'auto', padding: '28px 26px' }}>
@@ -103,60 +104,60 @@ function ChatSetup({ c }: { c: ChatState }) {
           <h2 style={{ margin: 0, font: '700 21px var(--hf-font-sans)', letterSpacing: '-.015em' }}>Set up the chat engine</h2>
           <p style={{ margin: '8px 0 0', font: '400 13.5px/1.7 var(--hf-font-sans)', color: 'var(--hf-text-secondary)' }}>
             Bonsai runs fully offline on this machine. Its weights use a custom <code style={{ font: '500 12.5px var(--hf-font-mono)', background: 'var(--hf-fill-medium)', padding: '.12em .38em', borderRadius: 5 }}>dspark</code> architecture,
-            so it needs Prism ML's llama.cpp fork — stock llama.cpp cannot load these files. This is a one-time build.
+            so it needs Prism ML's llama.cpp fork — stock llama.cpp cannot load these files. This is a one-time setup.
           </p>
         </div>
 
-        {/* stage 1 — build */}
+        {/* stage 1 — engine */}
         <div style={{ ...CARD, padding: 16 }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
               <span style={{ width: 22, height: 22, borderRadius: 99, display: 'flex', alignItems: 'center', justifyContent: 'center', background: llm.built ? 'var(--hf-accent)' : 'var(--hf-fill-strong)', color: llm.built ? '#fff' : 'var(--hf-text-secondary)', font: '700 11px var(--hf-font-sans)' }}>
                 {llm.built ? <Icon name="check" size={13} sw={2.6} /> : '1'}
               </span>
-              <span style={{ font: '650 14px var(--hf-font-sans)' }}>Build llama.cpp (PrismML fork)</span>
+              <span style={{ font: '650 14px var(--hf-font-sans)' }}>Install the engine (PrismML llama.cpp)</span>
             </div>
             {llm.built
-              ? <span style={{ font: '600 12.5px var(--hf-font-sans)', color: 'var(--hf-accent)' }}>Built</span>
-              : <Button size="sm" onClick={c.install} loading={llm.busy && llm.action === 'install'} disabled={llm.busy || missing.length > 0}>
-                  {llm.busy && llm.action === 'install' ? 'Building…' : 'Build'}
+              ? <span style={{ font: '600 12.5px var(--hf-font-sans)', color: 'var(--hf-accent)' }}>Installed</span>
+              : <Button size="sm" onClick={c.install} loading={installing} disabled={llm.busy}>
+                  {installing ? 'Installing…' : 'Install'}
                 </Button>}
           </div>
-          {!llm.built && (
-            <div style={{ marginTop: 12, display: 'flex', flexWrap: 'wrap', gap: 7 }}>
-              {/* required tools only — GPU support is reported separately, since its absence
-                  makes the build slower rather than impossible. */}
-              {(['git', 'cmake', 'compiler'] as const).map((k) => (
-                <span key={k} style={{ display: 'flex', alignItems: 'center', gap: 5, height: 26, padding: '0 9px', borderRadius: 99, border: '1px solid var(--hf-border)', font: '500 11.5px var(--hf-font-mono)', color: tc[k] ? 'var(--hf-accent)' : 'var(--hf-text-tertiary)' }}>
-                  <Icon name={tc[k] ? 'check' : 'x'} size={11} sw={2.4} />{k}
+
+          {!llm.built && !installing && (
+            <>
+              <p style={{ margin: '11px 0 0', font: '400 12.5px/1.65 var(--hf-font-sans)', color: 'var(--hf-text-secondary)' }}>
+                Downloads Prism's prebuilt binaries for this machine — <strong>no CMake, Visual Studio or
+                CUDA Toolkit required</strong>.{' '}
+                {tc.prebuilt_gpu === 'cuda'
+                  ? <>An NVIDIA GPU was detected, so the CUDA build is used and the CUDA runtime ships with it (~650 MB).</>
+                  : tc.prebuilt_gpu === 'metal'
+                    ? <>Apple Silicon build with Metal GPU acceleration (~11 MB).</>
+                    : <>No NVIDIA GPU detected, so the CPU build is used — it works, but a 27B model answers slowly.</>}
+              </p>
+              <div style={{ marginTop: 12, display: 'flex', flexWrap: 'wrap', gap: 7 }}>
+                <span style={{ display: 'flex', alignItems: 'center', gap: 5, height: 26, padding: '0 9px', borderRadius: 99, border: '1px solid var(--hf-border)', font: '500 11.5px var(--hf-font-mono)', color: tc.prebuilt_gpu === 'cpu' ? 'var(--hf-text-tertiary)' : 'var(--hf-accent)' }}>
+                  <Icon name={tc.prebuilt_gpu === 'cpu' ? 'x' : 'check'} size={11} sw={2.4} />
+                  {tc.prebuilt_gpu === 'cuda' ? 'cuda gpu' : tc.prebuilt_gpu === 'metal' ? 'metal gpu' : 'cpu only'}
                 </span>
-              ))}
-              <span style={{ display: 'flex', alignItems: 'center', gap: 5, height: 26, padding: '0 9px', borderRadius: 99, border: '1px solid var(--hf-border)', font: '500 11.5px var(--hf-font-mono)', color: tc.gpu === 'cpu' ? 'var(--hf-text-tertiary)' : 'var(--hf-accent)' }}>
-                <Icon name={tc.gpu === 'cpu' ? 'x' : 'check'} size={11} sw={2.4} />
-                {tc.gpu === 'cuda' ? 'cuda gpu' : tc.gpu === 'metal' ? 'metal gpu' : 'cpu only'}
-              </span>
-            </div>
+              </div>
+              {/* escape hatch: only meaningful where a toolchain actually exists */}
+              <p style={{ margin: '12px 0 0', font: '400 11.5px/1.6 var(--hf-font-sans)', color: 'var(--hf-text-tertiary)' }}>
+                No binary for your platform?{' '}
+                <button onClick={c.installFromSource} disabled={llm.busy || missing.length > 0}
+                  style={{ border: 'none', background: 'none', padding: 0, font: 'inherit', cursor: missing.length ? 'not-allowed' : 'pointer', color: 'var(--hf-info)', textDecoration: 'underline' }}>
+                  Build from source
+                </button>
+                {missing.length > 0 && <> — needs {missing.join(' and ')} installed first.</>}
+              </p>
+            </>
           )}
-          {/* only while it still matters — a finished build makes the toolchain moot */}
-          {!llm.built && missing.length > 0 && (
-            <p style={{ margin: '11px 0 0', font: '500 12.5px/1.6 var(--hf-font-sans)', color: 'var(--hf-warning)' }}>
-              {missing.join(' and ')} {missing.length > 1 ? 'are' : 'is'} not on PATH — install {missing.length > 1 ? 'them' : 'it'} first, then reopen the terminal.
-            </p>
+          {(llm.action === 'install' || (llm.error && !llm.built)) && (
+            <>
+              {llm.progress.key === 'engine' && llm.progress.total > 0 && <DownloadBar p={llm.progress} />}
+              <LogPanel lines={llm.log} />
+            </>
           )}
-          {!llm.built && tc.gpu === 'cpu' && (
-            <p style={{ margin: '9px 0 0', font: '400 12.5px/1.6 var(--hf-font-sans)', color: 'var(--hf-text-tertiary)' }}>
-              No CUDA toolkit found, so the build would be <strong>CPU-only</strong> — it works, but a 27B
-              model will answer slowly. For full GPU speed install the{' '}
-              <a href="https://developer.nvidia.com/cuda-downloads" target="_blank" rel="noreferrer noopener"
-                style={{ color: 'var(--hf-info)' }}>CUDA Toolkit</a>, then restart the server so it is picked up.
-            </p>
-          )}
-          {!llm.built && tc.gpu === 'metal' && (
-            <p style={{ margin: '9px 0 0', font: '400 12.5px/1.6 var(--hf-font-sans)', color: 'var(--hf-text-tertiary)' }}>
-              Will build with <strong>Metal</strong> GPU acceleration — no CUDA toolkit needed on macOS.
-            </p>
-          )}
-          {llm.action === 'install' && <LogPanel lines={llm.log} />}
         </div>
 
         {/* stage 2/3 — weights + load */}

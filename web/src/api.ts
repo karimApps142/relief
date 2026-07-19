@@ -145,7 +145,12 @@ export type LlmStatus = {
   models: Record<string, boolean>
   models_dir: string
   progress: LlmProgress
-  toolchain: { git: boolean; cmake: boolean; nvcc: boolean; compiler: boolean; gpu: 'cuda' | 'metal' | 'cpu' }
+  toolchain: {
+    git: boolean; cmake: boolean; nvcc: boolean; compiler: boolean; nvidia: boolean
+    gpu: 'cuda' | 'metal' | 'cpu'
+    /** acceleration the PREBUILT engine gives — needs only a driver, not a toolkit */
+    prebuilt_gpu: 'cuda' | 'metal' | 'cpu'
+  }
   defaults: LlmSampling & { system_prompt: string }
   busy: boolean
   action: string | null
@@ -181,6 +186,7 @@ export const comfyRestart = () => post('/api/comfy/restart')
 export const comfyInterrupt = () => post('/api/comfy/interrupt')
 
 export const getLlmStatus = (): Promise<LlmStatus> => get('/api/llm/status')
+export const llmInstallPrebuilt = () => post('/api/llm/install-prebuilt')
 export const llmInstall = () => post('/api/llm/install')
 export const llmDownload = (models?: string[]) => postJson('/api/llm/download', { models })
 export const llmStart = (model: string, ctx?: number) => postJson('/api/llm/start', { model, ctx })

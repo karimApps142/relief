@@ -122,10 +122,18 @@ def llm_status():
     return llm_manager.status()
 
 
+@app.post("/api/llm/install-prebuilt")
+def llm_install_prebuilt():
+    """Install Prism's prebuilt llama.cpp for this platform (background) — the default path.
+    Needs no CMake/Visual Studio/CUDA Toolkit; the Windows CUDA pack bundles the runtime."""
+    return {"started": llm_manager.install_prebuilt_async(), **llm_manager.status()}
+
+
 @app.post("/api/llm/install")
 def llm_install():
-    """Clone + build the PrismML llama.cpp fork (background). Required: the Bonsai GGUFs
-    use a custom `dspark` architecture that stock llama.cpp cannot load."""
+    """Clone + build the PrismML llama.cpp fork from source (background). Fallback for
+    platforms with no published binary. The Bonsai GGUFs use a custom `dspark` architecture
+    that stock llama.cpp cannot load, so the fork is required either way."""
     return {"started": llm_manager.install_async(), **llm_manager.status()}
 
 

@@ -57,12 +57,16 @@ python3 -m venv .venv
 
 Open the **Chat** tab in the icon rail. It walks through a one-time setup:
 
-1. **Build llama.cpp (PrismML fork).** These GGUFs declare a custom `dspark` architecture with
-   `Q2_0_g128` ternary kernels, so **stock llama.cpp and `llama-cpp-python` cannot load them** —
-   the fork must be compiled. The button clones and builds it; the panel shows a live log and a
-   preflight for `git` / `cmake` / a C++ compiler / `nvcc`.
-   On Windows this needs **CMake** and **Visual Studio Build Tools** ("Desktop development with
-   C++"); with the CUDA toolkit present it builds a GPU binary, otherwise it falls back to CPU.
+1. **Install the engine.** These GGUFs declare a custom `dspark` architecture with `Q2_0_g128`
+   ternary kernels, so **stock llama.cpp and `llama-cpp-python` cannot load them** — Prism's fork
+   is required. The button downloads Prism's **prebuilt binaries** for the machine, so there is
+   **no CMake, Visual Studio or CUDA Toolkit to install**:
+   - Windows + NVIDIA → the CUDA 12.4 build plus the `cudart` pack that carries the CUDA runtime
+     DLLs (~650 MB total). Only the GPU *driver* is needed, never the toolkit.
+   - Apple Silicon / Intel Mac → the Metal build (~11 MB). Linux and CPU-only variants likewise.
+
+   A **Build from source** link remains as a fallback for platforms with no published binary;
+   that path does need `git`, CMake and a C++ compiler.
 2. **Download a model** (this does *not* wait for the build — it can run in parallel):
 
    | Model | File | Size | Notes |
